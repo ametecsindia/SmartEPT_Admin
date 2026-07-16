@@ -1,0 +1,39 @@
+<?php
+
+return [
+
+    // Force HTTPS on all API traffic. Keep false on Laragon local http://smartept.test;
+    // set SMARTEPT_FORCE_HTTPS=true in production.
+    'force_https' => env('SMARTEPT_FORCE_HTTPS', false),
+
+    // Default per-company data retention window (days) applied when a company has none set.
+    'default_retention_days' => (int) env('SMARTEPT_DEFAULT_RETENTION_DAYS', 90),
+
+    // Object-store disk for screenshots/webcam photos. 'local' (storage/app) works on
+    // Laragon out of the box; production points this at MinIO/S3/Azure/GCP.
+    'storage_disk' => env('SMARTEPT_STORAGE_DISK', 'local'),
+
+    // Agent device-token time-to-live in minutes. Null = non-expiring agent tokens.
+    'agent_token_ttl' => env('SMARTEPT_AGENT_TOKEN_TTL') !== null && env('SMARTEPT_AGENT_TOKEN_TTL') !== ''
+        ? (int) env('SMARTEPT_AGENT_TOKEN_TTL')
+        : null,
+
+    // Reserved integration endpoints (used from later milestones).
+    'smartprs_base_url' => env('SMARTPRS_BASE_URL'),
+    'smartdcm_base_url' => env('SMARTDCM_BASE_URL'),
+    'license_url'       => env('SMARTEPT_LICENSE_URL'),
+
+    // R2-2 ops alerts: minutes of heartbeat silence before a device is flagged
+    // OFFLINE + admins emailed, and the violations-per-hour spike threshold.
+    'offline_alert_minutes' => (int) env('SMARTEPT_OFFLINE_ALERT_MINUTES', 30),
+    'violation_spike_threshold' => (int) env('SMARTEPT_VIOLATION_SPIKE_THRESHOLD', 20),
+
+    // Policy resolution precedence (most specific first).
+    'policy_precedence' => ['DEVICE', 'EMPLOYEE', 'TEAM', 'DEPARTMENT', 'BRANCH', 'COMPANY'],
+
+    // Policy types the engine knows how to compose into the agent bundle.
+    'policy_types' => [
+        'MONITORING', 'SCREENSHOT', 'WEBCAM', 'APPLICATION', 'WEBSITE',
+        'NETWORK', 'DEVICE', 'USB', 'VPN_PROXY', 'BREAK', 'ATTENDANCE', 'COMPLIANCE',
+    ],
+];
