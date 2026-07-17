@@ -162,7 +162,7 @@ class BiometricController extends Controller
         }
         if ($rows) {
             BiometricLog::insert($rows);
-            $this->mergeIntoAttendance($companyId, $rows);
+            self::mergeIntoAttendance($companyId, $rows);
         }
         return count($rows);
     }
@@ -172,8 +172,10 @@ class BiometricController extends Controller
      * the employee PRESENT even without the desktop agent. Merge rule: earliest-in /
      * latest-out wins — a biometric punch never overwrites an EARLIER agent check-in
      * (the employee was already working) nor a LATER agent check-out.
+     * Public static: BiometricCloudSync feeds cloud-imported punches through the
+     * exact same merge, so every ingest path behaves identically.
      */
-    private function mergeIntoAttendance(int $companyId, array $rows): void
+    public static function mergeIntoAttendance(int $companyId, array $rows): void
     {
         $byDay = [];
         foreach ($rows as $r) {

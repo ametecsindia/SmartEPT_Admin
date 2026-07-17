@@ -40,6 +40,7 @@ class CompanyController extends Controller
             'deployment_model'    => ['nullable', 'in:LAN,PRIVATE_CLOUD,HYBRID,AMETECS_SAAS'],
             'storage_driver'      => ['nullable', 'in:MINIO,S3,AZURE,GCP,NAS,LOCAL'],
             'data_retention_days' => ['nullable', 'integer', 'min:1', 'max:3650'],
+            'attendance_mode'     => ['nullable', 'in:BIOMETRIC,AGENT_ONLY'],
         ]);
 
         $company = Company::create($data);
@@ -62,6 +63,7 @@ class CompanyController extends Controller
             'storage_settings'    => ['nullable', 'array'],
             'data_retention_days' => ['nullable', 'integer', 'min:1', 'max:3650'],
             'status'              => ['nullable', 'in:ACTIVE,SUSPENDED'],
+            'attendance_mode'     => ['nullable', 'in:BIOMETRIC,AGENT_ONLY'],
         ]);
 
         $company->update($data);

@@ -10,7 +10,15 @@ class BiometricDevice extends Model
     use BelongsToCompany;
 
     protected $guarded = ['id'];
-    protected $casts = ['last_sync_at' => 'datetime'];
+
+    /** The cloud API password never leaves the server. */
+    protected $hidden = ['api_password'];
+
+    protected $casts = [
+        'last_sync_at' => 'datetime',
+        'sync_enabled' => 'boolean',
+        'api_password' => 'encrypted',
+    ];
 
     public function logs() { return $this->hasMany(BiometricLog::class); }
 }

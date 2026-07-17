@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\ProductivityController;
 use App\Http\Controllers\Api\PublicApiController;
+use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\IntegrationController;
 use App\Http\Controllers\Api\ActivityController;
 use App\Http\Controllers\Api\AgentStatusController;
@@ -47,10 +48,6 @@ Route::get('ping', fn () => response()->json([
     'server_time' => now()->toIso8601String(),
 ]));
 Route::post('auth/login', [AuthController::class, 'login']);
-// Cloud SSO handoff from SmartEPT Central (secret-signed ticket → Sanctum token).
-Route::post('auth/sso', [\App\Http\Controllers\Api\SsoController::class, 'login']);
-// Server-to-server tenant provisioning from Central (shared-secret guarded).
-Route::post('provisioning/tenant', [\App\Http\Controllers\Api\ProvisioningController::class, 'store']);
 
 // ---- Authenticated (any valid token) ----
 Route::middleware('auth:sanctum')->group(function () {
@@ -150,7 +147,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:activity.view')->group(function () {
         Route::get('reports/usage-summary', [UsageController::class, 'companySummary']); // 17-Jul all-employees default
         Route::get('reports/productivity', [ProductivityController::class, 'report']); // 17-Jul all-employee day-wise productivity
-        Route::get('reports/employee/{employee}/day-logs', [ProductivityController::class, 'dayLogs']); // 17-Jul attendance drill-down
         Route::get('reports/employee/{employee}/app-usage', [UsageController::class, 'appReport']);
         Route::get('reports/employee/{employee}/website-usage', [UsageController::class, 'websiteReport']);
         Route::get('reports/employee/{employee}/compliance', [ComplianceController::class, 'report']);
@@ -183,8 +179,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('import', [BiometricController::class, 'import']);
         Route::post('map-employee', [BiometricController::class, 'mapEmployee']);
 
-        // Physical punch-device registry (readers at gates/doors).
+        // Punch-device registry: physical readers AND cloud attendance APIs.
         Route::get('devices', [BiometricDeviceController::class, 'index']);
+        Route::post('devices/test-connection', [BiometricDeviceController::class, 'testConnection']);
+        Route::post('devices/{device}/sync', [BiometricDeviceController::class, 'syncNow']);
         Route::post('devices', [BiometricDeviceController::class, 'store']);
         Route::put('devices/{device}', [BiometricDeviceController::class, 'update']);
         Route::delete('devices/{device}', [BiometricDeviceController::class, 'destroy']);
@@ -209,6 +207,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('org/{type}', [OrgController::class, 'store']);
         Route::put('org/{type}/{id}', [OrgController::class, 'update']);
         Route::delete('org/{type}/{id}', [OrgController::class, 'destroy']);
+    });
+
+    // ---- R4 item 5: organisation roles + module-permission matrix ----
+    Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN')->group(function () {
+        Route::get('roles', [RoleController::class, 'index']);
+        Route::post('roles', [RoleController::class, 'store']);
+        Route::put('roles/{role}', [RoleController::class, 'update']);
+        Route::delete('roles/{role}', [RoleController::class, 'destroy']);
+        Route::put('roles/{role}/permissions', [RoleController::class, 'syncPermissions']);
     });
 
     // ---- Integrations (17-Jul): API keys + outbound targets (company-admin) ----

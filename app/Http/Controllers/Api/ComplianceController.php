@@ -76,6 +76,10 @@ class ComplianceController extends Controller
             ->with('employee:id,first_name,last_name,employee_code')
             ->when($request->category, fn ($q, $v) => $q->where('event_category', $v))
             ->when($request->severity, fn ($q, $v) => $q->where('severity', $v))
+            ->when($request->employee_id, fn ($q, $v) => $q->where('employee_id', (int) $v))
+            ->when($request->date, fn ($q, $v) => $q->whereDate('started_at', $v))
+            ->when($request->from, fn ($q, $v) => $q->whereDate('started_at', '>=', $v))
+            ->when($request->to, fn ($q, $v) => $q->whereDate('started_at', '<=', $v))
             ->latest('started_at')
             ->paginate((int) $request->integer('per_page', 50));
 

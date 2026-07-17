@@ -253,21 +253,18 @@
 <!-- LOGIN -->
 <div class="login" id="login">
   <div class="box">
-    <div class="lock" style="justify-content:center;margin-bottom:24px"><img src="/img/smartept-logo-light.png" alt="SmartEPT — Employee Productivity Tracking" style="width:240px;max-width:82%;height:auto;display:block"></div>
+    <div class="lock"><div class="mark"><img src="data:image/png;base64,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" alt="SmartEPT" style="width:72%;height:72%;object-fit:contain;display:block"></div><div><h1>SmartEPT</h1><small>BY AMETECS</small></div></div>
     <label>Work email</label><input id="email" type="email" value="admin@ametecs.io">
     <label>Password</label><input id="password" type="password" value="password">
     <button class="primary" id="btn-login">Sign in</button>
     <div class="err" id="login-err"></div>
-  </div>
-  <div style="text-align:center;margin-top:18px;font-size:11px;color:var(--ink-3);line-height:1.7">
-    SmartEPT™ — developed by Ametecs India Private Limited<br>© 2026 Ametecs India Private Limited. All rights reserved.
   </div>
 </div>
 
 <!-- APP -->
 <div class="shell hide" id="app">
   <div class="side">
-    <div class="lock" style="justify-content:center;padding:12px 8px 16px"><img src="/img/smartept-logo-dark.png" alt="SmartEPT" style="width:158px;max-width:92%;height:auto;display:block"></div>
+    <div class="lock"><div class="mark"><img src="data:image/png;base64,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" alt="SmartEPT" style="width:72%;height:72%;object-fit:contain;display:block"></div><div><h1 style="font-size:15px">SmartEPT</h1><small>BY AMETECS</small></div></div>
     <div class="navgrp">MONITOR</div>
     <div class="nav active" data-view="dashboard"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/></svg></span> Live Dashboard</div>
     <div class="nav" data-view="attendance"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.4V12l3.2 1.9"/></svg></span> Attendance</div>
@@ -286,9 +283,7 @@
     <div class="nav" data-view="license"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="12" r="4.6"/><path d="M12.6 12H21M17.5 12v3.4M21 12v2.4"/></svg></span> Licence</div>
     <div class="nav" data-view="integrations"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg></span> API &amp; Integrations</div>
     <div class="nav" data-view="ops"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6.5 5 13L17 12h4"/></svg></span> Audit &amp; Ops</div>
-    <div class="foot"><span id="who"></span><br><a id="signout" style="color:var(--ink-3);cursor:pointer">Sign out</a>
-      <div style="margin-top:10px;font-size:9.5px;color:#6E9399;line-height:1.6">SmartEPT™ · Developed by Ametecs India Private Limited<br>© 2026 Ametecs India Private Limited. All rights reserved.</div>
-    </div>
+    <div class="foot"><span id="who"></span><br><a id="signout" style="color:var(--ink-3);cursor:pointer">Sign out</a></div>
   </div>
   <div class="main">
     <div class="top">
@@ -397,6 +392,12 @@
 
     <!-- 4. VIOLATIONS -->
     <div class="view" id="v-violations">
+      <div class="filters">
+        <label>Employee</label><select id="viol-emp" style="min-width:200px"><option value="">All employees</option></select>
+        <label>Date</label><input type="date" id="viol-date" style="min-width:0">
+        <button class="btn acc" id="viol-load">Load</button>
+        <button class="btn" id="viol-clear">Clear</button>
+      </div>
       <div class="card"><h3>Compliance violations
         <button class="btn" data-export="compliance">Export CSV</button></h3>
         <table><thead><tr><th>Time</th><th>Employee</th><th>Category</th><th>Type</th><th>Severity</th><th>Detected</th><th>Action taken</th><th>Evidence</th></tr></thead>
@@ -421,16 +422,28 @@
     <!-- 5b. USERS -->
     <!-- 5b. ORGANISATION (17-Jul) -->
     <div class="view" id="v-org">
+      <div class="card">
+        <h3>Attendance source <span class="hint">how this organisation records attendance</span></h3>
+        <div class="fbool"><input type="radio" name="attmode" id="attmode-bio" value="BIOMETRIC"> <b>With biometric device</b> <span class="mut" style="font-size:11.5px">— door punches (cloud API / middleware / CSV) merge with agent sessions; Gate-to-PC available</span></div>
+        <div class="fbool"><input type="radio" name="attmode" id="attmode-agent" value="AGENT_ONLY"> <b>Without biometric device</b> <span class="mut" style="font-size:11.5px">— attendance comes purely from agent login/logout; the Biometric screen is hidden</span></div>
+        <div class="row" style="margin-top:10px"><button class="btn solid" id="attmode-save">Save</button><span class="mut" id="attmode-msg"></span></div>
+      </div>
       <div class="tabs" id="org-tabs">
         <div class="tab active" data-org="branches">Branches</div>
         <div class="tab" data-org="departments">Departments</div>
         <div class="tab" data-org="teams">Teams</div>
         <div class="tab" data-org="designations">Designations</div>
         <div class="tab" data-org="shifts">Shifts</div>
+        <div class="tab" data-org="roles">Roles</div>
       </div>
-      <div class="card">
+      <div class="card" id="org-main-card">
         <h3 id="org-title">Branches <span class="row"><button class="btn solid" id="org-add">+ Add</button></span></h3>
         <table><thead id="org-head"></thead><tbody id="org-rows"></tbody></table>
+      </div>
+      <div class="card hide" id="roles-card">
+        <h3>Organisation roles <span class="row"><button class="btn solid" id="role-add">+ Add role</button></span></h3>
+        <table><thead><tr><th>Role</th><th>Type</th><th>Based on</th><th>Users</th><th>Modules</th><th></th></tr></thead><tbody id="role-rows"></tbody></table>
+        <div class="mut" style="font-size:11.5px;margin-top:8px">System roles are built in — their permission matrix can be tuned (Super/Company Admin always keep full access so you can never lock yourself out). Custom roles inherit screen access from the role they are based on; the matrix then decides which modules their users see.</div>
       </div>
     </div>
 
@@ -525,30 +538,38 @@
         <button class="btn acc" id="bio-load">Load</button>
       </div>
       <div class="card">
-        <h3>Registered punch devices <span class="hint">the physical readers at gates &amp; doors</span></h3>
-        <table><thead><tr><th>Name</th><th>Serial</th><th>Location</th><th>IP</th><th>Method</th><th>Vendor</th><th>Status</th><th>Last sync</th><th>Punches</th><th></th></tr></thead><tbody id="biodev-rows"></tbody></table>
-        <div class="grid2" style="margin-top:14px">
-          <div>
-            <label>Device name *</label><input id="bd-name" placeholder="e.g. Main Gate Reader">
-            <label>Serial number</label><input id="bd-serial" placeholder="e.g. ZK-58231">
-            <label>Location</label><input id="bd-loc" placeholder="e.g. Head Office — Main Gate">
-            <label>IP address</label><input id="bd-ip" placeholder="e.g. 192.168.1.201">
+        <h3>Biometric Device Setup <span class="hint">connect a cloud attendance API — punches import into Attendance &amp; payroll automatically every hour</span></h3>
+        <table><thead><tr><th>Provider</th><th>API</th><th>Hourly sync</th><th>Status</th><th>Last sync</th><th>Last result</th><th>Punches</th><th></th></tr></thead><tbody id="biodev-rows"></tbody></table>
+        <div style="margin-top:14px;max-width:560px">
+          <div class="fbool"><input type="checkbox" id="bd-sync"> <b>Enable automatic hourly sync</b></div>
+          <label>Provider</label><input id="bd-provider" placeholder="etimeoffice">
+          <div class="mut" style="font-size:11.5px;margin:2px 0 8px">Cloud attendance provider name.</div>
+          <label>API base URL</label><input id="bd-base" placeholder="https://api.etimeoffice.com/api">
+          <label>Endpoint</label><input id="bd-endpoint" placeholder="DownloadPunchDataMCID">
+          <label>Corporate ID</label><input id="bd-corp" placeholder="Your eTimeOffice corporate ID">
+          <label>Username</label><input id="bd-user" placeholder="API username">
+          <label>Password</label><input id="bd-pass" type="password" autocomplete="new-password" placeholder="••••••••">
+          <label>Employee code filter</label><input id="bd-filter" placeholder="ALL">
+          <div class="mut" style="font-size:11.5px;margin:2px 0 8px">Usually ALL.</div>
+          <label>Employee ID prefix</label><input id="bd-prefix" placeholder="e.g. A">
+          <div class="mut" style="font-size:11.5px;margin:2px 0 8px">If the device returns 12345 and your employees are A12345, enter A. Leave blank when codes match exactly.</div>
+          <div class="grid2">
+            <div><label>IN machine ID</label><input id="bd-inmc" placeholder="e.g. 1"><div class="mut" style="font-size:11.5px;margin:2px 0 8px">Machine number of the ENTRY device — its punches are marked IN.</div></div>
+            <div><label>OUT machine ID</label><input id="bd-outmc" placeholder="e.g. 2"><div class="mut" style="font-size:11.5px;margin:2px 0 8px">Machine number of the EXIT device — its punches are marked OUT.</div></div>
           </div>
-          <div>
-            <label>Integration method</label>
-            <select id="bd-method"><option>MIDDLEWARE_PUSH</option><option>CSV_IMPORT</option><option>DIRECT_PULL</option><option>HRMS_API</option></select>
-            <label>Vendor</label><input id="bd-vendor" placeholder="e.g. ZKTeco / eSSL / Realtime">
-            <label>Status</label><select id="bd-status"><option>ACTIVE</option><option>INACTIVE</option></select>
-            <div class="row" style="margin-top:12px;justify-content:flex-end">
-              <button class="btn" id="bd-reset">Clear</button>
-              <button class="btn solid" id="bd-save">Add device</button>
-            </div>
-            <div class="mut" id="bd-msg"></div>
+          <div class="mut" style="font-size:11.5px;margin:2px 0 8px">Use these when separate devices handle entry and exit: the machine number decides the punch direction, overriding the feed's IN/OUT flag. Leave BOTH blank if one device reports direction itself. Run Test connection to see each punch's MC number.</div>
+          <div class="row" style="margin-top:12px">
+            <button class="btn solid" id="bd-save">Save</button>
+            <button class="btn acc" id="bd-test">✓ Test connection</button>
+            <button class="btn" id="bd-syncnow">⟳ Sync now</button>
+            <button class="btn" id="bd-reset">Clear</button>
           </div>
+          <div class="mut" id="bd-msg"></div>
+          <div id="bd-test-out" style="margin-top:8px"></div>
         </div>
       </div>
       <div class="card">
-        <h3>Punch log <span class="hint">from device middleware push or CSV import</span></h3>
+        <h3>Punch log <span class="hint">from cloud sync, device middleware push or CSV import</span></h3>
         <table><thead><tr><th>Time</th><th>Employee</th><th>Bio ID</th><th>Punch</th><th>Mode</th></tr></thead><tbody id="bio-rows"></tbody></table>
       </div>
       <div class="card">
@@ -896,6 +917,25 @@
 </div>
 
 <!-- ONE-TIME CREDENTIALS PANEL -->
+<div class="ovl" id="role-ovl">
+  <div class="modal" style="width:640px;max-height:86vh;overflow:auto">
+    <div class="mhead">
+      <div class="mt"><b id="role-m-title">Role</b><span id="role-m-sub"></span></div>
+      <button class="btn" id="role-x">✕</button>
+    </div>
+    <div class="mbody">
+      <div id="role-name-wrap" class="fgrid">
+        <div><label>Role name <span style="color:var(--danger)">*</span></label><input id="role-name" placeholder="e.g. Floor Supervisor"></div>
+        <div><label>Based on (screen access)</label><select id="role-base"></select></div>
+      </div>
+      <h3 style="margin:12px 0 6px">Module permissions</h3>
+      <div id="role-matrix"></div>
+      <div class="mut" id="role-err"></div>
+    </div>
+    <div class="mfoot"><button class="btn" id="role-cancel">Cancel</button><button class="btn solid" id="role-save">Save</button></div>
+  </div>
+</div>
+
 <div class="ovl" id="cred-ovl">
   <div class="modal" style="width:480px">
     <div class="mhead">
@@ -907,8 +947,12 @@
       <label>Email</label><input id="cred-email" readonly>
       <label>Temporary password</label>
       <div class="row" style="flex-wrap:nowrap">
-        <input id="cred-pass" readonly style="font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;font-size:15px;letter-spacing:1px">
+        <input id="cred-pass" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;font-size:15px;letter-spacing:1px">
         <button class="btn acc" id="cred-copy" style="white-space:nowrap">Copy</button>
+      </div>
+      <div class="row hide" id="cred-apply-row" style="margin-top:8px">
+        <button class="btn solid" id="cred-apply">Apply password</button>
+        <span class="mut" style="font-size:11.5px">Keep the suggestion or type your own (min 8 chars), then Apply.</span>
       </div>
       <div class="mut" id="cred-msg"></div>
     </div>
@@ -943,18 +987,6 @@
       <button class="btn" data-close="att-ovl">Cancel</button>
       <button class="btn solid" id="att-m-save">Save</button>
     </div>
-  </div>
-</div>
-
-<!-- ATTENDANCE DAY LOGS (drill-down) -->
-<div class="ovl" id="daylog-ovl">
-  <div class="modal" style="width:640px">
-    <div class="mhead">
-      <div class="mt"><b id="daylog-title">Day logs</b><span>Punch pairs, breaks &amp; totals for the selected day</span></div>
-      <button class="x" data-close="daylog-ovl">✕</button>
-    </div>
-    <div class="mbody" id="daylog-body"><div class="mut">Loading…</div></div>
-    <div class="mfoot"><button class="btn" data-close="daylog-ovl">Close</button></div>
   </div>
 </div>
 
@@ -1089,9 +1121,32 @@ function enterApp() {
   $('#who').innerHTML = '<b>' + esc(ME.name) + '</b><br>' + esc(ME.role_name || ME.role || '');
   if (ME.company) $('#company-name').textContent = ME.company;
   $('#login').classList.add('hide'); $('#app').classList.remove('hide');
+  applyAttendanceMode();
+  applyPermissionNav();
   show('dashboard');
   // Temp-password logins must set their own password before doing anything else.
   if (ME.must_change_password) openForcedPwd();
+}
+// R4 item 3: organisations without a biometric device hide the Biometric screen.
+function applyAttendanceMode() {
+  const off = ME && ME.attendance_mode === 'AGENT_ONLY';
+  const nav = document.querySelector('.nav[data-view="biometric"]');
+  if (nav) nav.style.display = off ? 'none' : '';
+}
+// R4 item 5: the role's permission matrix decides which modules appear.
+function applyPermissionNav() {
+  if (!ME || !ME.role) return;
+  if (ME.role === 'SUPER_ADMIN' || ME.role === 'COMPANY_ADMIN') return;
+  const perms = ME.permissions || [];
+  const NAVP = {
+    dashboard: 'dashboard.view', screenshots: 'screenshot.view', usage: 'activity.view',
+    attendance: 'attendance.view', violations: 'dashboard.view', reports: 'export.data',
+    policies: 'policy.view', ops: 'audit.view',
+  };
+  Object.entries(NAVP).forEach(([view, perm]) => {
+    const el = document.querySelector('.nav[data-view="' + view + '"]');
+    if (el && !perms.includes(perm)) el.style.display = 'none';
+  });
 }
 $('#btn-login').onclick = async () => {
   $('#login-err').textContent = '';
@@ -1108,19 +1163,8 @@ $('#signout').onclick = async () => {
   TOKEN = null; ME = null; sessionStorage.removeItem('ept_token');
   clearInterval(poll); $('#app').classList.add('hide'); $('#login').classList.remove('hide');
 };
-// Restore session on refresh — or complete an SSO handoff from SmartEPT Central.
+// Restore session on refresh.
 (async () => {
-  // One-click SSO: Central sends the browser to /admin?sso=<signed ticket>.
-  // Trade it for a real token, then scrub it from the URL/history.
-  const ssoTicket = new URLSearchParams(location.search).get('sso');
-  if (ssoTicket) {
-    history.replaceState(null, '', location.pathname);
-    try {
-      const res = await api('/auth/sso', { method: 'POST', body: JSON.stringify({ token: ssoTicket }) });
-      TOKEN = res.token; sessionStorage.setItem('ept_token', TOKEN);
-      const me = await api('/auth/me'); ME = me.user; enterApp(); return;
-    } catch (e) { $('#login-err').textContent = 'That console link has expired — open it again from your SmartEPT portal.'; }
-  }
   const saved = sessionStorage.getItem('ept_token');
   if (!saved) return;
   TOKEN = saved;
@@ -1140,7 +1184,7 @@ const TITLES = {
   users: ['Users', 'Login accounts, roles & credentials'],
   devices: ['Devices', 'Registered endpoints & agent health'],
   policies: ['Policies', 'The control room — what is tracked, for whom'],
-  biometric: ['Biometric', 'Door punches, mapping & reconciliation'],
+  biometric: ['Biometric', 'Cloud punch sync, mapping & reconciliation'],
   reports: ['Reports & Exports', 'CSV exports for Excel and payroll'],
   license: ['Licence', 'Key, plan, device seats & daily validation'],
   integrations: ['API & Integrations', 'Connect SmartEPT to SmartPRS & any external device or app'],
@@ -1157,7 +1201,7 @@ function show(v) {
   if (v === 'attendance') initAttendance();
   if (v === 'screenshots') initScreenshots();
   if (v === 'usage') initUsage();
-  if (v === 'violations') loadViolations();
+  if (v === 'violations') initViolations();
   if (v === 'employees') loadEmployees();
   if (v === 'org') initOrg();
   if (v === 'users') loadUsers();
@@ -1421,9 +1465,28 @@ $('#us-open-drawer').onclick = () => {
 };
 
 // ---- 4. violations ----
+let VIOL_INIT = false;
+async function initViolations() {
+  if (!VIOL_INIT) {
+    VIOL_INIT = true;
+    employeesList().then((emps) => {
+      const sel = $('#viol-emp');
+      sel.innerHTML = '<option value="">All employees</option>'
+        + emps.map((e) => '<option value="' + e.id + '">' + esc(fullName(e) + ' (' + (e.employee_code || '#' + e.id) + ')') + '</option>').join('');
+    }).catch(() => {});
+    $('#viol-load').onclick = loadViolations;
+    $('#viol-emp').onchange = loadViolations;
+    $('#viol-date').onchange = loadViolations;
+    $('#viol-clear').onclick = () => { $('#viol-emp').value = ''; $('#viol-date').value = ''; loadViolations(); };
+  }
+  loadViolations();
+}
 async function loadViolations() {
   try {
-    const d = await api('/dashboard/violations?per_page=100');
+    const q = ['per_page=100'];
+    if ($('#viol-emp').value) q.push('employee_id=' + $('#viol-emp').value);
+    if ($('#viol-date').value) q.push('date=' + $('#viol-date').value);
+    const d = await api('/dashboard/violations?' + q.join('&'));
     $('#viol-rows').innerHTML = (d.data || []).map((v) => {
       const sc = { LOW: 't-info', MEDIUM: 't-warn', HIGH: 't-danger', CRITICAL: 't-danger' }[v.severity] || 't-off';
       const date = v.started_at ? String(v.started_at).slice(0, 10) : today();
@@ -1685,9 +1748,30 @@ let ORG_TAB = 'branches';
 async function initOrg() {
   $$('#org-tabs .tab').forEach((t) => t.onclick = () => { ORG_TAB = t.dataset.org;
     $$('#org-tabs .tab').forEach((x) => x.classList.toggle('active', x === t)); renderOrg(); });
+  if (!window.ATTMODE_INIT) {
+    window.ATTMODE_INIT = true;
+    ((ME && ME.attendance_mode) === 'AGENT_ONLY' ? $('#attmode-agent') : $('#attmode-bio')).checked = true;
+    $('#attmode-save').onclick = async () => {
+      const mode = $('#attmode-agent').checked ? 'AGENT_ONLY' : 'BIOMETRIC';
+      try {
+        await api('/companies/' + ME.company_id, { method: 'PUT', body: JSON.stringify({ attendance_mode: mode }) });
+        ME.attendance_mode = mode;
+        applyAttendanceMode();
+        toast('Attendance source saved');
+        $('#attmode-msg').textContent = '✓ Saved.';
+      } catch (e) { $('#attmode-msg').textContent = '✕ ' + e.message; }
+    };
+  }
   renderOrg();
 }
 async function renderOrg() {
+  const isRoles = ORG_TAB === 'roles';
+  $('#roles-card').classList.toggle('hide', !isRoles);
+  $('#org-main-card').classList.toggle('hide', isRoles);
+  if (isRoles) {
+    loadRoles().catch((e) => { $('#role-rows').innerHTML = '<tr><td colspan="6" class="mut">' + esc(e.message) + '</td></tr>'; });
+    return;
+  }
   const def = ORG_DEFS[ORG_TAB];
   $('#org-title').childNodes[0].nodeValue = def.label + 's ';
   $('#org-head').innerHTML = '<tr>' + def.cols.map((c) => '<th>' + c[0].toUpperCase() + c.slice(1) + '</th>').join('') + '<th></th></tr>';
@@ -1753,6 +1837,80 @@ $('#org-save').onclick = async () => {
     $('#org-ovl').classList.remove('open'); toast('Saved'); ORG_CACHE = null; renderOrg();
   } catch (e) { $('#org-err').textContent = e.message; }
 };
+
+// ---- roles & permission matrix (R4 item 5) ----
+let ROLE_DATA = null, ROLE_EDIT = null;
+async function loadRoles() {
+  const d = await api('/roles');
+  ROLE_DATA = d;
+  $('#role-rows').innerHTML = (d.data || []).map((r) => '<tr>'
+    + '<td><span class="nm">' + esc(r.name) + '</span></td>'
+    + '<td>' + (r.is_system ? '<span class="tag t-info">SYSTEM</span>' : '<span class="tag t-ok">CUSTOM</span>') + '</td>'
+    + '<td>' + esc((r.base_slug || (r.is_system ? '—' : '')) || '—') + '</td>'
+    + '<td>' + (r.users_count ?? 0) + '</td>'
+    + '<td>' + (r.locked ? 'All modules' : ((r.permission_ids || []).length + ' of ' + (d.permissions || []).length)) + '</td>'
+    + '<td style="white-space:nowrap"><button class="btn" data-role-perm="' + r.id + '">' + (r.locked ? 'View' : 'Permissions') + '</button>'
+    + (!r.is_system ? ' <button class="btn danger" data-role-del="' + r.id + '">Delete</button>' : '')
+    + '</td></tr>').join('') || '<tr><td colspan="6" class="mut">No roles yet.</td></tr>';
+}
+function roleMatrixHtml(checkedIds, disabled) {
+  const groups = {};
+  (ROLE_DATA.permissions || []).forEach((p) => { (groups[p.group] = groups[p.group] || []).push(p); });
+  return Object.keys(groups).map((g) => '<div style="margin-bottom:10px"><b style="font-size:12px;color:var(--accent-ink)">' + esc(g) + '</b>'
+    + groups[g].map((p) => '<div class="fbool"><input type="checkbox" data-perm="' + p.id + '"' + (checkedIds.includes(p.id) ? ' checked' : '') + (disabled ? ' disabled' : '') + '> ' + esc(p.name) + '</div>').join('')
+    + '</div>').join('');
+}
+function openRoleModal(role) {
+  ROLE_EDIT = role || null;
+  $('#role-m-title').textContent = role ? role.name : 'Add custom role';
+  $('#role-m-sub').textContent = role
+    ? (role.locked ? 'Always full access' : (role.is_system ? 'System role — tune its module permissions' : 'Custom role'))
+    : 'Inherits screen access from the base role, starts with its permissions';
+  const baseSel = $('#role-base');
+  baseSel.innerHTML = (ROLE_DATA.bases || []).map((b) => '<option value="' + b + '">' + b.replace(/_/g, ' ') + '</option>').join('');
+  $('#role-name').value = role ? role.name : '';
+  if (role && role.base_slug) baseSel.value = role.base_slug;
+  $('#role-name-wrap').style.display = role && role.is_system ? 'none' : '';
+  $('#role-matrix').innerHTML = roleMatrixHtml(role ? (role.permission_ids || []) : [], !!(role && role.locked));
+  $('#role-save').classList.toggle('hide', !!(role && role.locked));
+  $('#role-err').textContent = '';
+  $('#role-ovl').classList.add('open');
+}
+$('#role-add').onclick = () => openRoleModal(null);
+$('#role-x').onclick = $('#role-cancel').onclick = () => $('#role-ovl').classList.remove('open');
+$('#role-save').onclick = async () => {
+  const permIds = $$('#role-matrix [data-perm]').filter((c) => c.checked).map((c) => Number(c.dataset.perm));
+  try {
+    let id = ROLE_EDIT ? ROLE_EDIT.id : null;
+    if (!ROLE_EDIT) {
+      const name = $('#role-name').value.trim();
+      if (!name) { $('#role-err').textContent = 'Role name is required.'; return; }
+      const r = await api('/roles', { method: 'POST', body: JSON.stringify({ name, base_slug: $('#role-base').value }) });
+      id = r.data.id;
+    } else if (!ROLE_EDIT.is_system) {
+      await api('/roles/' + id, { method: 'PUT', body: JSON.stringify({ name: $('#role-name').value.trim() || ROLE_EDIT.name, base_slug: $('#role-base').value }) });
+    }
+    if (!(ROLE_EDIT && ROLE_EDIT.locked)) {
+      await api('/roles/' + id + '/permissions', { method: 'PUT', body: JSON.stringify({ permission_ids: permIds }) });
+    }
+    $('#role-ovl').classList.remove('open');
+    toast('Role saved');
+    loadRoles();
+  } catch (e) { $('#role-err').textContent = e.message; }
+};
+$('#role-rows').addEventListener('click', async (ev) => {
+  const pBtn = ev.target.closest('[data-role-perm]');
+  const dBtn = ev.target.closest('[data-role-del]');
+  const find = (id) => (ROLE_DATA.data || []).find((x) => x.id === Number(id));
+  if (pBtn) openRoleModal(find(pBtn.dataset.rolePerm));
+  if (dBtn) {
+    const r = find(dBtn.dataset.roleDel);
+    if (!r) return;
+    if (!confirm('Delete role "' + r.name + '"? Users must be reassigned first.')) return;
+    try { await api('/roles/' + r.id, { method: 'DELETE' }); toast('Deleted'); loadRoles(); }
+    catch (e) { toast(e.message); }
+  }
+});
 
 // ---- bulk import (17-Jul) ----
 const EMP_CSV_HEADER = 'employee_code,first_name,last_name,email,mobile,department,team,branch,designation,shift,date_of_joining,biometric_id';
@@ -2197,47 +2355,98 @@ async function loadBioDevices() {
     const d = await api('/integrations/biometric/devices');
     bdDevices = d.data || [];
     $('#biodev-rows').innerHTML = bdDevices.map((v) => '<tr>'
-      + '<td><span class="nm">' + esc(v.name) + '</span></td>'
-      + '<td>' + esc(v.device_serial || '—') + '</td>'
-      + '<td>' + esc(v.location || '—') + '</td>'
-      + '<td>' + esc(v.ip_address || '—') + '</td>'
-      + '<td>' + esc(v.integration_method || '—') + '</td>'
-      + '<td>' + esc(v.vendor || '—') + '</td>'
+      + '<td><span class="nm">' + esc(v.provider || v.name) + '</span></td>'
+      + '<td class="mut" style="max-width:200px;overflow:hidden;text-overflow:ellipsis">' + esc(v.api_base_url ? (v.api_base_url + (v.api_endpoint ? '/' + v.api_endpoint : '')) : (v.integration_method || '—')) + '</td>'
+      + '<td><span class="tag ' + (v.sync_enabled ? 't-ok' : 't-off') + '">' + (v.sync_enabled ? 'HOURLY' : 'OFF') + '</span></td>'
       + '<td><span class="tag ' + (v.status === 'ACTIVE' ? 't-ok' : 't-off') + '">' + esc(v.status) + '</span></td>'
       + '<td>' + (v.last_sync_at ? dt(v.last_sync_at) : '—') + '</td>'
+      + '<td class="mut" style="max-width:220px">' + esc(v.last_sync_result || '—') + '</td>'
       + '<td>' + (v.logs_count ?? 0) + '</td>'
       + '<td><button class="btn" data-bd-edit="' + v.id + '">Edit</button> <button class="btn" data-bd-del="' + v.id + '">Delete</button></td></tr>').join('')
-      || '<tr><td colspan="10" class="mut">No punch devices registered yet — add your first one below. Punches can also arrive without a registered device (middleware push / CSV).</td></tr>';
+      || '<tr><td colspan="8" class="mut">No biometric device connected yet — fill the form below and press Save. Punches can also arrive via middleware push or CSV import.</td></tr>';
   } catch (e) {
-    $('#biodev-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="10" class="mut">' + esc(e.message) + '</td></tr>';
+    $('#biodev-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="8" class="mut">' + esc(e.message) + '</td></tr>';
   }
 }
 function bdReset() {
   bdEditId = null;
-  ['#bd-name', '#bd-serial', '#bd-loc', '#bd-ip', '#bd-vendor'].forEach((q) => { $(q).value = ''; });
-  $('#bd-method').value = 'MIDDLEWARE_PUSH';
-  $('#bd-status').value = 'ACTIVE';
-  $('#bd-save').textContent = 'Add device';
+  ['#bd-provider', '#bd-base', '#bd-endpoint', '#bd-corp', '#bd-user', '#bd-pass', '#bd-filter', '#bd-prefix', '#bd-inmc', '#bd-outmc'].forEach((q) => { $(q).value = ''; });
+  $('#bd-sync').checked = false;
+  $('#bd-pass').placeholder = '••••••••';
+  $('#bd-save').textContent = 'Save';
   $('#bd-msg').textContent = '';
+  $('#bd-test-out').innerHTML = '';
+}
+function bdCollect() {
+  const gv = (q) => ($(q).value.trim() || null);
+  const editing = bdEditId ? bdDevices.find((x) => x.id === bdEditId) : null;
+  const body = {
+    provider: gv('#bd-provider'),
+    name: gv('#bd-provider'),
+    sync_enabled: $('#bd-sync').checked,
+    api_base_url: gv('#bd-base'),
+    api_endpoint: gv('#bd-endpoint'),
+    corporate_id: gv('#bd-corp'),
+    api_username: gv('#bd-user'),
+    employee_code_filter: gv('#bd-filter') || 'ALL',
+    employee_id_prefix: gv('#bd-prefix'),
+    in_machine_id: gv('#bd-inmc'),
+    out_machine_id: gv('#bd-outmc'),
+    integration_method: 'DIRECT_PULL',
+    status: (editing && editing.status) || 'ACTIVE',
+  };
+  const pw = $('#bd-pass').value;
+  if (pw) body.api_password = pw;
+  return body;
 }
 $('#bd-reset').onclick = bdReset;
 $('#bd-save').onclick = async () => {
-  const body = {
-    name: $('#bd-name').value.trim(),
-    device_serial: $('#bd-serial').value.trim() || null,
-    location: $('#bd-loc').value.trim() || null,
-    ip_address: $('#bd-ip').value.trim() || null,
-    integration_method: $('#bd-method').value,
-    vendor: $('#bd-vendor').value.trim() || null,
-    status: $('#bd-status').value,
-  };
-  if (!body.name) { $('#bd-msg').textContent = 'Device name is required.'; return; }
+  const body = bdCollect();
+  if (!body.provider) { $('#bd-msg').textContent = 'Provider is required.'; return; }
+  if (!body.api_base_url || !body.api_endpoint) { $('#bd-msg').textContent = 'API base URL and endpoint are required.'; return; }
   try {
     if (bdEditId) await api('/integrations/biometric/devices/' + bdEditId, { method: 'PUT', body: JSON.stringify(body) });
     else await api('/integrations/biometric/devices', { method: 'POST', body: JSON.stringify(body) });
     bdReset();
-    $('#bd-msg').textContent = '✓ Saved.';
+    $('#bd-msg').textContent = '✓ Saved.' ;
+    toast('Biometric device saved');
     loadBioDevices();
+  } catch (e) { $('#bd-msg').textContent = '✕ ' + e.message; }
+};
+$('#bd-test').onclick = async () => {
+  const body = bdCollect();
+  if (bdEditId) body.device_id = bdEditId;
+  $('#bd-msg').textContent = 'Testing connection…';
+  $('#bd-test-out').innerHTML = '';
+  try {
+    const r = await api('/integrations/biometric/devices/test-connection', { method: 'POST', body: JSON.stringify(body) });
+    $('#bd-msg').textContent = '✓ ' + r.message;
+    if (r.raw) {
+      $('#bd-test-out').innerHTML = '<div class="mut" style="font-size:11.5px">Raw provider response (for field-mapping check — punch count or MC numbers missing):</div>'
+        + '<pre style="white-space:pre-wrap;word-break:break-all;font-size:11px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;max-height:220px;overflow:auto">' + esc(r.raw) + '</pre>';
+    }
+    if ((r.sample || []).length) {
+      $('#bd-test-out').innerHTML += '<table><thead><tr><th>Emp code</th><th>Name (device)</th><th>Punch time</th><th>MC</th><th>Direction</th><th>Matched employee</th></tr></thead><tbody>'
+        + r.sample.map((s) => '<tr><td>' + esc(s.code) + '</td><td>' + esc(s.name || '—') + '</td><td>' + esc(s.punched_at) + '</td><td>' + esc(s.mc ?? '—') + '</td><td>' + esc(s.direction) + '</td><td>'
+          + (s.mapped ? '<span class="tag t-ok">MATCHED</span>' : '<span class="tag t-warn">NO MATCH</span>') + '</td></tr>').join('')
+        + '</tbody></table>';
+    }
+  } catch (e) { $('#bd-msg').textContent = '✕ ' + e.message; }
+};
+$('#bd-syncnow').onclick = async () => {
+  const id = bdEditId || (bdDevices.length === 1 ? bdDevices[0].id : null);
+  if (!id) { $('#bd-msg').textContent = bdDevices.length ? 'Press Edit on the device you want to sync, then Sync now.' : 'Save the device first, then press Sync now.'; return; }
+  $('#bd-msg').textContent = 'Syncing…';
+  try {
+    const r = await api('/integrations/biometric/devices/' + id + '/sync', { method: 'POST' });
+    $('#bd-msg').textContent = '✓ ' + r.message;
+    if ((r.unmatched_codes || []).length) {
+      $('#bd-test-out').innerHTML = '<div class="mut" style="font-size:11.5px">Unmatched employee codes — map them under "Map biometric ID → employee" below and old punches back-fill automatically: <b>'
+        + r.unmatched_codes.map(esc).join(', ') + '</b></div>';
+    }
+    toast('Sync finished');
+    loadBioDevices();
+    loadBiometric();
   } catch (e) { $('#bd-msg').textContent = '✕ ' + e.message; }
 };
 $('#biodev-rows').addEventListener('click', async (ev) => {
@@ -2247,18 +2456,23 @@ $('#biodev-rows').addEventListener('click', async (ev) => {
     const v = bdDevices.find((x) => x.id === Number(eBtn.dataset.bdEdit));
     if (!v) return;
     bdEditId = v.id;
-    $('#bd-name').value = v.name || '';
-    $('#bd-serial').value = v.device_serial || '';
-    $('#bd-loc').value = v.location || '';
-    $('#bd-ip').value = v.ip_address || '';
-    $('#bd-method').value = v.integration_method || 'MIDDLEWARE_PUSH';
-    $('#bd-vendor').value = v.vendor || '';
-    $('#bd-status').value = v.status || 'ACTIVE';
+    $('#bd-provider').value = v.provider || v.name || '';
+    $('#bd-base').value = v.api_base_url || '';
+    $('#bd-endpoint').value = v.api_endpoint || '';
+    $('#bd-corp').value = v.corporate_id || '';
+    $('#bd-user').value = v.api_username || '';
+    $('#bd-pass').value = '';
+    $('#bd-pass').placeholder = v.has_password ? '•••••••• (saved — leave blank to keep)' : '••••••••';
+    $('#bd-filter').value = v.employee_code_filter || '';
+    $('#bd-prefix').value = v.employee_id_prefix || '';
+    $('#bd-inmc').value = v.in_machine_id || '';
+    $('#bd-outmc').value = v.out_machine_id || '';
+    $('#bd-sync').checked = !!v.sync_enabled;
     $('#bd-save').textContent = 'Save changes';
-    $('#bd-msg').textContent = 'Editing "' + v.name + '" — change the fields and press Save changes.';
+    $('#bd-msg').textContent = 'Editing "' + (v.provider || v.name) + '" — change the fields and press Save changes.';
   }
   if (dBtn) {
-    if (!window.confirm('Delete this punch device? Its punch history is kept.')) return;
+    if (!window.confirm('Delete this biometric device? Its punch history is kept.')) return;
     try {
       await api('/integrations/biometric/devices/' + Number(dBtn.dataset.bdDel), { method: 'DELETE' });
       bdReset();
@@ -2357,16 +2571,18 @@ async function loadProductivity() {
     $('#pr-note').textContent = PROD_ROWS.length + ' rows · ' + from + ' → ' + to + ' · working = active tracked time; present = in-office span.';
   } catch (e) { $('#pr-rows').innerHTML = '<tr><td colspan="15" class="mut">' + esc(e.message) + '</td></tr>'; }
 }
+// R4 item 6: extracted reports use hh:mm, not raw seconds/minutes.
+const hhmm = (sec) => { const m = Math.max(0, Math.round((sec || 0) / 60)); return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
 function prCSV() {
-  const head = ['Date','Code','Employee','Department','Team','Logged in','Logged out','Present(s)','Working(s)','Idle(s)','Breaks','Break(s)','Time-outs','NonProductive(s)','Violations','Productivity%'];
-  const rows = PROD_ROWS.map((x) => [x.work_date,x.employee_code,x.name,x.department,x.team,x.first_in,x.last_out,x.present_seconds,x.work_seconds,x.idle_seconds,x.break_count,x.break_seconds,x.timeouts,x.non_productive_seconds,x.violations,x.productivity]);
+  const head = ['Date','Code','Employee','Department','Team','Logged in','Logged out','Present (hh:mm)','Working (hh:mm)','Idle (hh:mm)','Breaks','Break time (hh:mm)','Time-outs','Non-productive (hh:mm)','Violations','Productivity%'];
+  const rows = PROD_ROWS.map((x) => [x.work_date,x.employee_code,x.name,x.department,x.team,x.first_in,x.last_out,hhmm(x.present_seconds),hhmm(x.work_seconds),hhmm(x.idle_seconds),x.break_count,hhmm(x.break_seconds),x.timeouts,hhmm(x.non_productive_seconds),x.violations,x.productivity]);
   const csv = [head, ...rows].map((r) => r.map((c) => '"' + String(c==null?'':c).replace(/"/g,'""') + '"').join(',')).join('\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
   a.download = 'smartept-productivity-' + $('#pr-from').value + '_' + $('#pr-to').value + '.csv'; a.click(); URL.revokeObjectURL(a.href);
 }
 function prPDF() {
   const from = $('#pr-from').value, to = $('#pr-to').value;
-  const rowsHtml = PROD_ROWS.map((x) => '<tr><td>' + esc(x.work_date) + '</td><td>' + esc(x.employee_code||'') + '</td><td>' + esc(x.name) + '</td><td>' + esc(x.department||'') + '</td><td>' + esc(x.first_in||'—') + '</td><td>' + esc(x.last_out||'—') + '</td><td>' + hms(x.present_seconds) + '</td><td>' + hms(x.work_seconds) + '</td><td>' + hms(x.idle_seconds) + '</td><td>' + x.break_count + '</td><td>' + hms(x.break_seconds) + '</td><td>' + x.timeouts + '</td><td>' + x.violations + '</td><td>' + Number(x.productivity).toFixed(0) + '%</td></tr>').join('');
+  const rowsHtml = PROD_ROWS.map((x) => '<tr><td>' + esc(x.work_date) + '</td><td>' + esc(x.employee_code||'') + '</td><td>' + esc(x.name) + '</td><td>' + esc(x.department||'') + '</td><td>' + esc(x.first_in||'—') + '</td><td>' + esc(x.last_out||'—') + '</td><td>' + hhmm(x.present_seconds) + '</td><td>' + hhmm(x.work_seconds) + '</td><td>' + hhmm(x.idle_seconds) + '</td><td>' + x.break_count + '</td><td>' + hhmm(x.break_seconds) + '</td><td>' + x.timeouts + '</td><td>' + x.violations + '</td><td>' + Number(x.productivity).toFixed(0) + '%</td></tr>').join('');
   const co = ($('#company-name') ? $('#company-name').textContent : 'Company');
   const w = window.open('', '_blank');
   w.document.write('<html><head><title>SmartEPT Productivity ' + from + ' to ' + to + '</title><style>'
@@ -2381,7 +2597,6 @@ function prPDF() {
     + '<table><thead><tr><th>Date</th><th>Code</th><th>Employee</th><th>Dept</th><th>In</th><th>Out</th><th>Present</th><th>Working</th><th>Idle</th><th>Breaks</th><th>Break time</th><th>Time-outs</th><th>Violations</th><th>Prod.%</th></tr></thead><tbody>'
     + (rowsHtml || '<tr><td colspan="14">No data</td></tr>') + '</tbody></table>'
     + '<p style="margin-top:14px;color:#878C99;font-size:10px">Generated ' + new Date().toLocaleString() + ' · SmartEPT — Employee Productivity Tracking & Intelligence</p>'
-    + '<p style="margin-top:2px;color:#A6ADB8;font-size:9px">SmartEPT™ · Developed by Ametecs India Private Limited · © 2026 Ametecs India Private Limited. All rights reserved.</p>'
     + '</body></html>');
   w.document.close();
 }
@@ -2538,12 +2753,9 @@ $('#u-rows').addEventListener('click', async (e) => {
   if (!u) return;
   if (btn.dataset.uact === 'edit') { openUserModal(u); return; }
   if (btn.dataset.uact === 'reset') {
-    if (!confirm('Reset the password for ' + u.email + '?\nAll their sessions are signed out and a new one-time password is generated.')) return;
-    try {
-      const r = await api('/users/' + u.id + '/reset-password', { method: 'POST' });
-      showCredentials(u.email, r.temp_password);
-      loadUsers();
-    } catch (err) { alert(err.message); }
+    // R4 item 1: show a suggested password the admin can edit to a custom one.
+    // Nothing is applied (and no sessions die) until they press Apply password.
+    showCredentials(u.email, genPw(), u.id);
     return;
   }
   if (btn.dataset.uact === 'disable') {
@@ -2557,7 +2769,13 @@ async function openUserModal(u) {
   $('#u-m-title').textContent = u ? 'Edit user' : 'Add user';
   $('#u-m-err').textContent = '';
   const roleSel = $('#uf-role');
-  if (!roleSel.options.length) fillSelect(roleSel, ROLES, (r) => r[1], (r) => r[0]);
+  if (!roleSel.dataset.loaded) {
+    // R4 item 5: include custom organisation roles in the assignment list.
+    let list = ROLES.map((r) => ({ slug: r[0], name: r[1] }));
+    try { const d = await api('/roles'); if ((d.data || []).length) list = d.data.map((r) => ({ slug: r.slug, name: r.name })); } catch (e) { /* non-admins keep the static list */ }
+    fillSelect(roleSel, list, (r) => r.name, (r) => r.slug);
+    roleSel.dataset.loaded = '1';
+  }
   $('#uf-name').value = u ? (u.name || '') : '';
   $('#uf-email').value = u ? (u.email || '') : '';
   roleSel.value = (u && u.role) || 'EMPLOYEE';
@@ -2602,12 +2820,34 @@ $('#u-m-save').onclick = async () => {
 };
 
 // ---- one-time credentials panel (user create / reset / employee auto-login) ----
-function showCredentials(email, tempPassword) {
+let CRED_PENDING_UID = null;
+const genPw = () => {
+  const c = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$%';
+  return Array.from(crypto.getRandomValues(new Uint32Array(12))).map((x) => c[x % c.length]).join('');
+};
+function showCredentials(email, tempPassword, pendingUserId) {
+  CRED_PENDING_UID = pendingUserId || null;
   $('#cred-email').value = email || '';
   $('#cred-pass').value = tempPassword || '';
-  $('#cred-msg').textContent = '';
+  $('#cred-pass').readOnly = !CRED_PENDING_UID;
+  $('#cred-apply-row').classList.toggle('hide', !CRED_PENDING_UID);
+  $('#cred-msg').textContent = CRED_PENDING_UID
+    ? 'Nothing has changed yet — the reset applies only when you press Apply password.'
+    : '';
   $('#cred-ovl').classList.add('open');
 }
+$('#cred-apply').onclick = async () => {
+  if (!CRED_PENDING_UID) return;
+  const pw = $('#cred-pass').value.trim();
+  if (pw.length < 8) { $('#cred-msg').textContent = '✕ The password must be at least 8 characters.'; return; }
+  try {
+    await api('/users/' + CRED_PENDING_UID + '/reset-password', { method: 'POST', body: JSON.stringify({ password: pw }) });
+    $('#cred-msg').textContent = '✓ Password applied and emailed. All their old sessions are signed out; they must change it at first sign-in.';
+    $('#cred-apply-row').classList.add('hide');
+    CRED_PENDING_UID = null;
+    loadUsers();
+  } catch (e) { $('#cred-msg').textContent = '✕ ' + e.message; }
+};
 $('#cred-copy').onclick = async () => {
   const text = 'Login: ' + $('#cred-email').value + '\nTemporary password: ' + $('#cred-pass').value;
   try {
@@ -2648,7 +2888,7 @@ async function loadAttendance() {
       + '<td>' + (r.late_minutes ?? 0) + '</td>'
       + '<td>' + esc(r.source || '—') + '</td>'
       + '<td title="' + esc(r.notes || '') + '">' + (esc(lastNote(r.notes)) || '—') + '</td>'
-      + '<td><button class="btn" data-att-logs="' + r.employee_id + '" data-att-name="' + esc(r.employee_name || ('#' + r.employee_id)) + '">Logs</button> <button class="btn" data-att-edit="' + r.id + '">Edit</button></td></tr>').join('')
+      + '<td><button class="btn" data-att-edit="' + r.id + '">Edit</button></td></tr>').join('')
       || '<tr><td colspan="8" class="mut">No attendance rows for ' + esc(date) + '. Rows appear from agent logins, biometric punches or the nightly marking job — use "+ Add missed day" to record one manually.</td></tr>';
   } catch (e) {
     $('#at-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="8" class="mut">' + esc(e.message) + '</td></tr>';
@@ -2659,43 +2899,11 @@ $('#at-date').addEventListener('change', loadAttendance);
 $('#at-status').addEventListener('change', loadAttendance);
 $('#at-add').onclick = () => openAttModal(null);
 $('#at-rows').addEventListener('click', (e) => {
-  const logs = e.target.closest('[data-att-logs]');
-  if (logs) { openDayLogs(Number(logs.dataset.attLogs), logs.dataset.attName); return; }
   const btn = e.target.closest('[data-att-edit]');
   if (!btn) return;
   const r = ATT_LIST.find((x) => x.id === Number(btn.dataset.attEdit));
   if (r) openAttModal(r);
 });
-async function openDayLogs(empId, name) {
-  const date = $('#at-date').value || today();
-  $('#daylog-title').textContent = (name || '#' + empId) + ' · ' + date;
-  $('#daylog-body').innerHTML = '<div class="mut">Loading…</div>';
-  $('#daylog-ovl').classList.add('open');
-  try {
-    const d = await api('/reports/employee/' + empId + '/day-logs?date=' + encodeURIComponent(date));
-    const t = d.totals || {};
-    const kpi = (l, v) => '<div class="kpi"><div class="l">' + l + '</div><div class="v">' + v + '</div></div>';
-    let h = '<div class="grid4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">'
-      + kpi('Working', secH(t.worked_seconds)) + kpi('Idle', secH(t.idle_seconds))
-      + kpi('Breaks', secH(t.break_seconds) + ' · ' + (t.break_count || 0)) + kpi('Punch pairs', t.punch_pairs || 0)
-      + '</div>';
-    h += '<h4 style="margin:4px 0 6px">Punch pairs</h4><table><thead><tr><th>In</th><th>Out</th><th>Worked</th><th>Reason</th><th>Break after</th></tr></thead><tbody>'
-      + ((d.punches || []).map((p) => '<tr><td>' + esc(p.in) + '</td><td>' + esc(p.out) + '</td>'
-        + '<td>' + (p.worked_seconds != null ? secH(p.worked_seconds) : '—') + '</td>'
-        + '<td>' + esc(p.logout_reason || '—') + '</td>'
-        + '<td>' + (p.break_after_seconds != null ? secH(p.break_after_seconds) : '—') + '</td></tr>').join('')
-        || '<tr><td colspan="5" class="mut">No login sessions recorded for this day.</td></tr>')
-      + '</tbody></table>';
-    h += '<h4 style="margin:16px 0 6px">Breaks</h4><table><thead><tr><th>Type</th><th>Start</th><th>End</th><th>Duration</th><th>Source</th></tr></thead><tbody>'
-      + ((d.breaks || []).map((b) => '<tr><td>' + esc(b.type || '—') + '</td><td>' + esc(b.start) + '</td><td>' + esc(b.end) + '</td>'
-        + '<td>' + (b.seconds != null ? secH(b.seconds) : '—') + '</td><td>' + esc(b.source || '—') + '</td></tr>').join('')
-        || '<tr><td colspan="5" class="mut">No breaks recorded for this day.</td></tr>')
-      + '</tbody></table>';
-    $('#daylog-body').innerHTML = h;
-  } catch (e) {
-    $('#daylog-body').innerHTML = isDenied(e) ? deniedCard() : '<div class="mut">' + esc(e.message) + '</div>';
-  }
-}
 // "YYYY-MM-DD HH:MM:SS" ⇄ datetime-local's "YYYY-MM-DDTHH:MM"
 const toLocalDt = (s) => s ? String(s).replace(' ', 'T').slice(0, 16) : '';
 const fromLocalDt = (v) => v ? v.replace('T', ' ') + ':00' : null;
@@ -2992,7 +3200,7 @@ const HELP = {
   users: ['Users', '<h5>What</h5>The login accounts for this console and the employee self-service — name, email, role, optional link to an employee record, status and last login.<h5>Why</h5>Accounts and employee records are different things: an auditor logs in but is not an employee, and an employee may exist without any login. Roles decide exactly what each account can see and do.<h5>How</h5>Add a user and SmartEPT generates a strong temporary password shown <b>exactly once</b> — copy it and hand it over; the user must change it at first sign-in. Reset password re-issues a one-time password and signs the user out everywhere. Disable blocks login immediately and kills active sessions; accounts are never hard-deleted because the audit trail references them.'],
   devices: ['Devices', '<h5>What</h5>Every PC where the SmartEPT agent is registered: hostname, OS, agent version, live status, compliance state, sync backlog and last heartbeat.<h5>Why</h5>A stopped or stale agent means a blind spot — this screen tells you whether the data you see elsewhere is complete.<h5>How</h5>Healthy agents heartbeat about every 30 seconds. A growing sync queue with an OFFLINE status usually just means the PC is off; DEGRADED or STOPPED health on an online device needs IT attention. <b>Unbind</b> a lost, replaced or misused PC to stop its agent instantly and free its licence seat — it stays blocked until you <b>Approve re-bind</b>, so nobody can quietly reconnect it.'],
   policies: ['Policies', '<h5>What</h5>The control room: 12 policy types (monitoring master switch, screenshots, webcam presence, app/site rules, network, USB, breaks, attendance, compliance scoring) with versioned edit forms and an assignment panel.<h5>Why</h5>Nothing is captured because the software can — everything is captured because a policy you wrote says so, and the version trail shows what applied when.<h5>How</h5>Pick a type, create or edit a policy (each save bumps the version; agents pick it up on the next heartbeat), then assign it to the company, a branch, department, team, employee or single device. More specific assignments win.'],
-  biometric: ['Biometric', '<h5>What</h5>Door-punch integration: the registered punch devices (readers at gates/doors), the punch log, CSV import, biometric-ID-to-employee mapping, and a daily reconciliation of first punch vs first agent login.<h5>Why</h5>The gap between "in the office" and "at the system" is invisible to either source alone — the mismatch report exposes it in minutes per employee.<h5>How</h5>Push punches from your device middleware or import the device\'s CSV export, map each biometric ID to an employee once (old punches back-fill automatically), then read the mismatch report: OK, MISMATCH over 15 minutes, or NO_BIOMETRIC.'],
+  biometric: ['Biometric', '<h5>What</h5>Door-punch integration: connect a cloud attendance API (eTimeOffice-style — punches import into Attendance &amp; payroll automatically every hour), plus the punch log, CSV import, biometric-ID-to-employee mapping, and a daily reconciliation of first punch vs first agent login.<h5>Why</h5>The gap between "in the office" and "at the system" is invisible to either source alone — the mismatch report exposes it in minutes per employee.<h5>How</h5>Fill the Biometric Device Setup form (provider, API base URL, endpoint, corporate ID, credentials), press Test connection to preview punches and their MC machine numbers, then Save with hourly sync enabled — or press Sync now anytime. Separate entry/exit readers? Enter their IN/OUT machine IDs and the machine number decides direction. Employee codes match automatically by employee code or biometric ID (use the prefix field when the feed drops a letter); anything unmatched appears under Map biometric ID → employee, and old punches back-fill once mapped. The mismatch report reads: OK, MISMATCH over 15 minutes, or NO_BIOMETRIC.'],
   integrations: ['API & Integrations', '<h5>What</h5>SmartEPT as an integration hub: API keys let external devices/apps push attendance IN and read it OUT; outbound targets push attendance to SmartPRS or other systems automatically.<h5>Why</h5>No manual CSV shuffling between your gate devices, SmartPRS and SmartEPT — secure API keys in, HMAC-signed pushes out.<h5>How</h5>Create a key (shown once), give it ingest/read scope. Add an outbound target with its URL + shared secret; Test push sends a day now, the nightly job ships the previous day. The Integration guide card has the exact URLs, JSON and signature check for the other side.'],
   license: ['Licence', '<h5>What</h5>This server\'s SmartEPT licence: the key, the plan and company it belongs to, how many device seats are licensed vs registered, the expiry date with its grace window, and when the server last confirmed all of this with SmartEPT Central. A server with no key runs a <b>7-day free evaluation</b>, then monitoring stops until a key is entered.<h5>Why</h5>The licence is what ties your installation to what you purchased — seats, plan features and validity. Only licence metadata travels to Central: screenshots, activity and camera data never leave this server. If a paid renewal is missed, agents keep working through the grace days so a busy week never stops monitoring mid-shift; trials stop the moment they end.<h5>How</h5>Paste the key from your order email or the client portal and click "Save & validate" — the server confirms it with Central instantly and then re-checks once a day on its own. "Validate now" forces a fresh check after a renewal or seat upgrade. If the status shows EXPIRED, renew from the client portal; the seats line tells you when you\'re close to the licensed device limit.'],
   ops: ['Audit & Ops', '<h5>What</h5>Three operational views in one place: the full audit trail (every admin action, export, screenshot view and licence event with who, when and from which IP), storage consumed by screenshot/webcam evidence per company, and the state of your database backups.<h5>Why</h5>Monitoring software must itself be accountable — when an employee questions an action, the audit trail shows exactly who did what. Storage growth and backups are the two quiet things that sink servers: full disks and "we never had a backup".<h5>How</h5>Filter the trail by action text or date range. Backups run automatically every night at 01:30 (newest 14 kept in storage/app/backups — copy them off this PC for real safety); "Back up now" runs one immediately before risky changes. If a company\'s evidence storage grows fast, tighten its screenshot policy, shorten retention, or use \'Free up storage\' to bulk-delete old screenshots and logs by date range — violation evidence is kept unless you explicitly say otherwise, and every cleanup is itself audit-logged.'],

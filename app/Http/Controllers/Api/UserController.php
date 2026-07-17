@@ -158,12 +158,17 @@ class UserController extends Controller
         return response()->json(['data' => $this->payload($user->fresh(['role', 'employee']))]);
     }
 
-    /** POST /api/users/{user}/reset-password — new temp password, all sessions revoked. */
+    /**
+     * POST /api/users/{user}/reset-password — new temp password, all sessions revoked.
+     * Accepts an optional custom password (R4 item 1) — when the admin edits the
+     * generated suggestion in the console, that exact password is applied instead.
+     */
     public function resetPassword(Request $request, User $user): JsonResponse
     {
         $this->guardTenant($request->user(), $user);
 
-        $temp = Str::password(10);
+        $data = $request->validate(['password' => ['nullable', 'string', 'min:8', 'max:72']]);
+        $temp = $data['password'] ?? Str::password(10);
         $user->forceFill(['password' => $temp, 'must_change_password' => true])->save();
 
         // A reset means the old credential can no longer be trusted — revoke

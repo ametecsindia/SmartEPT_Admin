@@ -74,7 +74,16 @@ class AttendanceController extends Controller
             'LOGOUT', 'LOCK'  => $this->handleLogout($employee, $at, $attendance, $data['event_type']),
         };
 
-        EmployeeDevice::where('device_uuid', $data['device_uuid'])->update(['last_sync_at' => now()]);
+        // R4 item 7: the live dashboard must flip THE INSTANT a session event lands —
+        // never wait for the heartbeat window to expire.
+        EmployeeDevice::where('device_uuid', $data['device_uuid'])->update([
+            'last_sync_at'   => now(),
+            'current_status' => match ($data['event_type']) {
+                'LOGIN', 'UNLOCK' => 'ONLINE',
+                'LOCK'            => 'AWAY',
+                'LOGOUT'          => 'OFFLINE',
+            },
+        ]);
 
         // Biometric-style real-time relay (Ejaz 17-Jul): forward this login/logout
         // to any outbound target subscribed to "attendance.punch" (e.g. SmartPRS),

@@ -30,10 +30,11 @@ class ExportController extends Controller
             ->whereBetween('work_date', [$from, $to])->orderBy('work_date')->get();
 
         return $this->stream('attendance.csv',
-            ['Employee Code', 'Name', 'Date', 'Source', 'Check In', 'Check Out', 'Late Min', 'Early Logout Min', 'Status'],
+            ['Employee Code', 'Name', 'Date', 'Source', 'Check In', 'Check Out', 'Late (hh:mm)', 'Early Logout (hh:mm)', 'Status'],
             $rows->map(fn ($r) => [
                 $r->employee?->employee_code, $r->employee?->fullName(), $r->work_date?->toDateString(),
-                $r->source, $r->check_in_at, $r->check_out_at, $r->late_minutes, $r->early_logout_minutes, $r->status,
+                $r->source, $r->check_in_at, $r->check_out_at,
+                $this->hmFromMinutes($r->late_minutes), $this->hmFromMinutes($r->early_logout_minutes), $r->status,
             ]));
     }
 
@@ -54,13 +55,13 @@ class ExportController extends Controller
 
         $rows = Employee::where('employment_status', 'ACTIVE')->get()->map(fn ($e) => [
             $e->employee_code, $e->fullName(),
-            round(((int) ($active[$e->id] ?? 0)) / 3600, 2),
-            round(((int) ($idle[$e->id] ?? 0)) / 3600, 2),
-            round(((int) ($break[$e->id] ?? 0)) / 3600, 2),
+            $this->hmFromSeconds($active[$e->id] ?? 0),
+            $this->hmFromSeconds($idle[$e->id] ?? 0),
+            $this->hmFromSeconds($break[$e->id] ?? 0),
         ]);
 
         return $this->stream('productivity_' . ($from === $to ? $from : "{$from}_{$to}") . '.csv',
-            ['Employee Code', 'Name', 'Active Hours', 'Idle Hours', 'Break Hours'], $rows);
+            ['Employee Code', 'Name', 'Active (hh:mm)', 'Idle (hh:mm)', 'Break (hh:mm)'], $rows);
     }
 
     /** GET /api/export/compliance?from=&to= */
@@ -93,12 +94,24 @@ class ExportController extends Controller
             ->orderBy('work_date')->get();
 
         return $this->stream('daily_summary_' . ($from === $to ? $from : "{$from}_{$to}") . '.csv',
-            ['Employee Code', 'Name', 'Date', 'Active H', 'Idle H', 'Break H', 'Late Min', 'Violations', 'Productivity', 'Compliance'],
+            ['Employee Code', 'Name', 'Date', 'Active (hh:mm)', 'Idle (hh:mm)', 'Break (hh:mm)', 'Late (hh:mm)', 'Violations', 'Productivity', 'Compliance'],
             $rows->map(fn ($r) => [
                 $r->employee?->employee_code, $r->employee?->fullName(), $r->work_date?->toDateString(),
-                round($r->active_seconds / 3600, 2), round($r->idle_seconds / 3600, 2), round($r->break_seconds / 3600, 2),
-                $r->late_minutes, $r->violation_count, $r->productivity_score, $r->compliance_score,
+                $this->hmFromSeconds($r->active_seconds), $this->hmFromSeconds($r->idle_seconds), $this->hmFromSeconds($r->break_seconds),
+                $this->hmFromMinutes($r->late_minutes), $r->violation_count, $r->productivity_score, $r->compliance_score,
             ]));
+    }
+
+    /** R4 item 6: durations in reports as hh:mm, not raw minutes/decimal hours. */
+    private function hmFromMinutes($minutes): string
+    {
+        $m = max(0, (int) $minutes);
+        return sprintf('%02d:%02d', intdiv($m, 60), $m % 60);
+    }
+
+    private function hmFromSeconds($seconds): string
+    {
+        return $this->hmFromMinutes((int) round(((int) $seconds) / 60));
     }
 
     /** Resolve [from, to]: explicit from/to range, else the legacy single date= param. */

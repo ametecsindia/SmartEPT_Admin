@@ -26,6 +26,14 @@ class EnsureRole
             return $next($request);
         }
 
+        // R4 item 5: a custom role created in the console inherits route access
+        // from the system role it is based on; the permission matrix then narrows
+        // which modules its users actually see.
+        $base = $user->role?->base_slug;
+        if ($base && in_array($base, $roles, true)) {
+            return $next($request);
+        }
+
         return response()->json([
             'error' => ['code' => 'FORBIDDEN', 'message' => 'Your role does not permit this action.'],
         ], 403);

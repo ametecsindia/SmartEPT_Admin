@@ -115,6 +115,7 @@ class AuthController extends Controller
             'email'                => $user->email,
             'company_id'           => $user->company_id,
             'company'              => $user->company?->name,
+            'attendance_mode'      => $user->company?->attendance_mode ?? 'BIOMETRIC',
             'role'                 => $user->roleSlug(),
             'role_name'            => $user->role?->name,
             'permissions'          => $user->permissionSlugs(),

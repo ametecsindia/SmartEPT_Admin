@@ -9,7 +9,6 @@ use App\Models\EmployeeAttendanceLog;
 use App\Models\EmployeeBreakLog;
 use App\Models\EmployeeComplianceEvent;
 use App\Models\EmployeeDailySummary;
-use App\Models\EmployeeIdleLog;
 use App\Models\EmployeeLoginSession;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -125,74 +124,6 @@ class ProductivityController extends Controller
         return response()->json([
             'from' => $from->toDateString(), 'to' => $to->toDateString(),
             'count' => count($rows), 'data' => $rows,
-        ]);
-    }
-
-
-    /**
-     * GET /api/reports/employee/{employee}/day-logs?date=YYYY-MM-DD
-     * SmartPRS-style day drill-down: every login/logout pair (with worked time
-     * and the break that followed), all breaks, plus totals — worked, break,
-     * idle, punch-pair count.
-     */
-    public function dayLogs(Request $request, \App\Models\Employee $employee): JsonResponse
-    {
-        abort_unless($employee->company_id === $request->user()->company_id, 404);
-        $date = $request->query('date', now()->toDateString());
-
-        $sessions = EmployeeLoginSession::where('employee_id', $employee->id)
-            ->whereDate('login_at', $date)->orderBy('login_at')->get();
-
-        $breaks = EmployeeBreakLog::where('employee_id', $employee->id)
-            ->whereDate('start_at', $date)->orderBy('start_at')->get();
-
-        $act = EmployeeActivityEvent::where('employee_id', $employee->id)
-            ->whereDate('started_at', $date)
-            ->selectRaw("COALESCE(SUM(CASE WHEN event_type='ACTIVE' THEN duration_seconds ELSE 0 END),0) act, COALESCE(SUM(CASE WHEN event_type='IDLE' THEN duration_seconds ELSE 0 END),0) idl")
-            ->first();
-
-        $att = EmployeeAttendanceLog::where('employee_id', $employee->id)->whereDate('work_date', $date)->first();
-
-        // Pair each session with the break that started after its logout.
-        $pairs = $sessions->map(function ($s, $i) use ($sessions, $breaks) {
-            $worked = ($s->login_at && $s->logout_at)
-                ? Carbon::parse($s->logout_at)->diffInSeconds(Carbon::parse($s->login_at)) : null;
-            $nextLogin = $sessions[$i + 1]->login_at ?? null;
-            $breakAfter = $breaks->first(function ($b) use ($s, $nextLogin) {
-                if (! $s->logout_at || ! $b->start_at) return false;
-                $bs = Carbon::parse($b->start_at);
-                return $bs->gte(Carbon::parse($s->logout_at)) && (! $nextLogin || $bs->lt(Carbon::parse($nextLogin)));
-            });
-            return [
-                'in' => $s->login_at ? Carbon::parse($s->login_at)->format('H:i') : '—',
-                'out' => $s->logout_at ? Carbon::parse($s->logout_at)->format('H:i') : '—',
-                'worked_seconds' => $worked,
-                'logout_reason' => $s->logout_reason,
-                'break_after_seconds' => $breakAfter?->duration_seconds,
-            ];
-        });
-
-        return response()->json([
-            'date' => $date,
-            'employee' => ['name' => trim($employee->first_name . ' ' . $employee->last_name), 'code' => $employee->employee_code],
-            'status' => $att?->status,
-            'first_in' => optional($att?->check_in_at)->format('H:i'),
-            'last_out' => optional($att?->check_out_at)->format('H:i'),
-            'totals' => [
-                'worked_seconds' => (int) ($act->act ?? 0),
-                'idle_seconds' => (int) ($act->idl ?? 0),
-                'break_seconds' => (int) $breaks->sum('duration_seconds'),
-                'break_count' => $breaks->count(),
-                'punch_pairs' => $sessions->count(),
-            ],
-            'punches' => $pairs->values(),
-            'breaks' => $breaks->map(fn ($b) => [
-                'type' => $b->break_type,
-                'start' => $b->start_at ? Carbon::parse($b->start_at)->format('H:i') : '—',
-                'end' => $b->end_at ? Carbon::parse($b->end_at)->format('H:i') : 'ongoing',
-                'seconds' => $b->duration_seconds,
-                'source' => $b->source,
-            ])->values(),
         ]);
     }
 

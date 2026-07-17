@@ -29,3 +29,7 @@ Schedule::command('smartept:backup-database')->dailyAt('01:30');
 
 // 17-Jul: outbound integration push (SmartEPT → SmartPRS etc.) — previous day at 02:00.
 Schedule::command('smartept:push-integrations')->dailyAt('02:00');
+
+// 17-Jul: cloud biometric punch import (eTimeOffice-style APIs) — hourly, for
+// every device with "Enable automatic hourly sync" ticked on the Biometric screen.
+Schedule::command('smartept:biometric-sync')->hourly();
