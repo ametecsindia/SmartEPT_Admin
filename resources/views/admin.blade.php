@@ -5,127 +5,246 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SmartEPT — Admin Console</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
 <style>
+  /* ============================================================
+     SmartEPT Admin Console — Design System v2 (Ocean Teal)
+     17-Jul-2026 visual upgrade: SAME classes, SAME behaviour —
+     only the design layer changed. Matches Central + Client Portal.
+     ============================================================ */
   :root{
-    --canvas:#F4F6F9;--card:#FFFFFF;--card-2:#FAFBFC;--border:#E7E9EF;--hairline:#F0F1F4;
-    --ink:#15171C;--ink-2:#565A66;--ink-3:#878C99;--accent:#0E7C8F;--accent-2:#22B8CF;--accent-weak:#E3F4F7;
-    --ok:#08875D;--ok-w:#E6F5EE;--warn:#B7791F;--warn-w:#FBF3E2;--danger:#D02748;--danger-w:#FBE9ED;--info:#0B72C9;--idle:#6D28D9;
-    --navy:#0C3B46;
+    --canvas:#EEF3F6;--card:#FFFFFF;--card-2:#F7FAFB;--border:#E3E9EF;--hairline:#EEF2F6;
+    --ink:#0F1E26;--ink-2:#4A5A66;--ink-3:#8494A0;
+    --accent:#0E7C8F;--accent-2:#22B8CF;--accent-3:#31D2E8;--accent-weak:#E1F3F6;--accent-ink:#0A6273;
+    --ok:#0A9464;--ok-w:#E3F6EE;--warn:#B7791F;--warn-w:#FBF3E2;--danger:#D22A4C;--danger-w:#FBE9ED;
+    --info:#0B72C9;--info-w:#E6F1FB;--idle:#6D28D9;--idle-w:#F0EAFC;
+    --navy:#052A33;--navy-2:#0B4A56;
+    --font-head:'Plus Jakarta Sans','Inter','Segoe UI',sans-serif;
+    --shadow-1:0 1px 2px rgba(15,30,38,.05),0 4px 14px rgba(15,30,38,.05);
+    --shadow-2:0 4px 10px rgba(15,30,38,.07),0 14px 34px rgba(15,30,38,.09);
+    --ring:0 0 0 3px rgba(34,184,207,.22);
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Inter','Segoe UI',system-ui,Arial,sans-serif;background:var(--canvas);color:var(--ink);font-size:13.5px}
+  html{scrollbar-color:#C6D2DA transparent;scrollbar-width:thin}
+  body{font-family:'Inter','Segoe UI',system-ui,Arial,sans-serif;background:
+    radial-gradient(900px 300px at 85% -80px, rgba(34,184,207,.10), transparent 60%),
+    var(--canvas);color:var(--ink);font-size:13.5px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(34,184,207,.25)}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:#C6D2DA;border-radius:8px;border:2px solid var(--canvas)}
+  ::-webkit-scrollbar-thumb:hover{background:#AEBEC9}
   .hide{display:none!important}
   a{color:var(--accent);text-decoration:none}
-  /* Login */
-  .login{min-height:100vh;display:flex;align-items:center;justify-content:center}
-  .login .box{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:30px;width:360px;box-shadow:0 10px 30px rgba(21,23,28,.06)}
-  .lock{display:flex;align-items:center;gap:11px;margin-bottom:20px}
-  .mark{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px;flex:none}
-  .lock h1{font-size:18px;font-weight:800}.lock small{display:block;color:var(--ink-3);font-size:9px;font-weight:700;letter-spacing:1.8px}
-  label{display:block;font-size:11px;color:var(--ink-2);font-weight:600;margin:13px 0 5px}
-  input,select,textarea{width:100%;background:var(--card-2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:13px;font-family:inherit;color:var(--ink)}
-  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
-  input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.15);cursor:pointer}
-  button.primary{width:100%;margin-top:18px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;border:none;border-radius:9px;padding:11px;font-weight:700;font-size:13.5px;cursor:pointer}
+  a:hover{color:var(--accent-ink)}
+  h1,h2,h3,h4{font-family:var(--font-head);letter-spacing:-.01em}
+
+  /* ---------- Login ---------- */
+  .login{min-height:100vh;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(150deg,var(--navy) 0%,#083A44 55%,var(--navy-2) 100%);position:relative;overflow:hidden}
+  .login::before{content:'';position:absolute;width:640px;height:640px;border-radius:50%;
+    background:radial-gradient(circle,rgba(34,184,207,.20),transparent 65%);top:-260px;right:-160px}
+  .login::after{content:'';position:absolute;width:520px;height:520px;border-radius:50%;
+    background:radial-gradient(circle,rgba(14,124,143,.25),transparent 65%);bottom:-240px;left:-140px}
+  .login .box{background:var(--card);border:none;border-radius:20px;padding:34px 32px;width:384px;
+    box-shadow:0 30px 90px rgba(0,0,0,.45);position:relative;z-index:2}
+  .login .box::before{content:'';display:block;position:absolute;top:0;left:24px;right:24px;height:4px;
+    border-radius:0 0 6px 6px;background:linear-gradient(90deg,var(--accent),var(--accent-3))}
+  .lock{display:flex;align-items:center;gap:11px;margin-bottom:22px}
+  .mark{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px;flex:none;
+    box-shadow:0 6px 16px rgba(14,124,143,.35);font-family:var(--font-head)}
+  .lock h1{font-size:19px;font-weight:800}
+  .lock small{display:block;color:var(--ink-3);font-size:9px;font-weight:700;letter-spacing:2px}
+  label{display:block;font-size:11px;color:var(--ink-2);font-weight:700;margin:13px 0 5px}
+  input,select,textarea{width:100%;background:var(--card-2);border:1.5px solid var(--border);border-radius:10px;
+    padding:10px 12px;font-size:13px;font-family:inherit;color:var(--ink);transition:border-color .15s, box-shadow .15s}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent-2);box-shadow:var(--ring);background:#fff}
+  input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.15);cursor:pointer;box-shadow:none}
+  button.primary{width:100%;margin-top:20px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;
+    border:none;border-radius:10px;padding:12px;font-weight:700;font-size:13.5px;cursor:pointer;font-family:inherit;
+    box-shadow:0 8px 20px rgba(14,124,143,.35);transition:transform .12s, box-shadow .12s}
+  button.primary:hover{transform:translateY(-1px);box-shadow:0 12px 26px rgba(14,124,143,.45)}
   .err{color:var(--danger);font-size:12px;margin-top:12px;min-height:15px}
-  /* Shell */
+
+  /* ---------- Shell ---------- */
   .shell{display:flex;min-height:100vh}
-  .side{width:220px;background:var(--card);border-right:1px solid var(--border);position:fixed;height:100vh;padding:18px 14px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;z-index:6}
-  .side .lock{padding:4px 6px 12px;margin:0}
-  .navgrp{font-size:9.5px;letter-spacing:1.4px;color:var(--ink-3);font-weight:800;margin:12px 12px 4px}
-  .nav{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:9px;color:var(--ink-2);font-size:13px;font-weight:600;cursor:pointer}
-  .nav:hover{background:var(--card-2)}.nav.active{background:var(--accent-weak);color:var(--accent)}
-  .nav .ic{width:16px;text-align:center}
-  .side .foot{margin-top:auto;font-size:11px;color:var(--ink-3);padding:8px 6px;border-top:1px solid var(--hairline)}
-  .main{margin-left:220px;flex:1;padding:0 26px 40px;min-width:0}
-  .top{display:flex;align-items:center;justify-content:space-between;padding:18px 0 14px;position:sticky;top:0;background:var(--canvas);border-bottom:1px solid var(--border);margin-bottom:20px;z-index:5}
-  .top h2{font-size:19px;font-weight:800}.top .sub{color:var(--ink-3);font-size:12px}
-  .who{font-size:12px;color:var(--ink-2);display:flex;align-items:center;gap:12px}.who b{color:var(--ink)}
-  .help-i{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--accent);color:var(--accent);background:var(--accent-weak);font-weight:800;font-size:13px;cursor:pointer;flex:none}
-  .view{display:none}.view.active{display:block}
-  /* Cards */
-  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
-  .kpi{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:13px 14px}
-  .kpi .l{font-size:10.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.4px}
-  .kpi .v{font-size:24px;font-weight:800;margin-top:6px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:16px}
-  .card h3{font-size:13px;font-weight:700;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
-  .card h3 .hint{font-size:10.5px;color:var(--ink-3);font-weight:600}
-  table{width:100%;border-collapse:collapse;font-size:12.5px}
-  th{text-align:left;color:var(--ink-3);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;padding:8px 8px;border-bottom:1px solid var(--border)}
-  td{padding:9px 8px;border-bottom:1px solid var(--hairline);color:var(--ink-2);vertical-align:middle}
+  .side{width:232px;background:linear-gradient(178deg,var(--navy) 0%,#07333D 60%,#083A44 100%);
+    border-right:none;position:fixed;height:100vh;padding:18px 13px 14px;display:flex;flex-direction:column;gap:2px;
+    overflow-y:auto;z-index:6;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent}
+  .side::-webkit-scrollbar{width:5px}
+  .side::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border:none}
+  .side .lock{padding:4px 8px 16px;margin:0;border-bottom:1px solid rgba(255,255,255,.09)}
+  .side .lock h1{color:#fff}
+  .side .lock small{color:#7FA8AF}
+  .navgrp{font-size:9.5px;letter-spacing:2.2px;color:#5E858C;font-weight:800;margin:16px 12px 6px;font-family:var(--font-head)}
+  .nav{display:flex;align-items:center;gap:11px;padding:9.5px 12px;border-radius:10px;color:#A9CBD1;font-size:13.5px;
+    font-weight:600;letter-spacing:.1px;cursor:pointer;transition:background .12s,color .12s}
+  .nav:hover{background:rgba(255,255,255,.07);color:#fff}
+  .nav.active{background:linear-gradient(135deg,var(--accent),#1899AE);color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+  .nav .ic{width:18px;height:18px;display:flex;align-items:center;justify-content:center;opacity:.9;flex:none}
+  .nav .ic svg{width:16.5px;height:16.5px;display:block}
+  .nav.active .ic{opacity:1}
+  .side .foot{margin-top:auto;font-size:11px;color:#7FA8AF;padding:12px 8px 2px;border-top:1px solid rgba(255,255,255,.09);line-height:1.7}
+  .side .foot a{color:#A9CBD1!important}
+  .side .foot a:hover{color:#fff!important}
+  .main{margin-left:232px;flex:1;padding:0 28px 44px;min-width:0}
+  .top{display:flex;align-items:center;justify-content:space-between;padding:18px 0 14px;position:sticky;top:0;
+    background:linear-gradient(to bottom, var(--canvas) 82%, rgba(238,243,246,0));border-bottom:1px solid var(--border);
+    margin-bottom:22px;z-index:5;backdrop-filter:blur(3px)}
+  .top h2{font-size:21px;font-weight:800}
+  .top .sub{color:var(--ink-3);font-size:12px;margin-top:2px}
+  .who{font-size:12px;color:var(--ink-2);display:flex;align-items:center;gap:12px}
+  .who b{color:var(--ink)}
+  .help-i{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--accent);color:var(--accent);
+    background:var(--accent-weak);font-weight:800;font-size:13px;cursor:pointer;flex:none;transition:transform .12s}
+  .help-i:hover{transform:scale(1.08);background:var(--accent);color:#fff}
+  .view{display:none}
+  .view.active{display:block;animation:viewin .18s ease}
+  @keyframes viewin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  /* ---------- KPI cards ---------- */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+  .kpi{background:var(--card);border:1px solid var(--border);border-radius:15px;padding:15px 16px;position:relative;
+    overflow:hidden;box-shadow:var(--shadow-1);transition:transform .14s, box-shadow .14s}
+  .kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow-2)}
+  .kpi::before{content:'';position:absolute;left:0;top:12px;bottom:12px;width:3.5px;border-radius:0 4px 4px 0;
+    background:linear-gradient(180deg,var(--accent),var(--accent-3))}
+  .kpi .l{font-size:10.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.7px;font-weight:700}
+  .kpi .v{font-size:27px;font-weight:800;margin-top:7px;font-family:var(--font-head);letter-spacing:-.02em}
+
+  /* ---------- Cards & tables ---------- */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 20px;margin-bottom:18px;
+    box-shadow:var(--shadow-1)}
+  .card h3{font-size:13.5px;font-weight:800;margin-bottom:14px;display:flex;justify-content:space-between;
+    align-items:center;gap:10px;flex-wrap:wrap;color:var(--accent-ink)}
+  .card h3 .hint{font-size:10.5px;color:var(--ink-3);font-weight:600;font-family:'Inter',sans-serif;letter-spacing:0}
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px}
+  th{text-align:left;background:var(--accent-weak);color:var(--accent-ink);font-weight:700;font-size:10.5px;
+    text-transform:uppercase;letter-spacing:.5px;padding:9px 10px;border-bottom:none}
+  th.sortable-h{cursor:pointer;user-select:none;white-space:nowrap}
+  th.sortable-h:hover{color:var(--accent);background:#D2ECF1}
+  th.sortable-h .arw{opacity:.35;font-size:9px;margin-left:3px}
+  th.sortable-h.sorted .arw{opacity:1}
+  th:first-child{border-radius:9px 0 0 9px}
+  th:last-child{border-radius:0 9px 9px 0}
+  td{padding:10px;border-bottom:1px solid var(--hairline);color:var(--ink-2);vertical-align:middle}
   tr:last-child td{border-bottom:none}
   td b,td .nm{color:var(--ink);font-weight:600}
-  .tag{font-size:10px;font-weight:700;padding:3px 9px;border-radius:12px;display:inline-block;white-space:nowrap}
-  .t-ok{background:var(--ok-w);color:var(--ok)}.t-idle{background:#F0EAFC;color:var(--idle)}
-  .t-warn{background:var(--warn-w);color:var(--warn)}.t-off{background:var(--card-2);color:var(--ink-3)}
-  .t-danger{background:var(--danger-w);color:var(--danger)}.t-info{background:#E6F1FB;color:var(--info)}
-  .clk{cursor:pointer}.clk:hover td{background:var(--card-2)}
-  .btn{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;color:var(--ink-2);cursor:pointer;font-family:inherit}
-  .btn:hover{border-color:var(--accent);color:var(--accent)}
-  .btn.acc{background:var(--accent-weak);color:var(--accent);border-color:transparent}
-  .btn.solid{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;border-color:transparent}
+  tbody tr{transition:background .1s}
+  tbody tr:hover td{background:var(--card-2)}
+  .tag{font-size:10px;font-weight:700;padding:3.5px 10px;border-radius:12px;display:inline-block;white-space:nowrap}
+  .t-ok{background:var(--ok-w);color:var(--ok)}
+  .t-idle{background:var(--idle-w);color:var(--idle)}
+  .t-warn{background:var(--warn-w);color:var(--warn)}
+  .t-off{background:#EDF1F4;color:var(--ink-3)}
+  .t-danger{background:var(--danger-w);color:var(--danger)}
+  .t-info{background:var(--info-w);color:var(--info)}
+  .clk{cursor:pointer}
+  .clk:hover td{background:var(--accent-weak)!important}
+  .btn{background:var(--card);border:1.5px solid var(--border);border-radius:9px;padding:7px 13px;font-size:12px;
+    font-weight:700;color:var(--ink-2);cursor:pointer;font-family:inherit;transition:all .13s}
+  .btn:hover{border-color:var(--accent);color:var(--accent);box-shadow:0 2px 8px rgba(14,124,143,.12)}
+  .btn.acc{background:var(--accent-weak);color:var(--accent-ink);border-color:transparent}
+  .btn.acc:hover{background:#D2ECF1}
+  .btn.solid{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;border-color:transparent;
+    box-shadow:0 4px 12px rgba(14,124,143,.28)}
+  .btn.solid:hover{color:#fff;transform:translateY(-1px);box-shadow:0 7px 16px rgba(14,124,143,.38)}
   .btn.danger{background:var(--danger-w);color:var(--danger);border-color:transparent}
+  .btn.danger:hover{background:#F7D6DE;color:var(--danger);border-color:transparent}
   .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .filters{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:16px;background:var(--card);
+    border:1px solid var(--border);border-radius:13px;padding:11px 14px;box-shadow:var(--shadow-1)}
   .filters label{margin:0;white-space:nowrap}
   .filters input,.filters select{width:auto;min-width:150px;padding:8px 11px}
   .mut{color:var(--ink-3);font-size:12px;padding:10px 0}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
   .grid2 > .card{margin-bottom:0}
-  @media(max-width:1100px){.grid2{grid-template-columns:1fr}}
-  /* Screenshots */
-  .shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
-  .shotcard{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--card);cursor:pointer}
-  .shotcard:hover{border-color:var(--accent)}
-  .shotcard .img{height:110px;background:linear-gradient(135deg,#E7EDF3,#F2F5F9);display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:10px;font-weight:700;overflow:hidden}
+  @media(max-width:1100px){.grid2{grid-template-columns:1fr}.kpis{grid-template-columns:1fr 1fr}}
+
+  /* ---------- Screenshots ---------- */
+  .shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:13px}
+  .shotcard{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--card);cursor:pointer;
+    transition:transform .13s, box-shadow .13s, border-color .13s;box-shadow:var(--shadow-1)}
+  .shotcard:hover{border-color:var(--accent-2);transform:translateY(-2px);box-shadow:var(--shadow-2)}
+  .shotcard .img{height:112px;background:linear-gradient(135deg,#E7EDF3,#F2F5F9);display:flex;align-items:center;
+    justify-content:center;color:var(--ink-3);font-size:10px;font-weight:700;overflow:hidden}
   .shotcard .img img{width:100%;height:100%;object-fit:cover;display:block}
-  .shotcard .m{padding:8px 10px;font-size:10.5px;color:var(--ink-2);line-height:1.5}
+  .shotcard .m{padding:9px 11px;font-size:10.5px;color:var(--ink-2);line-height:1.5}
   .shotcard .m b{display:block;color:var(--ink);font-size:11px}
-  /* Overlays / modals */
-  .ovl{position:fixed;inset:0;background:rgba(21,23,28,.5);display:none;align-items:center;justify-content:center;z-index:80;padding:20px}
-  .ovl.open{display:flex}
-  .modal{background:var(--card);border-radius:14px;width:640px;max-width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 40px 100px rgba(0,0,0,.35)}
-  .mhead{background:var(--navy);color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px}
-  .mhead b{font-size:14px;display:block}.mhead span{font-size:10.5px;color:#AEB4D6}
+  .shotcard.ev-hit{outline:3px solid var(--warn);outline-offset:2px;animation:evpulse 1.6s ease 2}
+  .shotcard.ev-hit::after{content:'⚠ VIOLATION EVIDENCE';display:block;background:var(--warn-w);color:var(--warn);
+    font-size:9.5px;font-weight:800;letter-spacing:.6px;text-align:center;padding:4px}
+  @keyframes evpulse{0%,100%{box-shadow:var(--shadow-1)}50%{box-shadow:0 0 0 8px rgba(183,121,31,.22)}}
+
+  /* ---------- Overlays / modals ---------- */
+  .ovl{position:fixed;inset:0;background:rgba(5,42,51,.55);backdrop-filter:blur(3px);display:none;align-items:center;
+    justify-content:center;z-index:80;padding:20px}
+  .ovl.open{display:flex;animation:viewin .15s ease}
+  .modal{background:var(--card);border-radius:16px;width:640px;max-width:100%;max-height:88vh;display:flex;
+    flex-direction:column;overflow:hidden;box-shadow:0 40px 110px rgba(0,0,0,.45)}
+  .mhead{background:linear-gradient(135deg,var(--navy),var(--navy-2));color:#fff;padding:15px 20px;display:flex;align-items:center;gap:12px}
+  .mhead b{font-size:14px;display:block;font-family:var(--font-head)}
+  .mhead span{font-size:10.5px;color:#9FC5CC}
   .mhead .mt{flex:1}
-  .mhead .x{background:none;border:none;color:#fff;font-size:18px;cursor:pointer;font-family:inherit}
+  .mhead .x{background:rgba(255,255,255,.1);border:none;color:#fff;font-size:16px;cursor:pointer;font-family:inherit;
+    width:30px;height:30px;border-radius:8px;transition:background .12s}
+  .mhead .x:hover{background:rgba(255,255,255,.22)}
   .mbody{padding:18px 20px;overflow-y:auto;font-size:12.5px;line-height:1.65;color:var(--ink-2)}
-  .mbody h5{font-size:12px;color:var(--ink);margin:12px 0 5px}
+  .mbody h5{font-size:12px;color:var(--accent-ink);margin:13px 0 5px;font-family:var(--font-head)}
   .mbody h5:first-child{margin-top:0}
-  .mfoot{padding:13px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
-  .shotbig{max-width:92vw;max-height:78vh;border-radius:10px;display:block;background:#fff}
+  .mfoot{padding:13px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;background:var(--card-2)}
+  .shotbig{max-width:92vw;max-height:78vh;border-radius:12px;display:block;background:#fff;box-shadow:0 30px 80px rgba(0,0,0,.5)}
   .shotmeta{color:#fff;font-size:12px;text-align:center;margin-top:10px}
-  /* Forms */
+
+  /* ---------- Forms ---------- */
   .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
   .fgrid .full{grid-column:1 / -1}
   .fbool{display:flex;align-items:center;gap:9px;padding:9px 2px 0;font-size:12.5px;color:var(--ink-2);font-weight:600}
   textarea{min-height:64px;resize:vertical;font-size:12px}
-  /* Policies */
-  .never{background:var(--danger-w);border:1px solid #F3C2CE;border-radius:12px;padding:14px 16px;font-size:12px;color:var(--ink-2);margin-bottom:16px}
+  .search{min-width:220px}
+
+  /* ---------- Policies ---------- */
+  .never{background:var(--danger-w);border:1px solid #F3C2CE;border-left:4px solid var(--danger);border-radius:12px;
+    padding:14px 16px;font-size:12px;color:var(--ink-2);margin-bottom:16px}
   .never b{color:var(--danger);display:block;margin-bottom:7px;font-size:12px}
   .never ul{margin:0 0 0 18px;line-height:1.8}
-  /* Reports */
-  .exp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
-  .exp{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
-  .exp b{font-size:13px}
+
+  /* ---------- Reports ---------- */
+  .exp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:15px}
+  .exp{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:17px;box-shadow:var(--shadow-1);
+    transition:transform .13s, box-shadow .13s;position:relative;overflow:hidden}
+  .exp::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent-3));opacity:0;transition:opacity .13s}
+  .exp:hover{transform:translateY(-2px);box-shadow:var(--shadow-2)}
+  .exp:hover::before{opacity:1}
+  .exp b{font-size:13px;font-family:var(--font-head)}
   .exp p{font-size:11.5px;color:var(--ink-3);margin:7px 0 11px;line-height:1.55}
   .exp .row input{min-width:0;width:auto;flex:1;padding:8px 10px}
-  /* Drawer */
-  .drawer{position:fixed;top:0;right:0;width:520px;max-width:92vw;height:100vh;background:var(--card);border-left:1px solid var(--border);box-shadow:-10px 0 30px rgba(21,23,28,.08);padding:20px;overflow-y:auto;transform:translateX(100%);transition:.2s;z-index:20}
+
+  /* ---------- Drawer ---------- */
+  .drawer{position:fixed;top:0;right:0;width:530px;max-width:92vw;height:100vh;background:var(--card);border-left:1px solid var(--border);
+    box-shadow:-24px 0 60px rgba(5,42,51,.18);padding:22px;overflow-y:auto;transform:translateX(100%);
+    transition:transform .22s cubic-bezier(.2,.8,.3,1);z-index:20;border-radius:18px 0 0 18px}
   .drawer.open{transform:none}
-  .drawer .x{float:right;cursor:pointer;color:var(--ink-3);font-size:18px}
+  .drawer .x{float:right;cursor:pointer;color:var(--ink-3);font-size:18px;width:30px;height:30px;text-align:center;
+    line-height:30px;border-radius:8px;transition:background .12s}
+  .drawer .x:hover{background:var(--card-2);color:var(--ink)}
   .tabs{display:flex;gap:6px;margin:14px 0}
-  .tab{font-size:11.5px;padding:6px 11px;border-radius:8px;background:var(--card-2);border:1px solid var(--border);cursor:pointer;color:var(--ink-2)}
-  .tab.active{background:var(--accent);color:#fff;border-color:transparent}
-  .tl{border-left:2px solid var(--accent-weak);margin-left:6px;padding-left:14px}
+  .tab{font-size:11.5px;padding:7px 13px;border-radius:9px;background:var(--card-2);border:1.5px solid var(--border);
+    cursor:pointer;color:var(--ink-2);font-weight:700;transition:all .12s}
+  .tab:hover{border-color:var(--accent-2);color:var(--accent-ink)}
+  .tab.active{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;border-color:transparent;
+    box-shadow:0 3px 10px rgba(14,124,143,.3)}
+  .tl{border-left:2px solid var(--accent-weak);margin-left:6px;padding-left:15px}
   .tl .ev{position:relative;padding:7px 0;font-size:12px}
-  .tl .ev::before{content:'';position:absolute;left:-19px;top:11px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
-  .tl .ev .tm{color:var(--ink-3);font-size:10.5px;margin-right:8px}
-  .denied{text-align:center;padding:40px 20px;color:var(--ink-3)}
-  .denied .big{font-size:30px;margin-bottom:10px}
-  .empty{border:1.5px dashed var(--border);border-radius:12px;padding:34px 20px;text-align:center;color:var(--ink-3);font-size:12.5px;line-height:1.7}
+  .tl .ev::before{content:'';position:absolute;left:-20px;top:11px;width:8px;height:8px;border-radius:50%;
+    background:var(--accent-2);box-shadow:0 0 0 3px var(--accent-weak)}
+  .tl .ev .tm{color:var(--ink-3);font-size:10.5px;margin-right:8px;font-variant-numeric:tabular-nums}
+
+  /* ---------- Empty / denied ---------- */
+  .denied{text-align:center;padding:44px 20px;color:var(--ink-3)}
+  .denied .big{font-size:32px;margin-bottom:10px}
+  .empty{border:1.5px dashed #C9D6DE;border-radius:14px;padding:38px 22px;text-align:center;color:var(--ink-3);
+    font-size:12.5px;line-height:1.75;background:var(--card-2)}
   .empty b{color:var(--ink-2)}
 </style>
 </head>
@@ -134,35 +253,42 @@
 <!-- LOGIN -->
 <div class="login" id="login">
   <div class="box">
-    <div class="lock"><div class="mark">EPT</div><div><h1>SmartEPT</h1><small>BY AMETECS</small></div></div>
+    <div class="lock" style="justify-content:center;margin-bottom:24px"><img src="/img/smartept-logo-light.png" alt="SmartEPT — Employee Productivity Tracking" style="width:240px;max-width:82%;height:auto;display:block"></div>
     <label>Work email</label><input id="email" type="email" value="admin@ametecs.io">
     <label>Password</label><input id="password" type="password" value="password">
     <button class="primary" id="btn-login">Sign in</button>
     <div class="err" id="login-err"></div>
+  </div>
+  <div style="text-align:center;margin-top:18px;font-size:11px;color:var(--ink-3);line-height:1.7">
+    SmartEPT™ — developed by Ametecs India Private Limited<br>© 2026 Ametecs India Private Limited. All rights reserved.
   </div>
 </div>
 
 <!-- APP -->
 <div class="shell hide" id="app">
   <div class="side">
-    <div class="lock"><div class="mark">EPT</div><div><h1 style="font-size:15px">SmartEPT</h1><small>BY AMETECS</small></div></div>
+    <div class="lock" style="justify-content:center;padding:12px 8px 16px"><img src="/img/smartept-logo-dark.png" alt="SmartEPT" style="width:158px;max-width:92%;height:auto;display:block"></div>
     <div class="navgrp">MONITOR</div>
-    <div class="nav active" data-view="dashboard"><span class="ic">▦</span> Live Dashboard</div>
-    <div class="nav" data-view="attendance"><span class="ic">◷</span> Attendance</div>
-    <div class="nav" data-view="screenshots"><span class="ic">▣</span> Screenshots</div>
-    <div class="nav" data-view="usage"><span class="ic">◔</span> Usage &amp; Compliance</div>
-    <div class="nav" data-view="violations"><span class="ic">⚠</span> Violations</div>
+    <div class="nav active" data-view="dashboard"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/></svg></span> Live Dashboard</div>
+    <div class="nav" data-view="attendance"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.4V12l3.2 1.9"/></svg></span> Attendance</div>
+    <div class="nav" data-view="screenshots"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="13" rx="2"/><path d="M8.5 21h7M12 17.5V21"/><circle cx="9" cy="9.4" r="1.5"/><path d="M21 14.5l-4.2-4.2-5.3 5.2"/></svg></span> Screenshots</div>
+    <div class="nav" data-view="usage"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12A9 9 0 1 1 12 3"/><path d="M12 3a9 9 0 0 1 9 9h-9z"/></svg></span> Usage &amp; Compliance</div>
+    <div class="nav" data-view="violations"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 4.1 2.9 17a2 2 0 0 0 1.7 3h14.8a2 2 0 0 0 1.7-3L13.7 4.1a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4.2M12 16.9h.01"/></svg></span> Violations</div>
     <div class="navgrp">MANAGE</div>
-    <div class="nav" data-view="employees"><span class="ic">◍</span> Employees</div>
-    <div class="nav" data-view="users"><span class="ic">◉</span> Users</div>
-    <div class="nav" data-view="devices"><span class="ic">▢</span> Devices</div>
-    <div class="nav" data-view="policies"><span class="ic">✦</span> Policies</div>
-    <div class="nav" data-view="biometric"><span class="ic">☰</span> Biometric</div>
+    <div class="nav" data-view="employees"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.2" r="3.4"/><path d="M2.8 20.2a6.2 6.2 0 0 1 12.4 0"/><circle cx="17.2" cy="9.4" r="2.6"/><path d="M16 15.6a5 5 0 0 1 5.2 4.6"/></svg></span> Employees</div>
+    <div class="nav" data-view="org"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5M9 10h.01M15 10h.01M12 10h.01"/></svg></span> Organisation</div>
+    <div class="nav" data-view="users"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.4" r="3.6"/><path d="M4.8 20.4a7.2 7.2 0 0 1 14.4 0"/></svg></span> Users</div>
+    <div class="nav" data-view="devices"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="12.5" rx="2"/><path d="M8.5 21h7M12 17v4"/></svg></span> Devices</div>
+    <div class="nav" data-view="policies"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.5 3v5.2c0 4.8-3.2 8.2-7.5 9.8-4.3-1.6-7.5-5-7.5-9.8V6z"/><path d="M9 11.8l2.1 2.1 3.9-4.2"/></svg></span> Policies</div>
+    <div class="nav" data-view="biometric"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8A9 9 0 0 1 21 12c0 2.6-.4 5-1.2 7"/><path d="M3.6 8.4A9 9 0 0 0 3 12c0 2.8.6 5.2 1.6 7.2"/><path d="M12 8.4a3.6 3.6 0 0 1 3.6 3.6c0 2.3-.3 4.5-1 6.6"/><path d="M8.4 12a3.6 3.6 0 0 1 .4-1.7M8.6 15.6c.3 1.5.2 3-.2 4.6"/><path d="M12 12v2.4c0 1.7-.2 3.4-.7 5"/></svg></span> Biometric</div>
     <div class="navgrp">INSIGHT</div>
-    <div class="nav" data-view="reports"><span class="ic">⇓</span> Reports &amp; Exports</div>
-    <div class="nav" data-view="license"><span class="ic">⚿</span> Licence</div>
-    <div class="nav" data-view="ops"><span class="ic">☷</span> Audit &amp; Ops</div>
-    <div class="foot"><span id="who"></span><br><a id="signout" style="color:var(--ink-3);cursor:pointer">Sign out</a></div>
+    <div class="nav" data-view="reports"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11.5M7.5 10l4.5 4.5L16.5 10"/><path d="M4 17v2.4A1.6 1.6 0 0 0 5.6 21h12.8a1.6 1.6 0 0 0 1.6-1.6V17"/></svg></span> Reports &amp; Exports</div>
+    <div class="nav" data-view="license"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="12" r="4.6"/><path d="M12.6 12H21M17.5 12v3.4M21 12v2.4"/></svg></span> Licence</div>
+    <div class="nav" data-view="integrations"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg></span> API &amp; Integrations</div>
+    <div class="nav" data-view="ops"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6.5 5 13L17 12h4"/></svg></span> Audit &amp; Ops</div>
+    <div class="foot"><span id="who"></span><br><a id="signout" style="color:var(--ink-3);cursor:pointer">Sign out</a>
+      <div style="margin-top:10px;font-size:9.5px;color:#6E9399;line-height:1.6">SmartEPT™ · Developed by Ametecs India Private Limited<br>© 2026 Ametecs India Private Limited. All rights reserved.</div>
+    </div>
   </div>
   <div class="main">
     <div class="top">
@@ -248,7 +374,12 @@
         <button class="btn acc" id="us-load">Load</button>
         <button class="btn" id="us-open-drawer">Open full profile</button>
       </div>
-      <div class="grid2">
+      <div class="card" id="us-summary-card">
+        <h3>All employees — usage &amp; compliance <span class="hint">click any row to open that person · click a column to sort</span></h3>
+        <table><thead><tr><th>Code</th><th>Employee</th><th>Department</th><th>Team</th><th>App time</th><th>Website time</th><th>Violations</th></tr></thead>
+        <tbody id="us-sum-rows"><tr><td colspan="7" class="mut">Loading…</td></tr></tbody></table>
+      </div>
+      <div class="grid2" id="us-individual" style="display:none">
         <div class="card">
           <h3>Application usage</h3>
           <table><thead><tr><th>App</th><th>Category</th><th>Time</th><th>Status</th></tr></thead><tbody id="us-app-rows"></tbody></table>
@@ -258,8 +389,8 @@
           <table><thead><tr><th>Site</th><th>Category</th><th>Time</th><th>Status</th></tr></thead><tbody id="us-web-rows"></tbody></table>
         </div>
       </div>
-      <div class="card" style="margin-top:16px">
-        <h3>Compliance events (selected day)</h3>
+      <div class="card" id="us-comp-card" style="margin-top:16px;display:none">
+        <h3 id="us-comp-title">Compliance events (selected day)</h3>
         <table><thead><tr><th>Time</th><th>Type</th><th>Severity</th><th>Detected</th><th>Action taken</th></tr></thead><tbody id="us-comp-rows"></tbody></table>
       </div>
     </div>
@@ -277,7 +408,9 @@
     <div class="view" id="v-employees">
       <div class="filters">
         <input id="emp-q" class="search" placeholder="Search name / code…" style="min-width:220px">
-        <button class="btn solid" id="emp-add" style="margin-left:auto">+ Add employee</button>
+        <button class="btn" id="emp-template" style="margin-left:auto">Download CSV template</button>
+        <button class="btn acc" id="emp-import">Bulk import (CSV)</button>
+        <button class="btn solid" id="emp-add">+ Add employee</button>
       </div>
       <div class="card"><h3>All employees</h3>
         <table><thead><tr><th>Code</th><th>Name</th><th>Email</th><th>Department</th><th>Team</th><th>Shift</th><th>Status</th><th>Devices</th><th></th></tr></thead>
@@ -286,6 +419,21 @@
     </div>
 
     <!-- 5b. USERS -->
+    <!-- 5b. ORGANISATION (17-Jul) -->
+    <div class="view" id="v-org">
+      <div class="tabs" id="org-tabs">
+        <div class="tab active" data-org="branches">Branches</div>
+        <div class="tab" data-org="departments">Departments</div>
+        <div class="tab" data-org="teams">Teams</div>
+        <div class="tab" data-org="designations">Designations</div>
+        <div class="tab" data-org="shifts">Shifts</div>
+      </div>
+      <div class="card">
+        <h3 id="org-title">Branches <span class="row"><button class="btn solid" id="org-add">+ Add</button></span></h3>
+        <table><thead id="org-head"></thead><tbody id="org-rows"></tbody></table>
+      </div>
+    </div>
+
     <div class="view" id="v-users">
       <div class="filters">
         <input id="u-q" placeholder="Search name / email…" style="min-width:220px">
@@ -362,6 +510,16 @@
 
     <!-- 8. BIOMETRIC -->
     <div class="view" id="v-biometric">
+      <div class="card" style="border:1px solid var(--accent);background:linear-gradient(120deg,var(--accent-weak),var(--card))">
+        <h3 style="color:var(--accent-ink)">🚪 Gate-to-PC <span class="hint">the SmartEPT USP — the PC agent only starts after a real door punch</span></h3>
+        <div class="fbool"><input type="checkbox" id="gate-enabled"> <b>Require a door / biometric IN punch before the desktop agent can start a work session</b></div>
+        <div class="row" style="margin-top:10px;align-items:flex-end">
+          <div><label>Grace window (minutes)</label><input id="gate-grace" type="number" min="0" style="width:120px" placeholder="0"></div>
+          <button class="btn solid" id="gate-save">Save gate policy</button>
+          <span class="mut" id="gate-msg"></span>
+        </div>
+        <div class="mut" style="font-size:11.5px;margin-top:8px">When ON: an employee who opens the agent sees a "Punch in at the door" wall — tracking and the work clock start the instant their gate IN punch reaches SmartEPT (physical device or an IN punch pushed via the API). No punch = no login. The grace window lets a punch that lands a few minutes late still open the gate.</div>
+      </div>
       <div class="filters">
         <label>Date</label><input type="date" id="bio-date" style="min-width:0">
         <button class="btn acc" id="bio-load">Load</button>
@@ -417,6 +575,28 @@
 
     <!-- 9. REPORTS & EXPORTS -->
     <div class="view" id="v-reports">
+      <div class="card">
+        <h3>Live productivity — all employees <span class="hint">day-wise · today updates live · click a column to sort</span></h3>
+        <div class="filters" style="border:none;box-shadow:none;padding:0;background:none;margin-bottom:12px">
+          <label>From</label><input type="date" id="pr-from" style="min-width:0">
+          <label>To</label><input type="date" id="pr-to" style="min-width:0">
+          <button class="btn" id="pr-today">Today</button>
+          <button class="btn" id="pr-week">This week</button>
+          <button class="btn" id="pr-month">This month</button>
+          <button class="btn acc" id="pr-load">Show</button>
+          <span style="flex:1"></span>
+          <button class="btn" id="pr-csv">⇓ CSV</button>
+          <button class="btn solid" id="pr-pdf">⇓ PDF</button>
+        </div>
+        <div style="overflow-x:auto">
+        <table id="pr-table"><thead><tr>
+          <th>Date</th><th>Code</th><th>Employee</th><th>Dept</th>
+          <th>Logged in</th><th>Logged out</th><th>Present</th><th>Working</th><th>Idle</th>
+          <th>Breaks</th><th>Break time</th><th>Time-outs</th><th>Non-prod.</th><th>Violations</th><th>Prod. %</th>
+        </tr></thead><tbody id="pr-rows"><tr><td colspan="15" class="mut">Pick a range and press Show.</td></tr></tbody></table>
+        </div>
+        <div class="mut" id="pr-note" style="margin-top:8px"></div>
+      </div>
       <div class="exp-grid">
         <div class="exp"><b>Attendance report</b>
           <p>Punch in/out, agent login, late marks, source — day-wise per employee. CSV opens directly in Excel.</p>
@@ -473,17 +653,55 @@
     </div>
 
     <!-- 13. AUDIT & OPS (R2-4) -->
+    <!-- API & INTEGRATIONS (17-Jul) -->
+    <div class="view" id="v-integrations">
+      <div class="grid2">
+        <div class="card">
+          <h3>API keys <span class="row"><span class="hint">for external devices/apps to push in &amp; read out</span><button class="btn solid" id="key-add">+ New key</button></span></h3>
+          <table><thead><tr><th>Name</th><th>Key</th><th>Scopes</th><th>Last used</th><th>Status</th><th></th></tr></thead>
+          <tbody id="key-rows"><tr><td colspan="6" class="mut">Loading…</td></tr></tbody></table>
+        </div>
+        <div class="card">
+          <h3>Outbound targets <span class="row"><span class="hint">SmartEPT pushes attendance here (SmartPRS etc.)</span><button class="btn solid" id="tgt-add">+ Add target</button></span></h3>
+          <table><thead><tr><th>Name</th><th>URL</th><th>Last push</th><th>Status</th><th></th></tr></thead>
+          <tbody id="tgt-rows"><tr><td colspan="5" class="mut">Loading…</td></tr></tbody></table>
+        </div>
+      </div>
+      <div class="card"><h3>Integration guide <span class="hint">base URL, auth, formats — copy-paste ready</span></h3>
+        <div id="api-docs" style="font-size:12.5px;line-height:1.7"></div>
+      </div>
+    </div>
+
     <div class="view" id="v-ops">
       <div class="exp-grid">
         <div class="exp"><b>Storage usage</b>
           <p>Screenshot &amp; webcam evidence on disk, per company — watch this before it surprises you.</p>
           <div id="ops-storage" class="mut">…</div>
+          <div class="row" style="margin-top:10px"><button class="btn danger" id="ops-cleanup">Free up storage…</button></div>
         </div>
         <div class="exp"><b>Database backups</b>
           <p>Nightly at 01:30, newest 14 kept in <code>storage/app/backups</code>. You can also run one right now.</p>
           <div id="ops-backups" class="mut">…</div>
           <div class="row" style="margin-top:10px"><button class="btn acc" id="ops-backup-now">Back up now</button><span class="mut" id="ops-backup-msg"></span></div>
         </div>
+      </div>
+      <div class="card">
+        <h3>Automatic cleanup schedule <span class="hint">runs nightly at 02:00 — frees disk by deleting data past each window</span></h3>
+        <div class="fbool" style="margin-bottom:10px"><input type="checkbox" id="rt-enabled"> Automatic nightly cleanup is ON for this company</div>
+        <div class="fgrid" style="grid-template-columns:1fr 1fr 1fr">
+          <div><label>Screenshots &amp; webcam — keep (days)</label><input id="rt-shots" type="number" min="1" placeholder="e.g. 30"></div>
+          <div><label>Activity / breaks / presence — keep (days)</label><input id="rt-activity" type="number" min="1" placeholder="e.g. 90"></div>
+          <div><label>App / website usage — keep (days)</label><input id="rt-usage" type="number" min="1" placeholder="e.g. 90"></div>
+          <div><label>Violation evidence — keep (days)</label><input id="rt-viol" type="number" min="1" placeholder="e.g. 365"></div>
+          <div><label>Fallback for anything else (days)</label><input id="rt-base" type="number" min="1" placeholder="90"></div>
+          <div style="display:flex;align-items:flex-end"><label class="fbool" style="padding:0"><input type="checkbox" id="rt-keepviol"> Protect violation screenshots from routine cleanup</label></div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn solid" id="rt-save">Save schedule</button>
+          <button class="btn" id="rt-preview">Preview what would be deleted (dry run)</button>
+          <span class="mut" id="rt-msg"></span>
+        </div>
+        <div id="rt-out" style="margin-top:10px;font-size:11.5px;max-height:180px;overflow:auto"></div>
       </div>
       <div class="card"><h3>Audit trail <span class="hint">every admin action, export and screenshot view — accountable and searchable</span></h3>
         <div class="filters">
@@ -494,6 +712,101 @@
         <table><thead><tr><th>When</th><th>User</th><th>Action</th><th>Subject</th><th>Details</th><th>IP</th></tr></thead>
         <tbody id="au-rows"></tbody></table>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ORG UNIT EDITOR (17-Jul) -->
+<div class="ovl" id="org-ovl">
+  <div class="modal" style="width:520px">
+    <div class="mhead"><div class="mt"><b id="org-m-title">Add</b><span>Organisation structure — used across employees, attendance &amp; policies</span></div>
+      <button class="x" id="org-x">&#10005;</button></div>
+    <div class="mbody"><div id="org-form"></div><div class="err" id="org-err"></div></div>
+    <div class="mfoot"><button class="btn" id="org-cancel">Cancel</button><button class="btn solid" id="org-save">Save</button></div>
+  </div>
+</div>
+
+<!-- API KEY / TARGET editors (17-Jul) -->
+<div class="ovl" id="key-ovl"><div class="modal" style="width:520px">
+  <div class="mhead"><div class="mt"><b>New API key</b><span>Shown once — copy it now. Store it in the external app.</span></div><button class="x" id="key-x">&#10005;</button></div>
+  <div class="mbody" id="key-body"></div>
+  <div class="mfoot" id="key-foot"></div>
+</div></div>
+<div class="ovl" id="tgt-ovl"><div class="modal" style="width:560px">
+  <div class="mhead"><div class="mt"><b id="tgt-title">Add outbound target</b><span>SmartEPT POSTs signed attendance JSON to this URL</span></div><button class="x" id="tgt-x">&#10005;</button></div>
+  <div class="mbody">
+    <div class="fgrid">
+      <div class="full"><label>Name</label><input id="tgt-name" placeholder="SmartPRS Production"></div>
+      <div class="full"><label>Endpoint URL</label><input id="tgt-url" placeholder="https://smartprs.com/api/ingest/attendance"></div>
+      <div class="full"><label>Signing secret <span style="font-weight:400;color:var(--ink-3)">(blank = auto-generate; leave blank on edit to keep current)</span></label><input id="tgt-secret" placeholder="shared HMAC secret"></div>
+    </div>
+    <label>What to send</label>
+    <select id="tgt-events">
+      <option value="attendance.daily">Daily attendance summary (nightly batch)</option>
+      <option value="attendance.punch">Real-time IN/OUT punches (like a biometric device → SmartPRS)</option>
+      <option value="both">Both — real-time punches + nightly summary</option>
+    </select>
+    <div class="fbool" style="margin-top:8px"><input type="checkbox" id="tgt-active" checked> Active</div>
+    <div class="mut" style="font-size:11px">Real-time mode makes SmartEPT behave like a punch device: every login/unlock sends an IN, every logout/lock sends an OUT, HMAC-signed, the instant it happens.</div>
+    <div class="err" id="tgt-err"></div>
+  </div>
+  <div class="mfoot"><button class="btn" id="tgt-cancel">Cancel</button><button class="btn solid" id="tgt-save">Save</button></div>
+</div></div>
+
+<!-- BULK EMPLOYEE IMPORT (17-Jul, SmartPRS parity) -->
+<div class="ovl" id="import-ovl">
+  <div class="modal" style="width:640px">
+    <div class="mhead"><div class="mt"><b>Bulk import employees</b><span>Upload a CSV — one row per employee. Departments, teams, branches, shifts &amp; designations are matched by name and created if new.</span></div>
+      <button class="x" id="import-x">&#10005;</button></div>
+    <div class="mbody">
+      <div class="never" style="background:var(--accent-weak);border-color:var(--accent);margin-bottom:14px">
+        <b style="color:var(--accent-ink)">CSV columns</b>
+        <div style="font-size:11.5px;line-height:1.7">
+          <b>Required:</b> employee_code, first_name<br>
+          <b>Optional:</b> last_name, email, mobile, department, team, branch, designation, shift, date_of_joining, biometric_id<br>
+          A login is created for every row that has an email (opt out below). Download the template for the exact header row.
+        </div>
+      </div>
+      <label>Choose CSV file</label>
+      <input type="file" id="import-file" accept=".csv,text/csv">
+      <div class="fbool" style="margin-top:10px"><input type="checkbox" id="import-login" checked> Create a self-service login for each employee with an email</div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn" id="import-preview">Preview (dry run)</button>
+        <button class="btn solid" id="import-run" disabled>Import now</button>
+      </div>
+      <div id="import-result" style="margin-top:14px;font-size:12px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- STORAGE CLEANUP (17-Jul): bulk delete evidence & logs by date range -->
+<div class="ovl" id="cleanup-ovl">
+  <div class="modal" style="width:560px">
+    <div class="mhead"><div class="mt"><b>Free up storage — bulk delete</b><span>Deletes are permanent and audit-logged. Attendance, breaks and the audit trail are never touched.</span></div>
+      <button class="x" id="cleanup-x">✕</button></div>
+    <div class="mbody">
+      <div class="fgrid">
+        <div><label>From date</label><input type="date" id="cl-from"></div>
+        <div><label>To date</label><input type="date" id="cl-to"></div>
+      </div>
+      <label style="margin-top:14px">What to delete in this range</label>
+      <div class="fbool"><input type="checkbox" id="cl-shots" checked> Screenshots (frees disk space)</div>
+      <div class="fbool"><input type="checkbox" id="cl-activity"> Activity events (active/idle stretches)</div>
+      <div class="fbool"><input type="checkbox" id="cl-apps"> Application usage logs</div>
+      <div class="fbool"><input type="checkbox" id="cl-sites"> Website usage logs</div>
+      <div class="fbool"><input type="checkbox" id="cl-presence"> Webcam presence logs</div>
+      <div class="never" style="margin-top:14px;margin-bottom:0">
+        <b>Violation evidence protection</b>
+        <div class="fbool" style="padding-top:2px"><input type="checkbox" id="cl-keepviol" checked> Keep violation screenshots (recommended — evidence survives cleanup)</div>
+        <div class="fbool"><input type="checkbox" id="cl-delviol"> Also delete violation RECORDS in this range (needs the confirmation word)</div>
+      </div>
+      <label style="margin-top:14px">Type <b>DELETE</b> to confirm</label>
+      <input id="cl-confirm" placeholder="DELETE" autocomplete="off">
+      <div class="mut" id="cl-msg" style="min-height:18px"></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn" id="cleanup-cancel">Cancel</button>
+      <button class="btn danger" id="cleanup-run">Delete permanently</button>
     </div>
   </div>
 </div>
@@ -516,7 +829,7 @@
 <div class="ovl" id="help-ovl">
   <div class="modal">
     <div class="mhead">
-      <div class="mark" style="width:30px;height:30px;font-size:10px;border-radius:8px">EPT</div>
+      <div class="mark" style="width:30px;height:30px;font-size:10px;border-radius:8px"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACwAAAAsCAYAAAAehFoBAAALNklEQVR42u1Ze3CUVxX/nXu/x2Z3CY8lgSaxYMur2AeKRVvQQBUsapn6SKxtWp+l09ZpB1/F2nZJnVE6UwfbAgq22uowMhvtVFJsB+lAZLTDCNYCxUAhpJAmlDw32f3e9x7/2CQmNDxicdTRO3P3m93v3u/73d/53XPOPQv8v13AxkxpZgFm+j8ZF7AV2Jw7Nz6j/vktV7/W+MfZW198skA4k/hPMn/ljh1GJbMEM6GkxOCiMYvM1KRrZSxxzcAw4z+HV+IGIBr8XlWp883Hs8oPEqq7s2eA+n8/4HRaoLZWpx54YGbivXOXCEZR38H9v+186KHDfbHp1/Ua0lBBrndgUfTvBjtl6lRr6tSp0cE9r96avHb+z+KJOPJNx25sjpznUV2tRikrJmaWzGxc4P62vRO774Hbijc/xxdteZFLfvLT64dZYIhbo7OAFUSk/5UET3j00cVFFRUfIscLOra+0KAunTnNMhGQ47bEL7k0CDo68z213903dI5xJmaJSC9eXJNYvXrF9dls36UQAgJAFGkSp/GjtcbA/cEVFn4CAAYAAQHFiqWU1NqTbbz5xhu2iMS428zpl9Xw8eMomnP5xd0PPrgrBJB6ZvPvErNmLDWPHDnaA8wCUdTPMhsjMSsE6UwmM++66z7yy1RqwowLzezfDr/+JwBbdFublz10FHCyQRhF7sB99+Rb44zyCui+XPHpc0dk+Pbbl5sL5i94MpWaMMPzvGxvb25fLGY5vu/bzCwjpQwVRWYYhiYzEQBYhhHowY0stBDgWCzmSikjklITMyml2LZt8lxnFwDETr35aI/vPkeBP0YaYuqEp54qDY4cafeaXn+mz5J7RG/3SQAazIOWehu7APDss89eEwQh5/N5t77+hYX/amcR/8JX54x9Yl1QmqmLJjzxxL1nG2uMFBaFECWmaXB7R7t/ww1LX+WCfkT/KhkApJR8tgcrpWjIM2ljYT4AYO/evdhYX6/Q1ibx0Y9qtX1XKcgy4Siw62tUZSQ+njfR3ByhtjY6pyTCMNQAyJCSli1bVkRE3cysiYjPP3ANjh24juRTGRs3sl9V1WgdS6bV2PGm6O74M+q+qTA7zait1eelYSmtwkZnRls2+05cGwHgkvTapFVKSzhig5hZ2Db5bm7Pqa9/vQnMBKLjAfDwsJm1tRrMhLo6MTSAjBya5QUSZyZTeFmFvcC+Ys5vBBNIKZjFSYijTY8DuLdy507ZACik03LQIRbAShCp0y0zMmB1QeDS0NdwzlHMUCQFI2JDJuLRMGkM1WqBdQUgVrbxyZvyTUd+m129uhvAOdJLHiVEZhrsRIyqKoCZVG8uoUFS+57Urit1GEitz5DHpNMCRFT2q8yds/68Z1+iomJ59n3v663KZCQAPnc+7IwuRRzsBZMCRGxYttbMiJSGUgpRGCAKPR5BQhIPP6xTP3ysMjlr5noSxnS37c3voLpa1Z1NEkqpQaPG4+elVYnqalXy+LrbimbNuFsEkSYpbDJNhE1Hbs2RecpwHSCKwAQgDKG8EADQMGS5lSUl1MCM5LSptdKOa7fxbw0tX/lKA5hFv0TOnQ87ZzL9qlV02jZVsKwFNG7iPOrsBBkGZPEYsG1fFPV5fUopIAgLNvUDRGE4/JkbNhgNixaF5Zt+db9ZMeVDQVcX+x0daRABdXV0Drc2RMPOGUw/XOFB4VM5qrtHqXwuEtIQDJY6ZAXfI+2H4MCDJgJ8DzoIhoI1cccd4cTH1y81S0prdQR4bzSvbVv+5V0D1jv/I1L87X51zMrvp4zyMWWwbY0oIl8bhrP+Rwe177EKAkmamUkTtBah61iRHzjKcwHXBUmByLahfB8AUNHebrbccYc78bHH5toVZXUiUWx4LSdea214aSUyGYmqKn0egUOOnC33+1UxPrbWLLv4JoSBFgRh2jb0Bz94rY5UXkUKFIYQYQSWAlHoceiGMB0HFAQgIcBxpaIwMJHJyJbqanfiI49UmhVT6sx4ccI72dbnNh66CRs3OtiwQeC06DoM8M6dOwkA6VDTAN7hBFcVLpaVBATICzQMyQKhtJLJiIlCrVTB5JohJEFrrQo5M4AwVAQQh4GBbI+Pr92pxj+y5vNixrSfy1jc9j1fB8dbarq/+60DyGQGAseZQ/PChQsVAGYhzuCB+52L6yntOIAfgLSJgYxehSGR64IcB0QENiQi1yXkXOIxCQUhLQWADh9aK7e/sHrCT558QCST34PS7Dt5hCdPfqlnxV1bsGOHgUWLorNlawSAl9x6axxls2JePm8WWGE4I2w65QdC+gGgFEAE4RMgbNZdXdCpFBBGIBJMuZxSjhOykx/DNFmis313ePTYty0z9rq8/a5fytLSpQhC1mHEUevxL/Z8Y8UvzgYWGEj50mkCgL0zL/sGJo0tTRJ5zAxmRmy8bWYyGblz505ZBUhmJoSBq4MAOgihPQ/KD8D5nKXzjlA5h5UfRFEYUmRaUlvxIimoRR9vrnF+UDs/Nm/ue4wlCw+JZHKpzuUQOU6fd+KNT58P2ALD/XWBxPK7rxBjx34Sr+x+OCyyphMRx2I2dm3bFu7atk0NdROJ+x6ydBiBPRcEEJh10NkZx+SLDZImUeDH4DpQTv4P6uXdzcG25xuL70+PsdesbRCpifPBGmyYCLu7DniN+2vCNWtePR+wA5IQALROlSyMsvl3A5B9vt/s+z6NGzeu6JVXXr33L3/Z85KUtur18/FkFO2767VmFvmc0oGvYVoCWgsi8gkQ8P0O3dnxtD5ycL1fX38svmLlx61PfPLHMI2FJATY88CsEXV1rs8/9+v70NCQQyYjzwdsAXBbWcF5GbJcTyydmLrlCwu/ePPNL81tPLTp8pkzbpkz58qVc+ZcuXJgwvH9+x/1dh/wY8XjpO7LSu3koX3vdW0X9Uzasrm2paVlFQAZvz/9mfg1lZtlUdE8siwADC0IUa5vn8r23OfXPvjiYLIzioKJgYtaGQAon3c1gNyUd6+aXVm5+4pZM2sOHjh4OFVa8lnbthIkhBZERo/jtIPVKW59k1RPVz0dPrDD3769FTfemDpVXbPYHjvuc8IwlkrbGi9MC6w1OPChw7AFbm6N8+D96wD4/RFMj3SqOJckNABQR++vldmcJttecOSaypfNufMem3357HX4x0kgBsDvD8kiC0wyamouxlXv/6w5b8HHhGHOE5Y1UdoxCCmglEZfe0dgmGaTFTjPOH/dswFbt3YX3HmVHHUZaliSXVUlUVenYneu+A7KK74PISBYQfRluxjcqEEOM0dQKkaxIoODsJyZJ1FRLE6mVUirpQCUhpvt0SB5ImaYR2+7pLzjw8WJH9RUV/+VAPAAq6PPtEc4FfSDtu5deQ8lkw8JIVJkWSDLKoDREVjpwhStwVqDBkK460CHQYuled/15ZPal3/g6mTlZbOmG8XFs/18ftk9mzZtv2f+fKqre08ErELtKGVwhmPMP0qfRcuWlel3TfsUTOsjkHIaWJUCbIA1IIwQ4E7B9Jbrem0Io/3I5/9wpdd9dPdTT9XHxo+/sl8+YAAnWluXTCkv//2FqtsZbzupVmWkW1fdCmBdfwcuuWQspk0r0NnZqbB3bxYAtt19d9ni6+arnG3z5lNdV0W2PS/SmlnrUAqhAJjHjh69esPTTzdREEiimN6/f08fEb11wcv3SKcNFM5Rw0MjEdLptNXU/MZWHkXTSjMzc18up1/Zt++WfqblO2N4eIIenS6bqkxG1FVX68mTJ5c4udykEy0nXo7CiLkQ7aAU85D6JQQESBKRlAXdA8q2bctz3asAbPof+ovpn1IN0zuYz6Mpe/1Xt78DKJBLZqtAbdEAAAAASUVORK5CYII=" alt="SmartEPT" style="width:72%;height:72%;object-fit:contain;display:block"></div>
       <div class="mt"><b id="help-title">Screen help</b><span>SmartEPT · what this screen does and how to use it</span></div>
       <button class="x" data-close="help-ovl">✕</button>
     </div>
@@ -619,8 +932,8 @@
           <option value="HALF_DAY">HALF_DAY</option><option value="ON_LEAVE">ON_LEAVE</option>
         </select></div>
         <div></div>
-        <div><label>Check-in (optional)</label><input type="datetime-local" id="af-in"></div>
-        <div><label>Check-out (optional)</label><input type="datetime-local" id="af-out"></div>
+        <div><label>Check-in — date &amp; time (manual punch)</label><input type="datetime-local" id="af-in"></div>
+        <div><label>Check-out — date &amp; time (manual punch)</label><input type="datetime-local" id="af-out"></div><div class="full mut" style="font-size:11px;padding-top:2px">A manual check-in with a time counts as this employee's gate punch for that day — if Gate-to-PC is on, it lets their agent start. Time is captured, not just the date.</div>
         <div class="full"><label>Reason * — kept on the record with your name</label>
           <textarea id="af-reason" placeholder="e.g. Biometric reader was down — verified with the branch manager"></textarea></div>
       </div>
@@ -630,6 +943,18 @@
       <button class="btn" data-close="att-ovl">Cancel</button>
       <button class="btn solid" id="att-m-save">Save</button>
     </div>
+  </div>
+</div>
+
+<!-- ATTENDANCE DAY LOGS (drill-down) -->
+<div class="ovl" id="daylog-ovl">
+  <div class="modal" style="width:640px">
+    <div class="mhead">
+      <div class="mt"><b id="daylog-title">Day logs</b><span>Punch pairs, breaks &amp; totals for the selected day</span></div>
+      <button class="x" data-close="daylog-ovl">✕</button>
+    </div>
+    <div class="mbody" id="daylog-body"><div class="mut">Loading…</div></div>
+    <div class="mfoot"><button class="btn" data-close="daylog-ovl">Close</button></div>
   </div>
 </div>
 
@@ -667,6 +992,62 @@ let TOKEN = null, ME = null, CURRENT = null, poll = null;
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
+// Universal click-to-sort for EVERY table (17-Jul UX): click a column header to
+// sort its rows; click again to reverse. Numeric & date aware. Empty/action
+// headers and any table/th marked "nosort" are skipped. Pure client-side.
+document.addEventListener('click', (e) => {
+  const th = e.target.closest('th');
+  if (!th) return;
+  const table = th.closest('table');
+  if (!table || table.classList.contains('nosort') || th.classList.contains('nosort')) return;
+  const thead = th.closest('thead'); if (!thead) return;
+  const tbody = table.querySelector('tbody'); if (!tbody) return;
+  const rows = [...tbody.querySelectorAll('tr')].filter((r) => r.children.length > 1);
+  if (rows.length < 2) return;
+  const idx = [...th.parentElement.children].indexOf(th);
+  if (idx < 0 || !th.textContent.trim()) return; // skip action columns
+
+  const asc = !(th.dataset.sortDir === 'asc');
+  th.dataset.sortDir = asc ? 'asc' : 'desc';
+  thead.querySelectorAll('th').forEach((h) => { h.classList.remove('sorted'); const a = h.querySelector('.arw'); if (a) a.remove(); });
+  th.classList.add('sortable-h', 'sorted');
+  const arw = document.createElement('span'); arw.className = 'arw'; arw.textContent = asc ? '▲' : '▼'; th.appendChild(arw);
+
+  const val = (r) => {
+    const c = r.children[idx]; if (!c) return '';
+    return (c.getAttribute('data-sort') ?? c.textContent).trim();
+  };
+  const num = (v) => { const n = parseFloat(String(v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? null : n; };
+  rows.sort((a, b) => {
+    const va = val(a), vb = val(b), na = num(va), nb = num(vb);
+    let r; if (na !== null && nb !== null && va !== '' && vb !== '') r = na - nb;
+    else r = va.localeCompare(vb, undefined, { numeric: true, sensitivity: 'base' });
+    return asc ? r : -r;
+  });
+  rows.forEach((r) => tbody.appendChild(r));
+});
+// Mark header cells as sortable-looking on first hover of any table thead.
+document.addEventListener('mouseover', (e) => {
+  const th = e.target.closest('thead th');
+  if (th && th.textContent.trim() && !th.classList.contains('sortable-h')
+      && !th.closest('table').classList.contains('nosort')) th.classList.add('sortable-h');
+}, { once: false });
+// Lightweight non-blocking toast (17-Jul) — used by org/import/cleanup actions.
+function toast(msg) {
+  let el = document.getElementById('_toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = '_toast';
+    el.style.cssText = 'position:fixed;bottom:22px;right:22px;background:var(--navy);color:#fff;padding:12px 18px;'
+      + 'border-radius:11px;font-size:13px;font-weight:600;z-index:200;box-shadow:0 12px 30px rgba(0,0,0,.35);'
+      + 'max-width:340px;opacity:0;transform:translateY(8px);transition:opacity .18s,transform .18s';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'none'; });
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateY(8px)'; }, 3000);
+}
 
 async function api(path, opts = {}) {
   const isForm = opts.body instanceof FormData;
@@ -698,7 +1079,7 @@ const t = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit',
 const dt = (iso) => iso ? new Date(iso).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
 // esc() also escapes quotes so escaped values are safe inside HTML attributes (data-*).
 const esc = (s) => (s == null ? '' : String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])));
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }; // LOCAL date, not UTC — after midnight IST the console must default to the IST day
 const fullName = (e) => ((e?.first_name || '') + ' ' + (e?.last_name || '')).trim();
 const deniedCard = () => '<tr><td colspan="12"><div class="denied"><div class="big">🔒</div><b>Your role cannot view this</b><br>Ask a company admin to grant access.</div></td></tr>';
 const isDenied = (e) => e && e.status === 403;
@@ -727,8 +1108,19 @@ $('#signout').onclick = async () => {
   TOKEN = null; ME = null; sessionStorage.removeItem('ept_token');
   clearInterval(poll); $('#app').classList.add('hide'); $('#login').classList.remove('hide');
 };
-// Restore session on refresh.
+// Restore session on refresh — or complete an SSO handoff from SmartEPT Central.
 (async () => {
+  // One-click SSO: Central sends the browser to /admin?sso=<signed ticket>.
+  // Trade it for a real token, then scrub it from the URL/history.
+  const ssoTicket = new URLSearchParams(location.search).get('sso');
+  if (ssoTicket) {
+    history.replaceState(null, '', location.pathname);
+    try {
+      const res = await api('/auth/sso', { method: 'POST', body: JSON.stringify({ token: ssoTicket }) });
+      TOKEN = res.token; sessionStorage.setItem('ept_token', TOKEN);
+      const me = await api('/auth/me'); ME = me.user; enterApp(); return;
+    } catch (e) { $('#login-err').textContent = 'That console link has expired — open it again from your SmartEPT portal.'; }
+  }
   const saved = sessionStorage.getItem('ept_token');
   if (!saved) return;
   TOKEN = saved;
@@ -744,12 +1136,14 @@ const TITLES = {
   usage: ['Usage & Compliance', 'Per-employee application and website time'],
   violations: ['Violations', 'Compliance events across the company'],
   employees: ['Employees', 'Directory & lifecycle'],
+  org: ['Organisation', 'Branches, departments, teams, designations & shifts'],
   users: ['Users', 'Login accounts, roles & credentials'],
   devices: ['Devices', 'Registered endpoints & agent health'],
   policies: ['Policies', 'The control room — what is tracked, for whom'],
   biometric: ['Biometric', 'Door punches, mapping & reconciliation'],
   reports: ['Reports & Exports', 'CSV exports for Excel and payroll'],
   license: ['Licence', 'Key, plan, device seats & daily validation'],
+  integrations: ['API & Integrations', 'Connect SmartEPT to SmartPRS & any external device or app'],
   ops: ['Audit & Ops', 'Who did what, storage growth & database backups'],
 };
 $$('.nav').forEach((n) => n.onclick = () => show(n.dataset.view));
@@ -765,12 +1159,14 @@ function show(v) {
   if (v === 'usage') initUsage();
   if (v === 'violations') loadViolations();
   if (v === 'employees') loadEmployees();
+  if (v === 'org') initOrg();
   if (v === 'users') loadUsers();
   if (v === 'devices') loadDevices();
   if (v === 'policies') initPolicies();
   if (v === 'biometric') initBiometric();
   if (v === 'reports') initReports();
   if (v === 'license') loadLicense();
+  if (v === 'integrations') initIntegrations();
   if (v === 'ops') loadOps();
   CURRENT = v;
 }
@@ -895,6 +1291,28 @@ async function loadScreenshots() {
         + esc(s.active_app || s.window_title || '—')
         + ' · <span style="color:var(--ink-3)">' + esc(s.trigger_reason || '') + '</span></div></div>';
     }).join('');
+    // Evidence jump: highlight the capture taken at (or nearest to) the
+    // violation moment, so "View evidence" lands on the exact screenshot.
+    if (window._EV_TIME) {
+      const target = new Date(String(window._EV_TIME).replace(' ', 'T')).getTime();
+      window._EV_TIME = null;
+      if (!isNaN(target)) {
+        let best = null, bestDiff = Infinity;
+        shots.forEach((s) => {
+          const t2 = new Date(String(s.captured_at).replace(' ', 'T')).getTime();
+          const diff = Math.abs(t2 - target);
+          if (diff < bestDiff) { bestDiff = diff; best = s; }
+        });
+        if (best && bestDiff <= 5 * 60 * 1000) {
+          const el = document.querySelector('[data-shot="' + best.id + '"]');
+          if (el) {
+            el.classList.add('ev-hit');
+            setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
+          }
+        }
+      }
+    }
+
     // Fetch each image as a blob with the bearer token (the file route is protected).
     shots.forEach(async (s) => {
       const slot = document.getElementById('ss-img-' + s.id);
@@ -932,15 +1350,38 @@ async function initUsage() {
   if (!$('#us-date').value) $('#us-date').value = today();
   try {
     const emps = await employeesList();
-    fillEmpPicker($('#us-emp'), emps);
-    if ($('#us-emp').value) loadUsage();
+    // Default view = ALL employees (17-Jul). "— All employees —" is the first option.
+    fillSelect($('#us-emp'), emps, (e) => fullName(e) + ' (' + (e.employee_code || '#' + e.id) + ')', (e) => e.id, '— All employees —');
+    $('#us-emp').value = '';
+    loadUsage();
   } catch (e) {
-    if (isDenied(e)) $('#us-app-rows').innerHTML = deniedCard();
+    if (isDenied(e)) $('#us-sum-rows').innerHTML = deniedCard();
   }
+}
+async function loadUsageSummary() {
+  const date = $('#us-date').value || today();
+  $('#us-summary-card').style.display = '';
+  $('#us-individual').style.display = 'none';
+  $('#us-comp-card').style.display = 'none';
+  try {
+    const r = await api('/reports/usage-summary?date=' + encodeURIComponent(date));
+    $('#us-sum-rows').innerHTML = (r.data || []).length ? r.data.map((e) =>
+      '<tr class="clk" data-uemp="' + e.employee_id + '" data-uname="' + esc(e.name) + '">'
+      + '<td>' + esc(e.employee_code || '—') + '</td><td><b>' + esc(e.name) + '</b></td>'
+      + '<td>' + esc(e.department || '—') + '</td><td>' + esc(e.team || '—') + '</td>'
+      + '<td data-sort="' + e.app_seconds + '">' + secH(e.app_seconds) + '</td>'
+      + '<td data-sort="' + e.site_seconds + '">' + secH(e.site_seconds) + '</td>'
+      + '<td data-sort="' + e.violations + '">' + (e.violations ? '<span class="tag t-danger">' + e.violations + '</span>' : '0') + '</td></tr>'
+    ).join('') : '<tr><td colspan="7" class="mut">No app/website activity recorded for this day yet.</td></tr>';
+  } catch (e) { $('#us-sum-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="7" class="mut">' + esc(e.message) + '</td></tr>'; }
 }
 async function loadUsage() {
   const id = $('#us-emp').value, date = $('#us-date').value || today();
-  if (!id) return;
+  if (!id) { return loadUsageSummary(); }
+  // Individual view.
+  $('#us-summary-card').style.display = 'none';
+  $('#us-individual').style.display = '';
+  $('#us-comp-card').style.display = '';
   const q = '?date=' + encodeURIComponent(date);
   const secTable = (rows, keys, tbody, empty) => {
     tbody.innerHTML = (rows || []).map((r) => '<tr>'
@@ -968,6 +1409,10 @@ async function loadUsage() {
   } catch (e) { $('#us-comp-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="5" class="mut">' + esc(e.message) + '</td></tr>'; }
 }
 $('#us-load').onclick = loadUsage;
+$('#us-sum-rows').addEventListener('click', (e) => {
+  const tr = e.target.closest('[data-uemp]'); if (!tr) return;
+  $('#us-emp').value = tr.dataset.uemp; loadUsage();
+});
 $('#us-emp').addEventListener('change', loadUsage);
 $('#us-date').addEventListener('change', loadUsage);
 $('#us-open-drawer').onclick = () => {
@@ -983,7 +1428,7 @@ async function loadViolations() {
       const sc = { LOW: 't-info', MEDIUM: 't-warn', HIGH: 't-danger', CRITICAL: 't-danger' }[v.severity] || 't-off';
       const date = v.started_at ? String(v.started_at).slice(0, 10) : today();
       const evidence = v.screenshot_captured
-        ? '<a data-ev-emp="' + (v.employee?.id ?? '') + '" data-ev-name="' + esc(fullName(v.employee)) + '" data-ev-date="' + esc(date) + '" style="cursor:pointer;font-weight:600">View evidence</a>'
+        ? '<a data-ev-emp="' + (v.employee?.id ?? '') + '" data-ev-name="' + esc(fullName(v.employee)) + '" data-ev-date="' + esc(date) + '" data-ev-time="' + esc(String(v.started_at || '')) + '" style="cursor:pointer;font-weight:600">View evidence</a>'
         : '<span class="mut">—</span>';
       return '<tr><td>' + dt(v.started_at) + '</td><td><span class="nm">' + esc(fullName(v.employee) || '—') + '</span></td>'
         + '<td>' + esc(v.event_category) + '</td><td>' + esc(String(v.event_type || '').replace(/_/g, ' ')) + '</td>'
@@ -997,6 +1442,7 @@ async function loadViolations() {
 $('#viol-rows').addEventListener('click', async (e) => {
   const a = e.target.closest('[data-ev-emp]');
   if (!a || !a.dataset.evEmp) return;
+  window._EV_TIME = a.dataset.evTime || null; // highlight the exact capture
   show('screenshots');
   await initScreenshots();
   $('#ss-emp').value = a.dataset.evEmp;
@@ -1101,6 +1547,266 @@ async function openEmpModal(id) {
   $('#emp-ovl').classList.add('open');
 }
 $('#emp-add').onclick = () => openEmpModal(null);
+
+// ---- API & integrations (17-Jul) ----
+async function initIntegrations() { loadKeys(); loadTargets(); renderApiDocs(); }
+async function loadKeys() {
+  try {
+    const d = await api('/integrations/keys');
+    $('#key-rows').innerHTML = (d.data || []).length ? d.data.map((k) =>
+      '<tr><td><b>' + esc(k.name) + '</b></td><td><code>' + esc(k.prefix) + '…</code></td>'
+      + '<td class="mut">' + esc((k.scopes || []).join(', ') || 'all') + '</td>'
+      + '<td class="mut">' + (k.last_used_at ? esc(k.last_used_at) : 'never') + '</td>'
+      + '<td>' + (k.active ? '<span class="tag t-ok">active</span>' : '<span class="tag t-off">revoked</span>') + '</td>'
+      + '<td>' + (k.active ? '<button class="btn danger" onclick="revokeKey(' + k.id + ')">Revoke</button>' : '') + '</td></tr>'
+    ).join('') : '<tr><td colspan="6" class="mut">No keys yet. Create one for SmartPRS or a gate device.</td></tr>';
+  } catch (e) { $('#key-rows').innerHTML = '<tr><td colspan="6" class="mut">' + esc(e.message) + '</td></tr>'; }
+}
+window.revokeKey = async (id) => {
+  if (!confirm('Revoke this key? Any app using it stops working immediately.')) return;
+  try { await api('/integrations/keys/' + id + '/revoke', { method: 'POST' }); toast('Key revoked'); loadKeys(); }
+  catch (e) { toast(e.message); }
+};
+$('#key-add').onclick = () => {
+  $('#key-body').innerHTML = '<label>Key name</label><input id="key-name" placeholder="e.g. SmartPRS Production">'
+    + '<label style="margin-top:10px">What can this key do?</label>'
+    + '<div class="fbool"><input type="checkbox" id="key-ingest" checked> Push data IN (ingest attendance)</div>'
+    + '<div class="fbool"><input type="checkbox" id="key-read" checked> Read data OUT (attendance)</div>'
+    + '<div class="err" id="key-err"></div>';
+  $('#key-foot').innerHTML = '<button class="btn" onclick="document.getElementById(\'key-ovl\').classList.remove(\'open\')">Cancel</button>'
+    + '<button class="btn solid" id="key-create">Create key</button>';
+  $('#key-ovl').classList.add('open');
+  $('#key-create').onclick = async () => {
+    const scopes = []; if ($('#key-ingest').checked) scopes.push('ingest'); if ($('#key-read').checked) scopes.push('read');
+    if (!$('#key-name').value.trim()) { $('#key-err').textContent = 'Give the key a name.'; return; }
+    try {
+      const r = await api('/integrations/keys', { method: 'POST', body: JSON.stringify({ name: $('#key-name').value.trim(), scopes }) });
+      $('#key-body').innerHTML = '<div class="never" style="background:var(--ok-w);border-color:#B6E5CE">'
+        + '<b style="color:var(--ok)">Key created — copy it now, it is shown only once:</b>'
+        + '<div style="margin-top:8px;word-break:break-all;background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px;font-family:monospace;font-size:12px" id="key-secret">' + esc(r.secret) + '</div>'
+        + '<button class="btn acc" style="margin-top:8px" onclick="navigator.clipboard.writeText(document.getElementById(\'key-secret\').textContent);toast(\'Copied\')">Copy key</button></div>';
+      $('#key-foot').innerHTML = '<button class="btn solid" onclick="document.getElementById(\'key-ovl\').classList.remove(\'open\');loadKeys()">Done</button>';
+    } catch (e) { $('#key-err').textContent = e.message; }
+  };
+};
+$('#key-x').onclick = () => $('#key-ovl').classList.remove('open');
+
+async function loadTargets() {
+  try {
+    const d = await api('/integrations/targets');
+    $('#tgt-rows').innerHTML = (d.data || []).length ? d.data.map((t) =>
+      '<tr><td><b>' + esc(t.name) + '</b>' + (t.active ? '' : ' <span class="tag t-off">off</span>') + '</td>'
+      + '<td class="mut" style="max-width:200px;overflow:hidden;text-overflow:ellipsis">' + esc(t.url) + (((t.events||[]).includes('attendance.punch')) ? '<div style="color:var(--accent-ink);font-weight:700">⚡ real-time punches</div>' : '') + '</td>'
+      + '<td class="mut">' + (t.last_pushed_at ? esc(t.last_pushed_at) : '—') + '</td>'
+      + '<td class="mut">' + esc(t.last_status || '—') + '</td>'
+      + '<td style="white-space:nowrap"><button class="btn" onclick="pushTarget(' + t.id + ')">Test push</button> '
+      + '<button class="btn" onclick=\'editTarget(' + JSON.stringify(t).replace(/'/g, "&#39;") + ')\'>Edit</button> '
+      + '<button class="btn danger" onclick="delTarget(' + t.id + ')">Delete</button></td></tr>'
+    ).join('') : '<tr><td colspan="5" class="mut">No targets yet. Add SmartPRS to push attendance there nightly.</td></tr>';
+  } catch (e) { $('#tgt-rows').innerHTML = '<tr><td colspan="5" class="mut">' + esc(e.message) + '</td></tr>'; }
+}
+let TGT_EDIT = null;
+function openTarget(t) {
+  TGT_EDIT = t ? t.id : null;
+  $('#tgt-title').textContent = t ? 'Edit target' : 'Add outbound target';
+  $('#tgt-name').value = t ? t.name : ''; $('#tgt-url').value = t ? t.url : '';
+  $('#tgt-secret').value = ''; $('#tgt-active').checked = t ? !!t.active : true; $('#tgt-err').textContent = '';
+  const ev = t && t.events ? t.events : ['attendance.daily'];
+  $('#tgt-events').value = (ev.includes('attendance.daily') && ev.includes('attendance.punch')) ? 'both'
+    : ev.includes('attendance.punch') ? 'attendance.punch' : 'attendance.daily';
+  $('#tgt-ovl').classList.add('open');
+}
+window.editTarget = (t) => openTarget(t);
+$('#tgt-add').onclick = () => openTarget(null);
+$('#tgt-x').onclick = $('#tgt-cancel').onclick = () => $('#tgt-ovl').classList.remove('open');
+$('#tgt-save').onclick = async () => {
+  const mode = $('#tgt-events').value;
+  const events = mode === 'both' ? ['attendance.daily', 'attendance.punch'] : [mode];
+  const body = { name: $('#tgt-name').value.trim(), url: $('#tgt-url').value.trim(),
+    secret: $('#tgt-secret').value.trim() || null, active: $('#tgt-active').checked, events };
+  if (!body.name || !body.url) { $('#tgt-err').textContent = 'Name and URL are required.'; return; }
+  try {
+    if (TGT_EDIT) await api('/integrations/targets/' + TGT_EDIT, { method: 'PUT', body: JSON.stringify(body) });
+    else await api('/integrations/targets', { method: 'POST', body: JSON.stringify(body) });
+    $('#tgt-ovl').classList.remove('open'); toast('Saved'); loadTargets();
+  } catch (e) { $('#tgt-err').textContent = e.message; }
+};
+window.pushTarget = async (id) => {
+  toast('Pushing yesterday\'s attendance…');
+  try { const r = await api('/integrations/targets/' + id + '/push', { method: 'POST', body: JSON.stringify({}) });
+    toast((r.ok ? '✓ ' : '✕ ') + r.status + ' · ' + r.records + ' records'); loadTargets(); }
+  catch (e) { toast(e.message); }
+};
+window.delTarget = async (id) => { if (!confirm('Delete this target?')) return;
+  try { await api('/integrations/targets/' + id, { method: 'DELETE' }); toast('Deleted'); loadTargets(); } catch (e) { toast(e.message); } };
+
+function renderApiDocs() {
+  const base = location.origin + '/api/v1';
+  $('#api-docs').innerHTML =
+    '<h5 style="color:var(--accent-ink);margin:0 0 6px">Base URL</h5><code>' + esc(base) + '</code>'
+    + '<h5 style="color:var(--accent-ink);margin:14px 0 6px">Authentication</h5>'
+    + 'Send your API key on every request:<br><code>Authorization: Bearer sk_live_xxxxxxxx</code> &nbsp;(or <code>X-Api-Key: sk_live_...</code>)'
+    + '<h5 style="color:var(--accent-ink);margin:14px 0 6px">1 · Verify a key</h5>'
+    + '<code>GET ' + esc(base) + '/ping</code>'
+    + '<h5 style="color:var(--accent-ink);margin:14px 0 6px">2 · Push punches IN (ingest scope)</h5>'
+    + '<code>POST ' + esc(base) + '/attendance/punches</code>'
+    + '<pre style="background:var(--card-2);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;font-size:11.5px;margin-top:6px">'
+    + esc(JSON.stringify({ punches: [{ employee_code: 'EMP001', punch_type: 'IN', punched_at: '2026-07-17T09:15:00+05:30', source: 'gate-1' }, { employee_code: 'EMP001', punch_type: 'OUT', punched_at: '2026-07-17T18:05:00+05:30' }] }, null, 2)) + '</pre>'
+    + 'Rule: earliest IN / latest OUT wins per day; unknown employee_codes are returned so you can fix them.'
+    + '<h5 style="color:var(--accent-ink);margin:14px 0 6px">3 · Read attendance OUT (read scope)</h5>'
+    + '<code>GET ' + esc(base) + '/attendance?date=2026-07-17&employee_code=EMP001</code><br>'
+    + 'Returns per-employee first_in, last_out, worked_seconds, break_seconds, status.'
+    + '<h5 style="color:var(--accent-ink);margin:14px 0 6px">Outbound (SmartEPT → your app)</h5>'
+    + 'Add a target above with your endpoint URL + a shared secret. Every night (and on Test push) SmartEPT POSTs:'
+    + '<pre style="background:var(--card-2);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;font-size:11.5px;margin-top:6px">'
+    + esc(JSON.stringify({ event: 'attendance.daily', date: '2026-07-17', count: 2, records: [{ employee_code: 'EMP001', work_date: '2026-07-17', first_in: '…', last_out: '…', worked_seconds: 27300, break_seconds: 1320, status: 'PRESENT' }] }, null, 2)) + '</pre>'
+    + 'We sign the raw body: <code>X-SmartEPT-Signature: hex(hmac_sha256(body, secret))</code> — verify it before trusting the data.'
+    + '<h5 style="color:var(--accent-ink);margin:14px 0 6px">Real-time IN/OUT (biometric-device mode → SmartPRS)</h5>'
+    + 'Set a target to <b>Real-time punches</b>. Then every login/unlock (IN) and logout/lock (OUT) is POSTed the instant it happens — SmartEPT acts like a punch device:'
+    + '<pre style="background:var(--card-2);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;font-size:11.5px;margin-top:6px">'
+    + esc(JSON.stringify({ event: 'attendance.punch', device_id: 'SMARTEPT-ab12cd34', employee_code: 'EMP001', biometric_employee_id: 'EMP001', punch_type: 'IN', punched_at: '2026-07-17T09:15:00+05:30', verification_mode: 'SYSTEM', source: 'AGENT' }, null, 2)) + '</pre>'
+    + 'Same signature header. Point this at your SmartPRS punch-ingest endpoint and attendance flows straight through.';
+}
+
+// ---- organisation management (17-Jul) ----// ---- organisation management (17-Jul) ----
+const ORG_DEFS = {
+  branches:     { label: 'Branch',      cols: ['name','code','city','state'],
+                  fields: [['name','Name','text',1],['code','Code','text'],['city','City','text'],['state','State','text']] },
+  departments:  { label: 'Department',  cols: ['name','code','branch'],
+                  fields: [['name','Name','text',1],['code','Code','text'],['branch_id','Branch','select:branches']] },
+  teams:        { label: 'Team',        cols: ['name','code','department'],
+                  fields: [['name','Name','text',1],['code','Code','text'],['department_id','Department','select:departments']] },
+  designations: { label: 'Designation', cols: ['name','code','level'],
+                  fields: [['name','Name','text',1],['code','Code','text'],['level','Level (0=junior)','num']] },
+  shifts:       { label: 'Shift',       cols: ['name','code','timing'],
+                  fields: [['name','Name','text',1],['code','Code','text'],['start_time','Start (HH:MM)','time'],['end_time','End (HH:MM)','time'],['grace_minutes','Grace (min)','num'],['break_minutes_allowed','Break allowed (min)','num']] },
+};
+let ORG_TAB = 'branches';
+async function initOrg() {
+  $$('#org-tabs .tab').forEach((t) => t.onclick = () => { ORG_TAB = t.dataset.org;
+    $$('#org-tabs .tab').forEach((x) => x.classList.toggle('active', x === t)); renderOrg(); });
+  renderOrg();
+}
+async function renderOrg() {
+  const def = ORG_DEFS[ORG_TAB];
+  $('#org-title').childNodes[0].nodeValue = def.label + 's ';
+  $('#org-head').innerHTML = '<tr>' + def.cols.map((c) => '<th>' + c[0].toUpperCase() + c.slice(1) + '</th>').join('') + '<th></th></tr>';
+  $('#org-rows').innerHTML = '<tr><td colspan="' + (def.cols.length + 1) + '" class="mut">Loading…</td></tr>';
+  const org = await orgLists(true);
+  const rows = org[ORG_TAB] || [];
+  const nameOf = (list, id) => { const r = (org[list] || []).find((x) => x.id === id); return r ? r.name : '—'; };
+  $('#org-rows').innerHTML = rows.length ? rows.map((r) => {
+    const cells = def.cols.map((c) => {
+      if (c === 'branch') return esc(nameOf('branches', r.branch_id));
+      if (c === 'department') return esc(nameOf('departments', r.department_id));
+      if (c === 'timing') return r.start_time ? esc(String(r.start_time).slice(0,5) + '–' + String(r.end_time||'').slice(0,5)) : '—';
+      return esc(r[c] != null && r[c] !== '' ? r[c] : '—');
+    }).map((v) => '<td>' + v + '</td>').join('');
+    return '<tr>' + cells + '<td style="white-space:nowrap">'
+      + '<button class="btn" onclick="orgEdit(' + r.id + ')">Edit</button> '
+      + '<button class="btn danger" onclick="orgDelete(' + r.id + ',&#39;' + esc(r.name) + '&#39;)">Delete</button></td></tr>';
+  }).join('') : '<tr><td colspan="' + (def.cols.length + 1) + '" class="mut">No ' + def.label.toLowerCase() + 's yet — click + Add. (Bulk employee import also creates these automatically by name.)</td></tr>';
+}
+let ORG_EDIT_ID = null;
+function orgField(f, val) {
+  const [k, label, type, req] = f;
+  const star = req ? ' <span style="color:var(--danger)">*</span>' : '';
+  if (type && type.startsWith('select:')) {
+    const list = (ORG_CACHE && ORG_CACHE[type.slice(7)]) || [];
+    return '<label>' + label + star + '</label><select data-k="' + k + '"><option value="">— none —</option>'
+      + list.map((r) => '<option value="' + r.id + '"' + (val == r.id ? ' selected' : '') + '>' + esc(r.name) + '</option>').join('') + '</select>';
+  }
+  const t = type === 'num' ? 'number' : type === 'time' ? 'time' : 'text';
+  return '<label>' + label + star + '</label><input data-k="' + k + '" type="' + t + '" value="' + esc(val == null ? '' : val) + '">';
+}
+function orgOpen(row) {
+  const def = ORG_DEFS[ORG_TAB];
+  ORG_EDIT_ID = row ? row.id : null;
+  $('#org-m-title').textContent = (row ? 'Edit ' : 'Add ') + def.label;
+  $('#org-err').textContent = '';
+  $('#org-form').innerHTML = '<div class="fgrid">' + def.fields.map((f) => {
+    let v = row ? row[f[0]] : '';
+    if ((f[2] === 'time') && v) v = String(v).slice(0,5);
+    return '<div class="' + (f[3] ? 'full' : '') + '">' + orgField(f, v) + '</div>';
+  }).join('') + '</div>';
+  $('#org-ovl').classList.add('open');
+}
+window.orgEdit = async (id) => { const org = await orgLists(); orgOpen((org[ORG_TAB] || []).find((r) => r.id === id)); };
+window.orgDelete = async (id, name) => {
+  if (!confirm('Delete ' + ORG_DEFS[ORG_TAB].label + ' "' + name + '"? Employees mapped to it keep their record but lose this link.')) return;
+  try { await api('/org/' + ORG_TAB + '/' + id, { method: 'DELETE' }); toast('Deleted'); ORG_CACHE = null; renderOrg(); }
+  catch (e) { toast(e.message); }
+};
+$('#org-add').onclick = () => orgOpen(null);
+$('#org-x').onclick = $('#org-cancel').onclick = () => $('#org-ovl').classList.remove('open');
+$('#org-save').onclick = async () => {
+  const body = {};
+  $$('#org-form [data-k]').forEach((el) => {
+    let v = el.value.trim();
+    if (el.type === 'time' && v && v.length === 5) v = v + ':00';
+    body[el.dataset.k] = v === '' ? null : (el.type === 'number' ? Number(v) : v);
+  });
+  if (!body.name) { $('#org-err').textContent = 'Name is required.'; return; }
+  try {
+    if (ORG_EDIT_ID) await api('/org/' + ORG_TAB + '/' + ORG_EDIT_ID, { method: 'PUT', body: JSON.stringify(body) });
+    else await api('/org/' + ORG_TAB, { method: 'POST', body: JSON.stringify(body) });
+    $('#org-ovl').classList.remove('open'); toast('Saved'); ORG_CACHE = null; renderOrg();
+  } catch (e) { $('#org-err').textContent = e.message; }
+};
+
+// ---- bulk import (17-Jul) ----
+const EMP_CSV_HEADER = 'employee_code,first_name,last_name,email,mobile,department,team,branch,designation,shift,date_of_joining,biometric_id';
+$('#emp-template').onclick = () => {
+  const sample = EMP_CSV_HEADER + '\n'
+    + 'E-2001,Rahul,Sharma,rahul.sharma@company.com,9848012345,Operations,Team A,Head Office,Executive,General Shift,2026-07-01,\n'
+    + 'E-2002,Sneha,Iyer,sneha.iyer@company.com,9848067890,Sales,Team B,Head Office,Manager,General Shift,2026-07-01,BIO-114';
+  const blob = new Blob([sample], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'smartept-employees-template.csv';
+  a.click(); URL.revokeObjectURL(a.href);
+};
+$('#emp-import').onclick = () => {
+  $('#import-file').value = ''; $('#import-result').innerHTML = ''; $('#import-run').disabled = true;
+  $('#import-ovl').classList.add('open');
+};
+$('#import-x').onclick = () => $('#import-ovl').classList.remove('open');
+function importForm(dry) {
+  const f = $('#import-file').files[0];
+  if (!f) { $('#import-result').innerHTML = '<span style="color:var(--danger)">Choose a CSV file first.</span>'; return null; }
+  const fd = new FormData();
+  fd.append('file', f);
+  fd.append('dry_run', dry ? '1' : '0');
+  fd.append('create_login', $('#import-login').checked ? '1' : '0');
+  return fd;
+}
+async function runImport(dry) {
+  const fd = importForm(dry); if (!fd) return;
+  $('#import-result').innerHTML = '<span class="mut">' + (dry ? 'Checking…' : 'Importing…') + '</span>';
+  try {
+    const r = await api('/employees/bulk-import', { method: 'POST', body: fd });
+    const su = r.summary || {};
+    const bad = (r.results || []).filter((x) => !x.ok);
+    let html = '<div class="' + (bad.length ? 'never' : '') + '" style="' + (bad.length ? '' : 'background:var(--ok-w);border:1px solid #B6E5CE;border-radius:10px;padding:12px') + '">'
+      + '<b style="color:' + (bad.length ? 'var(--danger)' : 'var(--ok)') + '">'
+      + (dry ? 'Preview: ' : '✓ Imported: ') + (su.created || 0) + (dry ? ' rows ready' : ' created')
+      + (su.failed ? ' · ' + su.failed + ' with problems' : '') + '</b>';
+    if (bad.length) {
+      html += '<div style="max-height:180px;overflow:auto;margin-top:8px;font-size:11.5px">'
+        + bad.map((x) => 'Line ' + x.line + ' (' + esc(x.code || '—') + '): ' + esc(x.error)).join('<br>') + '</div>';
+    }
+    if (!dry && (r.credentials || []).length) {
+      html += '<div style="margin-top:10px;font-size:11.5px"><b>Temp passwords (shown once — hand these out):</b><br>'
+        + r.credentials.map((c) => esc(c.email) + ' → <code>' + esc(c.temp_password) + '</code>').join('<br>') + '</div>';
+    }
+    html += '</div>';
+    $('#import-result').innerHTML = html;
+    $('#import-run').disabled = dry ? false : true;
+    if (!dry) { loadEmployees(); }
+  } catch (e) { $('#import-result').innerHTML = '<span style="color:var(--danger)">' + esc(e.message) + '</span>'; }
+}
+$('#import-preview').onclick = () => runImport(true);
+$('#import-run').onclick = () => runImport(false);
+$('#import-file').onchange = () => { $('#import-run').disabled = true; $('#import-result').innerHTML = ''; };
 $('#emp-m-save').onclick = async () => {
   $('#emp-m-err').textContent = '';
   const numOrNull = (s) => $(s).value ? Number($(s).value) : null;
@@ -1212,6 +1918,7 @@ const POLICY_FIELDS = {
   screenshot: [
     { k: 'name', l: 'Policy name', t: 'text', full: 1 },
     { k: 'enabled', l: 'Screenshots enabled', t: 'bool' },
+    { k: 'interval_enabled', l: 'Timed captures (OFF = violations only)', t: 'bool' },
     { k: 'interval_seconds', l: 'Interval (sec)', t: 'num' },
     { k: 'random_enabled', l: 'Random captures', t: 'bool' },
     { k: 'on_violation', l: 'Capture on violation', t: 'bool' },
@@ -1461,9 +2168,27 @@ $('#as-save').onclick = async () => {
 // ---- 8. biometric ----
 function initBiometric() {
   if (!$('#bio-date').value) $('#bio-date').value = today();
+  loadGatePolicy();
+  $('#gate-save').onclick = saveGatePolicy;
   loadBioDevices();
   loadBiometric();
   employeesList().then((emps) => fillEmpPicker($('#bio-map-emp'), emps)).catch(() => {});
+}
+async function loadGatePolicy() {
+  try {
+    const g = (await api('/gate/policy')).data;
+    $('#gate-enabled').checked = !!g.gate_enabled;
+    $('#gate-grace').value = g.gate_grace_minutes || 0;
+  } catch (e) { $('#gate-msg').textContent = e.message; }
+}
+async function saveGatePolicy() {
+  try {
+    await api('/gate/policy', { method: 'PUT', body: JSON.stringify({
+      gate_enabled: $('#gate-enabled').checked,
+      gate_grace_minutes: Math.max(0, parseInt($('#gate-grace').value || '0', 10)),
+    }) });
+    toast('Gate policy saved');
+  } catch (e) { $('#gate-msg').textContent = e.message; }
 }
 let bdEditId = null;
 let bdDevices = [];
@@ -1600,7 +2325,76 @@ $('#bio-map-save').onclick = async () => {
 };
 
 // ---- 9. reports & exports ----
+// ---- Live productivity report (17-Jul) ----
+let PROD_ROWS = [];
+const hms = (s) => { s = Math.max(0, Math.round(s || 0)); const h = Math.floor(s/3600), m = Math.round((s%3600)/60); return h ? h + 'h ' + m + 'm' : m + 'm'; };
+function prSetRange(from, to) { $('#pr-from').value = from; $('#pr-to').value = to; loadProductivity(); }
+function isoDate(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+async function loadProductivity() {
+  const from = $('#pr-from').value || today(), to = $('#pr-to').value || today();
+  $('#pr-rows').innerHTML = '<tr><td colspan="15" class="mut">Loading…</td></tr>';
+  try {
+    const r = await api('/reports/productivity?from=' + from + '&to=' + to);
+    PROD_ROWS = r.data || [];
+    $('#pr-rows').innerHTML = PROD_ROWS.length ? PROD_ROWS.map((x) =>
+      '<tr>' +
+      '<td>' + esc(x.work_date) + (x.live ? ' <span class="tag t-info" style="font-size:8px">LIVE</span>' : '') + '</td>' +
+      '<td>' + esc(x.employee_code || '—') + '</td>' +
+      '<td><b>' + esc(x.name) + '</b></td>' +
+      '<td class="mut">' + esc(x.department || '—') + '</td>' +
+      '<td>' + esc(x.first_in || '—') + '</td>' +
+      '<td>' + esc(x.last_out || '—') + '</td>' +
+      '<td data-sort="' + x.present_seconds + '">' + hms(x.present_seconds) + '</td>' +
+      '<td data-sort="' + x.work_seconds + '"><b>' + hms(x.work_seconds) + '</b></td>' +
+      '<td data-sort="' + x.idle_seconds + '">' + hms(x.idle_seconds) + '</td>' +
+      '<td data-sort="' + x.break_count + '">' + x.break_count + '</td>' +
+      '<td data-sort="' + x.break_seconds + '">' + hms(x.break_seconds) + '</td>' +
+      '<td data-sort="' + x.timeouts + '">' + x.timeouts + '</td>' +
+      '<td data-sort="' + x.non_productive_seconds + '">' + hms(x.non_productive_seconds) + '</td>' +
+      '<td data-sort="' + x.violations + '">' + (x.violations ? '<span class="tag t-danger">' + x.violations + '</span>' : '0') + '</td>' +
+      '<td data-sort="' + x.productivity + '"><b>' + Number(x.productivity).toFixed(0) + '%</b></td></tr>'
+    ).join('') : '<tr><td colspan="15" class="mut">No activity in this range.</td></tr>';
+    $('#pr-note').textContent = PROD_ROWS.length + ' rows · ' + from + ' → ' + to + ' · working = active tracked time; present = in-office span.';
+  } catch (e) { $('#pr-rows').innerHTML = '<tr><td colspan="15" class="mut">' + esc(e.message) + '</td></tr>'; }
+}
+function prCSV() {
+  const head = ['Date','Code','Employee','Department','Team','Logged in','Logged out','Present(s)','Working(s)','Idle(s)','Breaks','Break(s)','Time-outs','NonProductive(s)','Violations','Productivity%'];
+  const rows = PROD_ROWS.map((x) => [x.work_date,x.employee_code,x.name,x.department,x.team,x.first_in,x.last_out,x.present_seconds,x.work_seconds,x.idle_seconds,x.break_count,x.break_seconds,x.timeouts,x.non_productive_seconds,x.violations,x.productivity]);
+  const csv = [head, ...rows].map((r) => r.map((c) => '"' + String(c==null?'':c).replace(/"/g,'""') + '"').join(',')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+  a.download = 'smartept-productivity-' + $('#pr-from').value + '_' + $('#pr-to').value + '.csv'; a.click(); URL.revokeObjectURL(a.href);
+}
+function prPDF() {
+  const from = $('#pr-from').value, to = $('#pr-to').value;
+  const rowsHtml = PROD_ROWS.map((x) => '<tr><td>' + esc(x.work_date) + '</td><td>' + esc(x.employee_code||'') + '</td><td>' + esc(x.name) + '</td><td>' + esc(x.department||'') + '</td><td>' + esc(x.first_in||'—') + '</td><td>' + esc(x.last_out||'—') + '</td><td>' + hms(x.present_seconds) + '</td><td>' + hms(x.work_seconds) + '</td><td>' + hms(x.idle_seconds) + '</td><td>' + x.break_count + '</td><td>' + hms(x.break_seconds) + '</td><td>' + x.timeouts + '</td><td>' + x.violations + '</td><td>' + Number(x.productivity).toFixed(0) + '%</td></tr>').join('');
+  const co = ($('#company-name') ? $('#company-name').textContent : 'Company');
+  const w = window.open('', '_blank');
+  w.document.write('<html><head><title>SmartEPT Productivity ' + from + ' to ' + to + '</title><style>'
+    + 'body{font-family:Inter,Segoe UI,sans-serif;color:#15171C;padding:22px;font-size:11px}'
+    + 'h1{color:#0E7C8F;font-size:18px;margin:0}.sub{color:#878C99;font-size:11px;margin:2px 0 14px}'
+    + 'table{width:100%;border-collapse:collapse}th{background:#E3F4F7;color:#0B6373;text-align:left;padding:6px;font-size:9px;text-transform:uppercase}'
+    + 'td{padding:5px 6px;border-bottom:1px solid #EEF2F6}tr:nth-child(even) td{background:#FAFBFC}'
+    + '.hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #0E7C8F;padding-bottom:10px;margin-bottom:14px}'
+    + '@media print{.np{display:none}}</style></head><body>'
+    + '<div class="hd"><div><h1>Productivity Report</h1><div class="sub">' + esc(co) + ' · ' + from + ' → ' + to + ' · SmartEPT by Ametecs</div></div>'
+    + '<button class="np" onclick="window.print()" style="padding:8px 14px;background:#0E7C8F;color:#fff;border:none;border-radius:7px;cursor:pointer">Print / Save PDF</button></div>'
+    + '<table><thead><tr><th>Date</th><th>Code</th><th>Employee</th><th>Dept</th><th>In</th><th>Out</th><th>Present</th><th>Working</th><th>Idle</th><th>Breaks</th><th>Break time</th><th>Time-outs</th><th>Violations</th><th>Prod.%</th></tr></thead><tbody>'
+    + (rowsHtml || '<tr><td colspan="14">No data</td></tr>') + '</tbody></table>'
+    + '<p style="margin-top:14px;color:#878C99;font-size:10px">Generated ' + new Date().toLocaleString() + ' · SmartEPT — Employee Productivity Tracking & Intelligence</p>'
+    + '<p style="margin-top:2px;color:#A6ADB8;font-size:9px">SmartEPT™ · Developed by Ametecs India Private Limited · © 2026 Ametecs India Private Limited. All rights reserved.</p>'
+    + '</body></html>');
+  w.document.close();
+}
+
 function initReports() {
+  if (!$('#pr-from').value) { const d = new Date(); $('#pr-from').value = isoDate(new Date(d.getFullYear(), d.getMonth(), 1)); $('#pr-to').value = today(); }
+  $('#pr-load').onclick = loadProductivity;
+  $('#pr-today').onclick = () => prSetRange(today(), today());
+  $('#pr-week').onclick = () => { const d = new Date(); const g = (d.getDay()+6)%7; const mon = new Date(d); mon.setDate(d.getDate()-g); prSetRange(isoDate(mon), today()); };
+  $('#pr-month').onclick = () => { const d = new Date(); prSetRange(isoDate(new Date(d.getFullYear(), d.getMonth(), 1)), today()); };
+  $('#pr-csv').onclick = prCSV;
+  $('#pr-pdf').onclick = prPDF;
+  loadProductivity();
   const d = today(), m = d.slice(0, 7);
   [['#rp-att-from', d], ['#rp-att-to', d], ['#rp-prod-from', d], ['#rp-prod-to', d],
    ['#rp-comp-from', d], ['#rp-comp-to', d], ['#rp-sum-from', d], ['#rp-sum-to', d],
@@ -1854,7 +2648,7 @@ async function loadAttendance() {
       + '<td>' + (r.late_minutes ?? 0) + '</td>'
       + '<td>' + esc(r.source || '—') + '</td>'
       + '<td title="' + esc(r.notes || '') + '">' + (esc(lastNote(r.notes)) || '—') + '</td>'
-      + '<td><button class="btn" data-att-edit="' + r.id + '">Edit</button></td></tr>').join('')
+      + '<td><button class="btn" data-att-logs="' + r.employee_id + '" data-att-name="' + esc(r.employee_name || ('#' + r.employee_id)) + '">Logs</button> <button class="btn" data-att-edit="' + r.id + '">Edit</button></td></tr>').join('')
       || '<tr><td colspan="8" class="mut">No attendance rows for ' + esc(date) + '. Rows appear from agent logins, biometric punches or the nightly marking job — use "+ Add missed day" to record one manually.</td></tr>';
   } catch (e) {
     $('#at-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="8" class="mut">' + esc(e.message) + '</td></tr>';
@@ -1865,11 +2659,43 @@ $('#at-date').addEventListener('change', loadAttendance);
 $('#at-status').addEventListener('change', loadAttendance);
 $('#at-add').onclick = () => openAttModal(null);
 $('#at-rows').addEventListener('click', (e) => {
+  const logs = e.target.closest('[data-att-logs]');
+  if (logs) { openDayLogs(Number(logs.dataset.attLogs), logs.dataset.attName); return; }
   const btn = e.target.closest('[data-att-edit]');
   if (!btn) return;
   const r = ATT_LIST.find((x) => x.id === Number(btn.dataset.attEdit));
   if (r) openAttModal(r);
 });
+async function openDayLogs(empId, name) {
+  const date = $('#at-date').value || today();
+  $('#daylog-title').textContent = (name || '#' + empId) + ' · ' + date;
+  $('#daylog-body').innerHTML = '<div class="mut">Loading…</div>';
+  $('#daylog-ovl').classList.add('open');
+  try {
+    const d = await api('/reports/employee/' + empId + '/day-logs?date=' + encodeURIComponent(date));
+    const t = d.totals || {};
+    const kpi = (l, v) => '<div class="kpi"><div class="l">' + l + '</div><div class="v">' + v + '</div></div>';
+    let h = '<div class="grid4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">'
+      + kpi('Working', secH(t.worked_seconds)) + kpi('Idle', secH(t.idle_seconds))
+      + kpi('Breaks', secH(t.break_seconds) + ' · ' + (t.break_count || 0)) + kpi('Punch pairs', t.punch_pairs || 0)
+      + '</div>';
+    h += '<h4 style="margin:4px 0 6px">Punch pairs</h4><table><thead><tr><th>In</th><th>Out</th><th>Worked</th><th>Reason</th><th>Break after</th></tr></thead><tbody>'
+      + ((d.punches || []).map((p) => '<tr><td>' + esc(p.in) + '</td><td>' + esc(p.out) + '</td>'
+        + '<td>' + (p.worked_seconds != null ? secH(p.worked_seconds) : '—') + '</td>'
+        + '<td>' + esc(p.logout_reason || '—') + '</td>'
+        + '<td>' + (p.break_after_seconds != null ? secH(p.break_after_seconds) : '—') + '</td></tr>').join('')
+        || '<tr><td colspan="5" class="mut">No login sessions recorded for this day.</td></tr>')
+      + '</tbody></table>';
+    h += '<h4 style="margin:16px 0 6px">Breaks</h4><table><thead><tr><th>Type</th><th>Start</th><th>End</th><th>Duration</th><th>Source</th></tr></thead><tbody>'
+      + ((d.breaks || []).map((b) => '<tr><td>' + esc(b.type || '—') + '</td><td>' + esc(b.start) + '</td><td>' + esc(b.end) + '</td>'
+        + '<td>' + (b.seconds != null ? secH(b.seconds) : '—') + '</td><td>' + esc(b.source || '—') + '</td></tr>').join('')
+        || '<tr><td colspan="5" class="mut">No breaks recorded for this day.</td></tr>')
+      + '</tbody></table>';
+    $('#daylog-body').innerHTML = h;
+  } catch (e) {
+    $('#daylog-body').innerHTML = isDenied(e) ? deniedCard() : '<div class="mut">' + esc(e.message) + '</div>';
+  }
+}
 // "YYYY-MM-DD HH:MM:SS" ⇄ datetime-local's "YYYY-MM-DDTHH:MM"
 const toLocalDt = (s) => s ? String(s).replace(' ', 'T').slice(0, 16) : '';
 const fromLocalDt = (v) => v ? v.replace('T', ' ') + ':00' : null;
@@ -1895,7 +2721,10 @@ async function openAttModal(row) {
     $('#af-date').disabled = false;
     $('#af-date').value = $('#at-date').value || today();
     $('#af-status').value = 'PRESENT';
-    $('#af-in').value = ''; $('#af-out').value = '';
+    // Pre-fill sensible punch times (editable) so the admin records the ACTUAL
+    // time, not just the date — 09:30 in / 18:00 out as a starting point.
+    const d0 = $('#af-date').value;
+    $('#af-in').value = d0 ? d0 + 'T09:30' : ''; $('#af-out').value = d0 ? d0 + 'T18:00' : '';
   }
   $('#af-reason').value = '';
   $('#att-ovl').classList.add('open');
@@ -2034,6 +2863,7 @@ $('#lic-check').onclick = async () => {
 // ---- audit & ops (R2-4) ----
 async function loadOps() {
   loadAudit();
+  loadRetention();
   try {
     const s = await api('/ops/storage-usage');
     $('#ops-storage').innerHTML = (s.data || []).length
@@ -2047,6 +2877,80 @@ async function loadOps() {
       : 'No backups yet — the first one runs tonight at 01:30, or click "Back up now".';
   } catch (e) { $('#ops-backups').textContent = e.message; }
 }
+// ---- storage cleanup (17-Jul) ----
+$('#ops-cleanup').onclick = () => {
+  const d = new Date(); d.setDate(d.getDate() - 30);
+  $('#cl-from').value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  $('#cl-to').value = today();
+  $('#cl-confirm').value = ''; $('#cl-msg').textContent = '';
+  $('#cleanup-ovl').classList.add('open');
+};
+$('#cleanup-x').onclick = $('#cleanup-cancel').onclick = () => $('#cleanup-ovl').classList.remove('open');
+$('#cleanup-run').onclick = async () => {
+  const msg = $('#cl-msg');
+  const targets = [];
+  if ($('#cl-shots').checked) targets.push('screenshots');
+  if ($('#cl-activity').checked) targets.push('activity');
+  if ($('#cl-apps').checked) targets.push('app_usage');
+  if ($('#cl-sites').checked) targets.push('website_usage');
+  if ($('#cl-presence').checked) targets.push('presence');
+  if (!targets.length && !$('#cl-delviol').checked) { msg.textContent = 'Pick at least one thing to delete.'; return; }
+  if ($('#cl-confirm').value.trim() !== 'DELETE') { msg.textContent = 'Type DELETE (capital letters) to confirm — this cannot be undone.'; return; }
+  if (!$('#cl-from').value || !$('#cl-to').value) { msg.textContent = 'Pick both dates.'; return; }
+  msg.textContent = 'Deleting…';
+  try {
+    const r = await api('/ops/storage-cleanup', { method: 'POST', body: {
+      from_date: $('#cl-from').value, to_date: $('#cl-to').value, targets: targets,
+      keep_violation_evidence: $('#cl-keepviol').checked,
+      delete_violation_records: $('#cl-delviol').checked,
+    }});
+    const parts = Object.entries(r.result || {}).map(([k, v]) =>
+      k + ': ' + (v.rows ?? 0) + ' rows' + (v.human ? ' (' + v.human + ' freed)' : ''));
+    msg.textContent = '✓ Done — ' + (parts.join(' · ') || 'nothing matched that range.');
+    $('#cl-confirm').value = '';
+    loadOps();
+  } catch (e) { msg.textContent = e.message; }
+};
+
+// ---- auto-cleanup retention (17-Jul) ----
+async function loadRetention() {
+  try {
+    const r = (await api('/ops/retention')).data;
+    $('#rt-enabled').checked = !!r.auto_cleanup_enabled;
+    $('#rt-shots').value = r.retention_screenshots_days || '';
+    $('#rt-activity').value = r.retention_activity_days || '';
+    $('#rt-usage').value = r.retention_usage_days || '';
+    $('#rt-viol').value = r.retention_violation_days || '';
+    $('#rt-base').value = r.data_retention_days || 90;
+    $('#rt-keepviol').checked = !!r.retention_keep_violation_evidence;
+  } catch (e) { $('#rt-msg').textContent = e.message; }
+}
+async function saveRetention() {
+  const numOr = (id) => { const v = $(id).value.trim(); return v === '' ? null : Math.max(1, parseInt(v, 10)); };
+  const body = {
+    auto_cleanup_enabled: $('#rt-enabled').checked,
+    data_retention_days: numOr('#rt-base') || 90,
+    retention_screenshots_days: numOr('#rt-shots'),
+    retention_activity_days: numOr('#rt-activity'),
+    retention_usage_days: numOr('#rt-usage'),
+    retention_violation_days: numOr('#rt-viol'),
+    retention_keep_violation_evidence: $('#rt-keepviol').checked,
+  };
+  try { await api('/ops/retention', { method: 'PUT', body: JSON.stringify(body) }); toast('Cleanup schedule saved'); }
+  catch (e) { $('#rt-msg').textContent = e.message; }
+}
+async function previewPurge() {
+  $('#rt-out').innerHTML = '<span class="mut">Checking…</span>';
+  try {
+    const r = await api('/ops/purge-run', { method: 'POST', body: JSON.stringify({ dry_run: true }) });
+    $('#rt-out').innerHTML = r.lines.length
+      ? '<b>Would delete (dry run — nothing removed):</b><br>' + r.lines.map(esc).join('<br>')
+      : '<span class="mut">Nothing is past its retention window right now — disk is clean.</span>';
+  } catch (e) { $('#rt-out').innerHTML = '<span style="color:var(--danger)">' + esc(e.message) + '</span>'; }
+}
+$('#rt-save').onclick = saveRetention;
+$('#rt-preview').onclick = previewPurge;
+
 async function loadAudit() {
   try {
     const p = new URLSearchParams();
@@ -2083,13 +2987,15 @@ const HELP = {
   screenshots: ['Screenshots', '<h5>What</h5>The screen captures the desktop agent uploaded for one employee on one day, with the app in focus and the reason each capture fired (interval, random or violation).<h5>Why</h5>Screenshots are the evidence layer: they turn a "13 minutes on YouTube" number into something you can verify before acting.<h5>How</h5>Pick an employee and a date, then click a tile for the full-size image. Captures only exist where the assigned screenshot policy enables them, and every image you open here is recorded in the audit log.'],
   usage: ['Usage & Compliance', '<h5>What</h5>Per-employee time by application and by website for a chosen day, alongside that day\'s compliance events.<h5>Why</h5>This is where productive vs unproductive time becomes concrete — which tools the employee actually used and where policy lines were crossed.<h5>How</h5>Pick an employee and date; categories (PRODUCTIVE, NEUTRAL, blocked) come from the application and website policies you define under Policies. Website names are read from the browser window title in this release.'],
   violations: ['Violations', '<h5>What</h5>The company-wide feed of compliance events: blocked apps and sites, category and severity, what the agent did about it, and a link to screenshot evidence when one was captured.<h5>Why</h5>Reviewing this daily keeps enforcement fair and consistent — the same event always produces the same recorded action.<h5>How</h5>Use "View evidence" to jump straight to that employee\'s screenshots for the day of the event. Export the full log as CSV for HR or audit.'],
+  org: ['Organisation', '<h5>What</h5>Your company structure — Branches, Departments, Teams, Designations and Shifts — each on its own tab.<h5>Why</h5>Employees are placed into this structure, and policies, attendance and reports all roll up through it. Create these first so the pickers on the employee form have options.<h5>How</h5>Pick a tab, click <b>+ Add</b>, fill the name (and shift timings / parent branch etc. where relevant), Save. Edit or Delete any row. Deleting a unit does not delete employees — they simply lose that one link. Tip: the bulk employee import also creates any branch/team/department it sees by name, so you can build the whole structure just by importing your staff sheet.'],
   employees: ['Employees', '<h5>What</h5>The employee directory: code, contact, org placement (branch / department / team / shift), employment status and how many monitored devices each person has.<h5>Why</h5>Everything else in SmartEPT hangs off this record — policies resolve through the employee\'s team and department, and agents bind devices to it.<h5>How</h5>Search by name or code, add or edit with the form, and delete with confirmation. Create branches, teams and shifts first so the pickers here have options. When someone leaves, use <b>Relieve</b> (not Delete): one click disables their login, revokes every token, stops the agent on all their PCs and frees the licence seats — with the reason kept in the audit log. Their history stays for reports and payroll.'],
   users: ['Users', '<h5>What</h5>The login accounts for this console and the employee self-service — name, email, role, optional link to an employee record, status and last login.<h5>Why</h5>Accounts and employee records are different things: an auditor logs in but is not an employee, and an employee may exist without any login. Roles decide exactly what each account can see and do.<h5>How</h5>Add a user and SmartEPT generates a strong temporary password shown <b>exactly once</b> — copy it and hand it over; the user must change it at first sign-in. Reset password re-issues a one-time password and signs the user out everywhere. Disable blocks login immediately and kills active sessions; accounts are never hard-deleted because the audit trail references them.'],
   devices: ['Devices', '<h5>What</h5>Every PC where the SmartEPT agent is registered: hostname, OS, agent version, live status, compliance state, sync backlog and last heartbeat.<h5>Why</h5>A stopped or stale agent means a blind spot — this screen tells you whether the data you see elsewhere is complete.<h5>How</h5>Healthy agents heartbeat about every 30 seconds. A growing sync queue with an OFFLINE status usually just means the PC is off; DEGRADED or STOPPED health on an online device needs IT attention. <b>Unbind</b> a lost, replaced or misused PC to stop its agent instantly and free its licence seat — it stays blocked until you <b>Approve re-bind</b>, so nobody can quietly reconnect it.'],
   policies: ['Policies', '<h5>What</h5>The control room: 12 policy types (monitoring master switch, screenshots, webcam presence, app/site rules, network, USB, breaks, attendance, compliance scoring) with versioned edit forms and an assignment panel.<h5>Why</h5>Nothing is captured because the software can — everything is captured because a policy you wrote says so, and the version trail shows what applied when.<h5>How</h5>Pick a type, create or edit a policy (each save bumps the version; agents pick it up on the next heartbeat), then assign it to the company, a branch, department, team, employee or single device. More specific assignments win.'],
   biometric: ['Biometric', '<h5>What</h5>Door-punch integration: the registered punch devices (readers at gates/doors), the punch log, CSV import, biometric-ID-to-employee mapping, and a daily reconciliation of first punch vs first agent login.<h5>Why</h5>The gap between "in the office" and "at the system" is invisible to either source alone — the mismatch report exposes it in minutes per employee.<h5>How</h5>Push punches from your device middleware or import the device\'s CSV export, map each biometric ID to an employee once (old punches back-fill automatically), then read the mismatch report: OK, MISMATCH over 15 minutes, or NO_BIOMETRIC.'],
+  integrations: ['API & Integrations', '<h5>What</h5>SmartEPT as an integration hub: API keys let external devices/apps push attendance IN and read it OUT; outbound targets push attendance to SmartPRS or other systems automatically.<h5>Why</h5>No manual CSV shuffling between your gate devices, SmartPRS and SmartEPT — secure API keys in, HMAC-signed pushes out.<h5>How</h5>Create a key (shown once), give it ingest/read scope. Add an outbound target with its URL + shared secret; Test push sends a day now, the nightly job ships the previous day. The Integration guide card has the exact URLs, JSON and signature check for the other side.'],
   license: ['Licence', '<h5>What</h5>This server\'s SmartEPT licence: the key, the plan and company it belongs to, how many device seats are licensed vs registered, the expiry date with its grace window, and when the server last confirmed all of this with SmartEPT Central. A server with no key runs a <b>7-day free evaluation</b>, then monitoring stops until a key is entered.<h5>Why</h5>The licence is what ties your installation to what you purchased — seats, plan features and validity. Only licence metadata travels to Central: screenshots, activity and camera data never leave this server. If a paid renewal is missed, agents keep working through the grace days so a busy week never stops monitoring mid-shift; trials stop the moment they end.<h5>How</h5>Paste the key from your order email or the client portal and click "Save & validate" — the server confirms it with Central instantly and then re-checks once a day on its own. "Validate now" forces a fresh check after a renewal or seat upgrade. If the status shows EXPIRED, renew from the client portal; the seats line tells you when you\'re close to the licensed device limit.'],
-  ops: ['Audit & Ops', '<h5>What</h5>Three operational views in one place: the full audit trail (every admin action, export, screenshot view and licence event with who, when and from which IP), storage consumed by screenshot/webcam evidence per company, and the state of your database backups.<h5>Why</h5>Monitoring software must itself be accountable — when an employee questions an action, the audit trail shows exactly who did what. Storage growth and backups are the two quiet things that sink servers: full disks and "we never had a backup".<h5>How</h5>Filter the trail by action text or date range. Backups run automatically every night at 01:30 (newest 14 kept in storage/app/backups — copy them off this PC for real safety); "Back up now" runs one immediately before risky changes. If a company\'s evidence storage grows fast, tighten its screenshot policy or shorten retention.'],
+  ops: ['Audit & Ops', '<h5>What</h5>Three operational views in one place: the full audit trail (every admin action, export, screenshot view and licence event with who, when and from which IP), storage consumed by screenshot/webcam evidence per company, and the state of your database backups.<h5>Why</h5>Monitoring software must itself be accountable — when an employee questions an action, the audit trail shows exactly who did what. Storage growth and backups are the two quiet things that sink servers: full disks and "we never had a backup".<h5>How</h5>Filter the trail by action text or date range. Backups run automatically every night at 01:30 (newest 14 kept in storage/app/backups — copy them off this PC for real safety); "Back up now" runs one immediately before risky changes. If a company\'s evidence storage grows fast, tighten its screenshot policy, shorten retention, or use \'Free up storage\' to bulk-delete old screenshots and logs by date range — violation evidence is kept unless you explicitly say otherwise, and every cleanup is itself audit-logged.'],
   reports: ['Reports & Exports', '<h5>What</h5>CSV exports — attendance, productivity, compliance, daily-summary scores and the classic monthly attendance register — plus an on-screen monthly summary with payable days.<h5>Why</h5>These are the hand-off artifacts: payroll wants the register and payable days, managers want productivity, HR wants compliance, and the MD wants the one-page summary.<h5>How</h5>Set the date range (or month for the register and summary), click Export, and the file downloads ready to open in Excel. The monthly summary renders here on screen: working days, P/A/H/L counts, payable days (P + 0.5×H + L) and average productivity. Every export is recorded in the audit log with who ran it and for which dates.'],
 };
 $('#btn-help').onclick = () => {

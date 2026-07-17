@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Api\ProductivityController;
+use App\Http\Controllers\Api\PublicApiController;
+use App\Http\Controllers\Api\IntegrationController;
 use App\Http\Controllers\Api\ActivityController;
 use App\Http\Controllers\Api\AgentStatusController;
 use App\Http\Controllers\Api\AttendanceAdminController;
@@ -44,6 +47,10 @@ Route::get('ping', fn () => response()->json([
     'server_time' => now()->toIso8601String(),
 ]));
 Route::post('auth/login', [AuthController::class, 'login']);
+// Cloud SSO handoff from SmartEPT Central (secret-signed ticket → Sanctum token).
+Route::post('auth/sso', [\App\Http\Controllers\Api\SsoController::class, 'login']);
+// Server-to-server tenant provisioning from Central (shared-secret guarded).
+Route::post('provisioning/tenant', [\App\Http\Controllers\Api\ProvisioningController::class, 'store']);
 
 // ---- Authenticated (any valid token) ----
 Route::middleware('auth:sanctum')->group(function () {
@@ -85,6 +92,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('ops/storage-usage', [OpsController::class, 'storageUsage']);
         Route::get('ops/backups', [OpsController::class, 'backups']);
         Route::post('ops/backup', [OpsController::class, 'runBackup']);
+        Route::post('ops/storage-cleanup', [OpsController::class, 'storageCleanup']); // 17-Jul bulk evidence/log cleanup
+        Route::get('ops/retention', [OpsController::class, 'retention']);              // 17-Jul auto-cleanup params
+        Route::put('ops/retention', [OpsController::class, 'updateRetention']);
+        Route::post('ops/purge-run', [OpsController::class, 'runPurge']);
+        Route::get('gate/policy', [OpsController::class, 'gatePolicy']);       // Gate-to-PC USP
+        Route::put('gate/policy', [OpsController::class, 'updateGatePolicy']);
     });
 
     // ---- Licence (R2-1): admin view/set key + force revalidation ----
@@ -106,6 +119,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Tracking ingestion (M2 + M3) — gated by recorded consent where policy requires it.
         Route::middleware('consent')->group(function () {
+            Route::get('gate-status', [AttendanceController::class, 'gateStatus']); // Gate-to-PC USP
             Route::post('attendance-event', [AttendanceController::class, 'store']);
             Route::post('activity-events', [ActivityController::class, 'activity']);
             Route::post('idle-event', [ActivityController::class, 'idle']);
@@ -134,6 +148,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ---- Usage + compliance reports (M4) ----
     Route::middleware('permission:activity.view')->group(function () {
+        Route::get('reports/usage-summary', [UsageController::class, 'companySummary']); // 17-Jul all-employees default
+        Route::get('reports/productivity', [ProductivityController::class, 'report']); // 17-Jul all-employee day-wise productivity
+        Route::get('reports/employee/{employee}/day-logs', [ProductivityController::class, 'dayLogs']); // 17-Jul attendance drill-down
         Route::get('reports/employee/{employee}/app-usage', [UsageController::class, 'appReport']);
         Route::get('reports/employee/{employee}/website-usage', [UsageController::class, 'websiteReport']);
         Route::get('reports/employee/{employee}/compliance', [ComplianceController::class, 'report']);
@@ -194,6 +211,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('org/{type}/{id}', [OrgController::class, 'destroy']);
     });
 
+    // ---- Integrations (17-Jul): API keys + outbound targets (company-admin) ----
+    Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN')->group(function () {
+        Route::get('integrations/keys', [IntegrationController::class, 'keys']);
+        Route::post('integrations/keys', [IntegrationController::class, 'createKey']);
+        Route::post('integrations/keys/{apiKey}/revoke', [IntegrationController::class, 'revokeKey']);
+        Route::get('integrations/targets', [IntegrationController::class, 'targets']);
+        Route::post('integrations/targets', [IntegrationController::class, 'saveTarget']);
+        Route::put('integrations/targets/{target}', [IntegrationController::class, 'saveTarget']);
+        Route::delete('integrations/targets/{target}', [IntegrationController::class, 'deleteTarget']);
+        Route::post('integrations/targets/{target}/push', [IntegrationController::class, 'pushTarget']);
+    });
+
     // ---- Employees ----
     Route::get('employees', [EmployeeController::class, 'index'])
         ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,HR_ADMIN,MANAGER,TEAM_LEADER,AUDITOR');
@@ -201,6 +230,7 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,HR_ADMIN,MANAGER,TEAM_LEADER,AUDITOR');
     Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,HR_ADMIN')->group(function () {
         Route::post('employees', [EmployeeController::class, 'store']);
+        Route::post('employees/bulk-import', [EmployeeController::class, 'bulkImport']); // 17-Jul SmartPRS-style bulk onboarding
         Route::put('employees/{employee}', [EmployeeController::class, 'update']);
         Route::post('employees/{employee}/relieve', [EmployeeController::class, 'relieve']); // R2-3 offboarding
         Route::delete('employees/{employee}', [EmployeeController::class, 'destroy']);
@@ -226,4 +256,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('policies/{type}/{id}', [PolicyController::class, 'update']);
         Route::delete('policies/{type}/{id}', [PolicyController::class, 'destroy']);
     });
+});
+
+// ==== SmartEPT PUBLIC API v1 — API-key authenticated (integration hub, 17-Jul) ====
+Route::prefix('v1')->group(function () {
+    Route::get('ping', [PublicApiController::class, 'ping'])->middleware('api-key');
+    Route::post('attendance/punches', [PublicApiController::class, 'ingestPunches'])->middleware('api-key:ingest');
+    Route::get('attendance', [PublicApiController::class, 'readAttendance'])->middleware('api-key:read');
 });

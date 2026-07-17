@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    // Cloud provisioning + SSO shared secrets (must match SmartEPT Central).
+    'provision' => [
+        'secret' => env('PROVISION_SECRET'),
+    ],
+    'sso' => [
+        'secret' => env('SSO_SHARED_SECRET'),
+    ],
+
 ];
