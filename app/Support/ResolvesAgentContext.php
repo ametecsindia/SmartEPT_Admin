@@ -34,15 +34,13 @@ trait ResolvesAgentContext
         abort_if($device && $device->employee_id !== $employee->id, 403, 'Device is not bound to this employee.');
 
         // R5 EPT-08: the agent token must be the one issued to THIS device at
-        // registration (device_token_hash === sha256 of the presented token).
-        // Guarded on both a stored hash and a presented token hash, so legacy
-        // devices keep working until they next register; only a spoofed or
-        // mismatched device_uuid is rejected.
+        // registration. Sanctum names each device token 'device:{uuid}', so a
+        // token presented with a *different* device_uuid (spoofing) is rejected.
+        // Guarded on the token name, so any non-device-token context is skipped.
         $token = $request->user()?->currentAccessToken();
-        $presented = $token ? (string) $token->getAttribute('token') : null;
+        $tokenName = $token ? (string) $token->getAttribute('name') : '';
         abort_if(
-            $device && $device->device_token_hash && $presented
-                && ! hash_equals((string) $device->device_token_hash, $presented),
+            $device && $tokenName !== '' && $tokenName !== 'device:' . $uuid,
             403,
             'Agent token does not match this device.'
         );
