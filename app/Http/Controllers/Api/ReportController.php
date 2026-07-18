@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\ScopesVisibleEmployees;
 use App\Models\Employee;
 use App\Models\EmployeeBreakLog;
 use App\Models\EmployeeComplianceEvent;
@@ -15,6 +16,7 @@ use Illuminate\Http\Request;
 
 class ReportController extends Controller
 {
+    use ScopesVisibleEmployees;
     /**
      * GET /api/reports/employee/{employee}/timeline?date=
      * Merges attendance, breaks, idle, presence, screenshots and compliance into one
@@ -22,6 +24,7 @@ class ReportController extends Controller
      */
     public function timeline(Request $request, Employee $employee): JsonResponse
     {
+        $this->assertEmployeeVisible($request, $employee->id);
         $date = $request->query('date', now()->toDateString());
         $entries = [];
         $add = function ($time, $type, $label, $detail = null) use (&$entries) {

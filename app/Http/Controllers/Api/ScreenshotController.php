@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\ScopesVisibleEmployees;
 use App\Models\Employee;
 use App\Models\EmployeeScreenshotLog;
 use App\Models\ScreenshotAccessLog;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\Storage;
 
 class ScreenshotController extends Controller
 {
+    use ScopesVisibleEmployees;
     use ResolvesAgentContext;
 
     /**
@@ -72,6 +74,7 @@ class ScreenshotController extends Controller
      */
     public function timeline(Request $request, Employee $employee): JsonResponse
     {
+        $this->assertEmployeeVisible($request, $employee->id);
         $date = $request->query('date', now()->toDateString());
 
         $logs = EmployeeScreenshotLog::where('employee_id', $employee->id)
@@ -101,6 +104,7 @@ class ScreenshotController extends Controller
      */
     public function file(Request $request, EmployeeScreenshotLog $screenshot)
     {
+        $this->assertEmployeeVisible($request, $screenshot->employee_id);
         $file = StorageFile::withoutGlobalScopes()->find($screenshot->storage_file_id);
         abort_if(! $file, 404, 'File not found.');
 

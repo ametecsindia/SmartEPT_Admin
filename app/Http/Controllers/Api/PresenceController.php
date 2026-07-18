@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\ScopesVisibleEmployees;
 use App\Models\Employee;
 use App\Models\EmployeePresenceEvent;
 use App\Models\EmployeeWebcamLog;
@@ -15,6 +16,7 @@ use Illuminate\Support\Carbon;
 
 class PresenceController extends Controller
 {
+    use ScopesVisibleEmployees;
     use ResolvesAgentContext;
 
     /**
@@ -110,6 +112,7 @@ class PresenceController extends Controller
      */
     public function timeline(Request $request, Employee $employee): JsonResponse
     {
+        $this->assertEmployeeVisible($request, $employee->id);
         $date = $request->query('date', now()->toDateString());
 
         $events = EmployeePresenceEvent::where('employee_id', $employee->id)

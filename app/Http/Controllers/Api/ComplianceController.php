@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\ScopesVisibleEmployees;
 use App\Models\Employee;
 use App\Models\EmployeeComplianceEvent;
 use App\Support\ResolvesAgentContext;
@@ -11,6 +12,7 @@ use Illuminate\Http\Request;
 
 class ComplianceController extends Controller
 {
+    use ScopesVisibleEmployees;
     use ResolvesAgentContext;
 
     /**
@@ -58,6 +60,7 @@ class ComplianceController extends Controller
     /** GET /api/reports/employee/{employee}/compliance — event list for a date. */
     public function report(Request $request, Employee $employee): JsonResponse
     {
+        $this->assertEmployeeVisible($request, $employee->id);
         $date = $request->query('date', now()->toDateString());
 
         $events = EmployeeComplianceEvent::where('employee_id', $employee->id)
@@ -72,7 +75,9 @@ class ComplianceController extends Controller
     /** GET /api/dashboard/violations — recent violations across the tenant (manager+). */
     public function feed(Request $request): JsonResponse
     {
+        $visible = $this->visibleEmployeeIds($request->user());
         $events = EmployeeComplianceEvent::query()
+            ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
             ->with('employee:id,first_name,last_name,employee_code')
             ->when($request->category, fn ($q, $v) => $q->where('event_category', $v))
             ->when($request->severity, fn ($q, $v) => $q->where('severity', $v))

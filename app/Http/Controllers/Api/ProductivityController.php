@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\ScopesVisibleEmployees;
 use App\Models\Employee;
 use App\Models\EmployeeActivityEvent;
 use App\Models\EmployeeAttendanceLog;
@@ -26,6 +27,7 @@ use Illuminate\Support\Facades\DB;
  */
 class ProductivityController extends Controller
 {
+    use ScopesVisibleEmployees;
     public function report(Request $request): JsonResponse
     {
         $companyId = $request->user()->company_id;
@@ -34,8 +36,10 @@ class ProductivityController extends Controller
         $empId = $request->query('employee_id');
         $today = now()->toDateString();
 
+        $visible = $this->visibleEmployeeIds($request->user());
         $employees = Employee::where('company_id', $companyId)
             ->when($empId, fn ($q) => $q->where('id', $empId))
+            ->when($visible !== null, fn ($q) => $q->whereIn('id', $visible))
             ->with(['department:id,name', 'team:id,name'])
             ->get()->keyBy('id');
 

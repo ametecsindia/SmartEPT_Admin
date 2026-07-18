@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\ScopesVisibleEmployees;
 use App\Models\Employee;
 use App\Models\EmployeeAppUsageLog;
 use App\Models\EmployeeDevice;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\DB;
 
 class UsageController extends Controller
 {
+    use ScopesVisibleEmployees;
     use ResolvesAgentContext;
 
     public function __construct(private PolicyResolver $resolver, private ComplianceEvaluator $evaluator) {}
@@ -135,6 +137,7 @@ class UsageController extends Controller
     /** GET /api/reports/employee/{employee}/app-usage — aggregated by app for a date. */
     public function appReport(Request $request, \App\Models\Employee $employee): JsonResponse
     {
+        $this->assertEmployeeVisible($request, $employee->id);
         $date = $request->query('date', now()->toDateString());
 
         $rows = EmployeeAppUsageLog::where('employee_id', $employee->id)
@@ -150,6 +153,7 @@ class UsageController extends Controller
     /** GET /api/reports/employee/{employee}/website-usage — aggregated by domain for a date. */
     public function websiteReport(Request $request, \App\Models\Employee $employee): JsonResponse
     {
+        $this->assertEmployeeVisible($request, $employee->id);
         $date = $request->query('date', now()->toDateString());
 
         $rows = EmployeeWebsiteUsageLog::where('employee_id', $employee->id)
@@ -190,8 +194,10 @@ class UsageController extends Controller
 
         $ids = collect($apps->keys())->merge($sites->keys())->merge($compl->keys())->unique();
 
+        $visible = $this->visibleEmployeeIds($request->user());
         $employees = Employee::where('company_id', $companyId)
             ->when($ids->isNotEmpty(), fn ($q) => $q->whereIn('id', $ids))
+            ->when($visible !== null, fn ($q) => $q->whereIn('id', $visible))
             ->with(['department:id,name', 'team:id,name'])
             ->get();
 
