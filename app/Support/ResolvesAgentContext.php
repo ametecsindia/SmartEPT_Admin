@@ -33,6 +33,20 @@ trait ResolvesAgentContext
         $device = EmployeeDevice::where('device_uuid', $uuid)->first();
         abort_if($device && $device->employee_id !== $employee->id, 403, 'Device is not bound to this employee.');
 
+        // R5 EPT-08: the agent token must be the one issued to THIS device at
+        // registration (device_token_hash === sha256 of the presented token).
+        // Guarded on both a stored hash and a presented token hash, so legacy
+        // devices keep working until they next register; only a spoofed or
+        // mismatched device_uuid is rejected.
+        $token = $request->user()?->currentAccessToken();
+        $presented = $token ? (string) $token->getAttribute('token') : null;
+        abort_if(
+            $device && $device->device_token_hash && $presented
+                && ! hash_equals((string) $device->device_token_hash, $presented),
+            403,
+            'Agent token does not match this device.'
+        );
+
         return $device;
     }
 }
