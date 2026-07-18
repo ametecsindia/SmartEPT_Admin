@@ -12,7 +12,7 @@ use Illuminate\Validation\Rule;
 /**
  * Biometric device registry. A "device" is either a physical punch reader
  * (middleware push / CSV) or — since 17-Jul — a CLOUD ATTENDANCE API
- * (eTimeOffice-style) that SmartEPT polls hourly for punches.
+ * (eTimeOffice-style) that SmartEPT polls every few minutes for punches.
  */
 class BiometricDeviceController extends Controller
 {

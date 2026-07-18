@@ -31,7 +31,6 @@ class PurgeExpiredData extends Command
         'employee_screenshot_logs'   => 'captured_at',
         'employee_webcam_logs'       => 'captured_at',
         'employee_compliance_events' => 'started_at',
-        'agent_heartbeats'           => 'received_at',
     ];
 
     public function handle(): int
@@ -77,7 +76,6 @@ class PurgeExpiredData extends Command
                 'employee_screenshot_logs'    => $shotsDays,
                 'employee_webcam_logs'        => $shotsDays,
                 'employee_compliance_events'  => $violDays,
-                'agent_heartbeats'            => min($activityDays, 14) ?: 14,
             ];
 
             foreach ($this->tables as $table => $col) {

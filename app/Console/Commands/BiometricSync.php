@@ -7,14 +7,14 @@ use App\Services\BiometricCloudSync;
 use Illuminate\Console\Command;
 
 /**
- * Hourly cloud biometric import (Ejaz 17-Jul): every ACTIVE device with
- * "Enable automatic hourly sync" ticked pulls its punches from the cloud
+ * Continuous (5-minute) cloud biometric import (Ejaz 17-Jul): every ACTIVE device with
+ * automatic sync enabled pulls its punches from the cloud
  * attendance API into BiometricLog + Attendance. Best-effort per device —
  * one provider being down never blocks the others.
  */
 class BiometricSync extends Command
 {
-    protected $signature = 'smartept:biometric-sync {--device= : Sync one device id (even if hourly sync is off)} {--days=2 : How many days back to pull}';
+    protected $signature = 'smartept:biometric-sync {--device= : Sync one device id (even if automatic sync is off)} {--days=2 : How many days back to pull}';
 
     protected $description = 'Pull punches from cloud biometric providers (eTimeOffice etc.) into attendance';
 
@@ -27,7 +27,7 @@ class BiometricSync extends Command
 
         $devices = $q->get();
         if ($devices->isEmpty()) {
-            $this->info('No cloud biometric devices with hourly sync enabled.');
+            $this->info('No cloud biometric devices with automatic sync enabled.');
 
             return self::SUCCESS;
         }
