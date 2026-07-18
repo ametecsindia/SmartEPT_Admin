@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Validation\Rule;
 use App\Models\BiometricEmployeeMapping;
 use App\Models\BiometricLog;
 use App\Models\Employee;
@@ -77,9 +78,10 @@ class BiometricController extends Controller
     /** POST /api/integrations/biometric/map-employee — map biometric ID → employee. */
     public function mapEmployee(Request $request): JsonResponse
     {
+        $companyId = $request->user()->company_id;
         $data = $request->validate([
             'biometric_employee_id' => ['required', 'string', 'max:64'],
-            'employee_id'           => ['required', 'integer', 'exists:employees,id'],
+            'employee_id'           => ['required', 'integer', Rule::exists('employees', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
             'biometric_device_id'   => ['nullable', 'integer'],
         ]);
 

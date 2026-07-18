@@ -18,6 +18,10 @@ use App\Models\UsbPolicy;
 use App\Models\VpnProxyPolicy;
 use App\Models\WebcamPolicy;
 use App\Models\WebsitePolicy;
+use App\Models\Branch;
+use App\Models\Company;
+use App\Models\Department;
+use App\Models\Team;
 use App\Services\PolicyResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -96,6 +100,29 @@ class PolicyController extends Controller
             'effective_from'  => ['nullable', 'date'],
             'effective_to'    => ['nullable', 'date'],
         ]);
+
+        // Tenant safety (R5 EPT-05): the policy AND the target must belong to the
+        // caller's company. Policy/org models carry the BelongsToCompany global scope,
+        // so findOrFail() 404s on a cross-tenant id; Super Admin bypasses the scope.
+        $policyClass = self::MODELS[strtolower($data['policy_type'])];
+        $policyClass::findOrFail($data['policy_id']);
+
+        if ($data['assignable_type'] === 'COMPANY') {
+            abort_unless(
+                $request->user()->isSuperAdmin()
+                    || (int) $data['assignable_id'] === (int) $request->user()->company_id,
+                403, 'Cannot assign a policy to another company.'
+            );
+        } else {
+            $targets = [
+                'BRANCH'     => Branch::class,
+                'DEPARTMENT' => Department::class,
+                'TEAM'       => Team::class,
+                'EMPLOYEE'   => Employee::class,
+                'DEVICE'     => EmployeeDevice::class,
+            ];
+            $targets[$data['assignable_type']]::findOrFail($data['assignable_id']);
+        }
 
         $assignment = PolicyAssignment::create(array_merge($data, [
             'assigned_by_user_id' => $request->user()->id,

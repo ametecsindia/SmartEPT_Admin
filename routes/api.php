@@ -47,7 +47,7 @@ Route::get('ping', fn () => response()->json([
     'version'     => config('smartept.version', '1.0'),
     'server_time' => now()->toIso8601String(),
 ]));
-Route::post('auth/login', [AuthController::class, 'login']);
+Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
 
 // ---- Authenticated (any valid token) ----
 Route::middleware('auth:sanctum')->group(function () {
@@ -104,7 +104,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('license/validate', [LicenseController::class, 'revalidate']);
     });
 
-    Route::prefix('agent')->middleware(['licensed', 'active-employee'])->group(function () {
+    Route::prefix('agent')->middleware(['licensed', 'active-employee', 'throttle:600,1'])->group(function () {
         // Bootstrap (no consent gate — these establish identity + consent).
         Route::post('register-device', [DeviceController::class, 'register']);
         Route::get('policy', [PolicyController::class, 'agentBundle']);
@@ -268,7 +268,7 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // ==== SmartEPT PUBLIC API v1 — API-key authenticated (integration hub, 17-Jul) ====
-Route::prefix('v1')->group(function () {
+Route::prefix('v1')->middleware('throttle:120,1')->group(function () {
     Route::get('ping', [PublicApiController::class, 'ping'])->middleware('api-key');
     Route::post('attendance/punches', [PublicApiController::class, 'ingestPunches'])->middleware('api-key:ingest');
     Route::get('attendance', [PublicApiController::class, 'readAttendance'])->middleware('api-key:read');

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Validation\Rule;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Designation;
@@ -73,6 +74,7 @@ class OrgController extends Controller
     private function rules(string $type, bool $creating = true): array
     {
         $req = $creating ? 'required' : 'sometimes';
+        $companyId = auth()->user()->company_id;
         $base = ['name' => [$req, 'string', 'max:255'], 'code' => ['nullable', 'string', 'max:64']];
 
         return match ($type) {
@@ -80,11 +82,11 @@ class OrgController extends Controller
                 'city' => ['nullable', 'string'], 'state' => ['nullable', 'string'],
                 'country' => ['nullable', 'string'], 'public_ip_whitelist' => ['nullable', 'array'],
             ],
-            'departments' => $base + ['branch_id' => ['nullable', 'integer', 'exists:branches,id']],
+            'departments' => $base + ['branch_id' => ['nullable', 'integer', Rule::exists('branches', 'id')->where(fn ($q) => $q->where('company_id', $companyId))]],
             'teams' => $base + [
-                'department_id' => ['nullable', 'integer', 'exists:departments,id'],
-                'manager_user_id' => ['nullable', 'integer', 'exists:users,id'],
-                'team_leader_user_id' => ['nullable', 'integer', 'exists:users,id'],
+                'department_id' => ['nullable', 'integer', Rule::exists('departments', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
+                'manager_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
+                'team_leader_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
             ],
             'designations' => $base + ['level' => ['nullable', 'integer', 'min:0']],
             'shifts' => $base + [
