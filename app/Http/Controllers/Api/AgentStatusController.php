@@ -16,6 +16,19 @@ class AgentStatusController extends Controller
     use ResolvesAgentContext;
 
     /**
+     * GET /api/agent/gate-status — Biometric Gate (Doc 11 v1.1).
+     * The agent polls this (and reads the same block off every heartbeat) to know
+     * whether the door punch has lifted the gate. Deliberately OUTSIDE the consent
+     * wall: it is a pre-work check, and it exposes only the caller's own punch state.
+     */
+    public function gateStatus(Request $request): JsonResponse
+    {
+        $employee = $this->agentEmployee($request);
+
+        return response()->json(['gate' => app(\App\Services\GateService::class)->stateFor($employee)]);
+    }
+
+    /**
      * GET /api/agent/today
      * Server-side truth for the employee's visible dashboard: today's active / idle /
      * break totals and login time. The agent renders these so the numbers can't drift.

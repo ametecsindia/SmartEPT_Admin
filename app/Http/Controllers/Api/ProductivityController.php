@@ -106,7 +106,7 @@ class ProductivityController extends Controller
                 $work = (int) ($ac->act ?? 0);
                 $idle = (int) ($ac->idl ?? 0);
                 $present = ($a && $a->check_in_at)
-                    ? max(0, (($a->check_out_at ? Carbon::parse($a->check_out_at) : now())->diffInSeconds(Carbon::parse($a->check_in_at)))) : 0;
+                    ? max(0, (($a->check_out_at ? Carbon::parse($a->check_out_at) : now())->diffInSeconds(Carbon::parse($a->check_in_at), true))) : 0;
                 $rows[] = $this->row($emp, $today, [
                     'first_in' => $a?->check_in_at, 'last_out' => $a?->check_out_at,
                     'present' => $present, 'work' => $work, 'idle' => $idle,

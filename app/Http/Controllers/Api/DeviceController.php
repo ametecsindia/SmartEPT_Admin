@@ -145,7 +145,15 @@ class DeviceController extends Controller
             'last_heartbeat_at' => now(),
         ]);
 
-        return response()->json(['ok' => true, 'server_time' => now()->toIso8601String()]);
+        // Biometric Gate: piggyback the live gate state on every heartbeat so the
+        // agent syncs continuously (Ejaz's rule — no hourly button, heartbeat-style).
+        $gate = null;
+
+        if ($device->employee) {
+            $gate = app(\App\Services\GateService::class)->stateFor($device->employee);
+        }
+
+        return response()->json(['ok' => true, 'server_time' => now()->toIso8601String(), 'gate' => $gate]);
     }
 
     /**

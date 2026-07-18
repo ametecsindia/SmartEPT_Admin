@@ -113,10 +113,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('consent/status', [ConsentController::class, 'status']);
         Route::get('today', [AgentStatusController::class, 'today']);
         Route::post('sync-batch', [SyncController::class, 'batch']);
+        // Biometric Gate v1.1: PRE-consent by design — the wall shows before work
+        // starts, and it exposes only the caller's own punch state.
+        Route::get('gate-status', [AgentStatusController::class, 'gateStatus']);
 
         // Tracking ingestion (M2 + M3) — gated by recorded consent where policy requires it.
         Route::middleware('consent')->group(function () {
-            Route::get('gate-status', [AttendanceController::class, 'gateStatus']); // Gate-to-PC USP
             Route::post('attendance-event', [AttendanceController::class, 'store']);
             Route::post('activity-events', [ActivityController::class, 'activity']);
             Route::post('idle-event', [ActivityController::class, 'idle']);

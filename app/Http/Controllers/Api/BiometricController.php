@@ -163,8 +163,29 @@ class BiometricController extends Controller
         if ($rows) {
             BiometricLog::insert($rows);
             self::mergeIntoAttendance($companyId, $rows);
+
+            // Biometric Gate (Doc 11 v1.1): every mapped punch drives the gate engine
+            // (auto-break on mid-day OUT, close/merge/flag on return IN). Punches are
+            // processed in time order so out→in pairs resolve correctly.
+            self::processGatePunches($companyId, $rows);
         }
         return count($rows);
+    }
+
+    /**
+     * Biometric Gate v1.1 fan-out: feed mapped punches (any ingest path — push API,
+     * CSV import, cloud sync) through GateService in time order. Public static so
+     * BiometricCloudSync uses the exact same path as the direct integrations.
+     */
+    public static function processGatePunches(int $companyId, array $rows): void
+    {
+        $gate = app(\App\Services\GateService::class);
+        $mapped = array_filter($rows, fn ($r) => ($r['employee_id'] ?? null) !== null);
+        usort($mapped, fn ($a, $b) => $a['punched_at'] <=> $b['punched_at']);
+
+        foreach ($mapped as $r) {
+            $gate->processPunch($companyId, (int) $r['employee_id'], $r['punch_type'], \Illuminate\Support\Carbon::parse($r['punched_at']));
+        }
     }
 
     /**

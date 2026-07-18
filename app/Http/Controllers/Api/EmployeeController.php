@@ -142,8 +142,16 @@ class EmployeeController extends Controller
     /** DELETE /api/employees/{employee} */
     public function destroy(Request $request, Employee $employee): JsonResponse
     {
+        // Employees are SOFT-deleted (history stays for reports/audit) — so free
+        // the employee code first, or it stays locked by the trashed row and the
+        // admin can never issue the same ID to a replacement (Ejaz, 16-Jul).
+        $freedCode = $employee->employee_code;
+        $employee->forceFill([
+            'employee_code' => $freedCode . '~del' . $employee->id . '~' . now()->format('ymdHis'),
+        ])->save();
+
         $employee->delete();
-        $this->audit($request, 'DELETE', Employee::class, $employee->id);
+        $this->audit($request, 'DELETE', Employee::class, $employee->id, ['employee_code' => $freedCode]);
 
         return response()->json(null, 204);
     }

@@ -59,7 +59,7 @@
   input,select,textarea{width:100%;background:var(--card-2);border:1.5px solid var(--border);border-radius:10px;
     padding:10px 12px;font-size:13px;font-family:inherit;color:var(--ink);transition:border-color .15s, box-shadow .15s}
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent-2);box-shadow:var(--ring);background:#fff}
-  input[type=checkbox]{width:auto;accent-color:var(--accent);transform:scale(1.15);cursor:pointer;box-shadow:none}
+  input[type=checkbox],input[type=radio]{width:auto;accent-color:var(--accent);transform:scale(1.15);cursor:pointer;box-shadow:none}
   button.primary{width:100%;margin-top:20px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;
     border:none;border-radius:10px;padding:12px;font-weight:700;font-size:13.5px;cursor:pointer;font-family:inherit;
     box-shadow:0 8px 20px rgba(14,124,143,.35);transition:transform .12s, box-shadow .12s}
@@ -253,7 +253,7 @@
 <!-- LOGIN -->
 <div class="login" id="login">
   <div class="box">
-    <div class="lock"><div class="mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACwAAAAsCAYAAAAehFoBAAALNklEQVR42u1Ze3CUVxX/nXu/x2Z3CY8lgSaxYMur2AeKRVvQQBUsapn6SKxtWp+l09ZpB1/F2nZJnVE6UwfbAgq22uowMhvtVFJsB+lAZLTDCNYCxUAhpJAmlDw32f3e9x7/2CQmNDxicdTRO3P3m93v3u/73d/53XPOPQv8v13AxkxpZgFm+j8ZF7AV2Jw7Nz6j/vktV7/W+MfZW198skA4k/hPMn/ljh1GJbMEM6GkxOCiMYvM1KRrZSxxzcAw4z+HV+IGIBr8XlWp883Hs8oPEqq7s2eA+n8/4HRaoLZWpx54YGbivXOXCEZR38H9v+186KHDfbHp1/Ua0lBBrndgUfTvBjtl6lRr6tSp0cE9r96avHb+z+KJOPJNx25sjpznUV2tRikrJmaWzGxc4P62vRO774Hbijc/xxdteZFLfvLT64dZYIhbo7OAFUSk/5UET3j00cVFFRUfIscLOra+0KAunTnNMhGQ47bEL7k0CDo68z213903dI5xJmaJSC9eXJNYvXrF9dls36UQAgJAFGkSp/GjtcbA/cEVFn4CAAYAAQHFiqWU1NqTbbz5xhu2iMS428zpl9Xw8eMomnP5xd0PPrgrBJB6ZvPvErNmLDWPHDnaA8wCUdTPMhsjMSsE6UwmM++66z7yy1RqwowLzezfDr/+JwBbdFublz10FHCyQRhF7sB99+Rb44zyCui+XPHpc0dk+Pbbl5sL5i94MpWaMMPzvGxvb25fLGY5vu/bzCwjpQwVRWYYhiYzEQBYhhHowY0stBDgWCzmSikjklITMyml2LZt8lxnFwDETr35aI/vPkeBP0YaYuqEp54qDY4cafeaXn+mz5J7RG/3SQAazIOWehu7APDss89eEwQh5/N5t77+hYX/amcR/8JX54x9Yl1QmqmLJjzxxL1nG2uMFBaFECWmaXB7R7t/ww1LX+WCfkT/KhkApJR8tgcrpWjIM2ljYT4AYO/evdhYX6/Q1ibx0Y9qtX1XKcgy4Siw62tUZSQ+njfR3ByhtjY6pyTCMNQAyJCSli1bVkRE3cysiYjPP3ANjh24juRTGRs3sl9V1WgdS6bV2PGm6O74M+q+qTA7zait1eelYSmtwkZnRls2+05cGwHgkvTapFVKSzhig5hZ2Db5bm7Pqa9/vQnMBKLjAfDwsJm1tRrMhLo6MTSAjBya5QUSZyZTeFmFvcC+Ys5vBBNIKZjFSYijTY8DuLdy507ZACik03LQIRbAShCp0y0zMmB1QeDS0NdwzlHMUCQFI2JDJuLRMGkM1WqBdQUgVrbxyZvyTUd+m129uhvAOdJLHiVEZhrsRIyqKoCZVG8uoUFS+57Urit1GEitz5DHpNMCRFT2q8yds/68Z1+iomJ59n3v663KZCQAPnc+7IwuRRzsBZMCRGxYttbMiJSGUgpRGCAKPR5BQhIPP6xTP3ysMjlr5noSxnS37c3voLpa1Z1NEkqpQaPG4+elVYnqalXy+LrbimbNuFsEkSYpbDJNhE1Hbs2RecpwHSCKwAQgDKG8EADQMGS5lSUl1MCM5LSptdKOa7fxbw0tX/lKA5hFv0TOnQ87ZzL9qlV02jZVsKwFNG7iPOrsBBkGZPEYsG1fFPV5fUopIAgLNvUDRGE4/JkbNhgNixaF5Zt+db9ZMeVDQVcX+x0daRABdXV0Drc2RMPOGUw/XOFB4VM5qrtHqXwuEtIQDJY6ZAXfI+2H4MCDJgJ8DzoIhoI1cccd4cTH1y81S0prdQR4bzSvbVv+5V0D1jv/I1L87X51zMrvp4zyMWWwbY0oIl8bhrP+Rwe177EKAkmamUkTtBah61iRHzjKcwHXBUmByLahfB8AUNHebrbccYc78bHH5toVZXUiUWx4LSdea214aSUyGYmqKn0egUOOnC33+1UxPrbWLLv4JoSBFgRh2jb0Bz94rY5UXkUKFIYQYQSWAlHoceiGMB0HFAQgIcBxpaIwMJHJyJbqanfiI49UmhVT6sx4ccI72dbnNh66CRs3OtiwQeC06DoM8M6dOwkA6VDTAN7hBFcVLpaVBATICzQMyQKhtJLJiIlCrVTB5JohJEFrrQo5M4AwVAQQh4GBbI+Pr92pxj+y5vNixrSfy1jc9j1fB8dbarq/+60DyGQGAseZQ/PChQsVAGYhzuCB+52L6yntOIAfgLSJgYxehSGR64IcB0QENiQi1yXkXOIxCQUhLQWADh9aK7e/sHrCT558QCST34PS7Dt5hCdPfqlnxV1bsGOHgUWLorNlawSAl9x6axxls2JePm8WWGE4I2w65QdC+gGgFEAE4RMgbNZdXdCpFBBGIBJMuZxSjhOykx/DNFmis313ePTYty0z9rq8/a5fytLSpQhC1mHEUevxL/Z8Y8UvzgYWGEj50mkCgL0zL/sGJo0tTRJ5zAxmRmy8bWYyGblz505ZBUhmJoSBq4MAOgihPQ/KD8D5nKXzjlA5h5UfRFEYUmRaUlvxIimoRR9vrnF+UDs/Nm/ue4wlCw+JZHKpzuUQOU6fd+KNT58P2ALD/XWBxPK7rxBjx34Sr+x+OCyyphMRx2I2dm3bFu7atk0NdROJ+x6ydBiBPRcEEJh10NkZx+SLDZImUeDH4DpQTv4P6uXdzcG25xuL70+PsdesbRCpifPBGmyYCLu7DniN+2vCNWtePR+wA5IQALROlSyMsvl3A5B9vt/s+z6NGzeu6JVXXr33L3/Z85KUtur18/FkFO2767VmFvmc0oGvYVoCWgsi8gkQ8P0O3dnxtD5ycL1fX38svmLlx61PfPLHMI2FJATY88CsEXV1rs8/9+v70NCQQyYjzwdsAXBbWcF5GbJcTyydmLrlCwu/ePPNL81tPLTp8pkzbpkz58qVc+ZcuXJgwvH9+x/1dh/wY8XjpO7LSu3koX3vdW0X9Uzasrm2paVlFQAZvz/9mfg1lZtlUdE8siwADC0IUa5vn8r23OfXPvjiYLIzioKJgYtaGQAon3c1gNyUd6+aXVm5+4pZM2sOHjh4OFVa8lnbthIkhBZERo/jtIPVKW59k1RPVz0dPrDD3769FTfemDpVXbPYHjvuc8IwlkrbGi9MC6w1OPChw7AFbm6N8+D96wD4/RFMj3SqOJckNABQR++vldmcJttecOSaypfNufMem3357HX4x0kgBsDvD8kiC0wyamouxlXv/6w5b8HHhGHOE5Y1UdoxCCmglEZfe0dgmGaTFTjPOH/dswFbt3YX3HmVHHUZaliSXVUlUVenYneu+A7KK74PISBYQfRluxjcqEEOM0dQKkaxIoODsJyZJ1FRLE6mVUirpQCUhpvt0SB5ImaYR2+7pLzjw8WJH9RUV/+VAPAAq6PPtEc4FfSDtu5deQ8lkw8JIVJkWSDLKoDREVjpwhStwVqDBkK460CHQYuled/15ZPal3/g6mTlZbOmG8XFs/18ftk9mzZtv2f+fKqre08ErELtKGVwhmPMP0qfRcuWlel3TfsUTOsjkHIaWJUCbIA1IIwQ4E7B9Jbrem0Io/3I5/9wpdd9dPdTT9XHxo+/sl8+YAAnWluXTCkv//2FqtsZbzupVmWkW1fdCmBdfwcuuWQspk0r0NnZqbB3bxYAtt19d9ni6+arnG3z5lNdV0W2PS/SmlnrUAqhAJjHjh69esPTTzdREEiimN6/f08fEb11wcv3SKcNFM5Rw0MjEdLptNXU/MZWHkXTSjMzc18up1/Zt++WfqblO2N4eIIenS6bqkxG1FVX68mTJ5c4udykEy0nXo7CiLkQ7aAU85D6JQQESBKRlAXdA8q2bctz3asAbPof+ovpn1IN0zuYz6Mpe/1Xt78DKJBLZqtAbdEAAAAASUVORK5CYII=" alt="SmartEPT" style="width:72%;height:72%;object-fit:contain;display:block"></div><div><h1>SmartEPT</h1><small>BY AMETECS</small></div></div>
+    <div class="lock" style="justify-content:center"><img src="/img/smartept-logo-h-light.png" alt="SmartEPT by Ametecs" style="width:210px;max-width:90%;height:auto;display:block"></div>
     <label>Work email</label><input id="email" type="email" value="admin@ametecs.io">
     <label>Password</label><input id="password" type="password" value="password">
     <button class="primary" id="btn-login">Sign in</button>
@@ -264,7 +264,7 @@
 <!-- APP -->
 <div class="shell hide" id="app">
   <div class="side">
-    <div class="lock"><div class="mark"><img src="data:image/png;base64,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" alt="SmartEPT" style="width:72%;height:72%;object-fit:contain;display:block"></div><div><h1 style="font-size:15px">SmartEPT</h1><small>BY AMETECS</small></div></div>
+    <div class="lock" style="justify-content:center;padding-top:2px"><img src="/img/smartept-logo-h-dark.png" alt="SmartEPT by Ametecs" style="width:170px;max-width:94%;height:auto;display:block"></div>
     <div class="navgrp">MONITOR</div>
     <div class="nav active" data-view="dashboard"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/></svg></span> Live Dashboard</div>
     <div class="nav" data-view="attendance"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.4V12l3.2 1.9"/></svg></span> Attendance</div>
@@ -527,21 +527,26 @@
         <h3 style="color:var(--accent-ink)">🚪 Gate-to-PC <span class="hint">the SmartEPT USP — the PC agent only starts after a real door punch</span></h3>
         <div class="fbool"><input type="checkbox" id="gate-enabled"> <b>Require a door / biometric IN punch before the desktop agent can start a work session</b></div>
         <div class="row" style="margin-top:10px;align-items:flex-end">
+          <div><label>Gate mode</label><select id="gate-mode" style="min-width:280px">
+            <option value="auto">Auto — ON when a punch device is registered (or box above ticked)</option>
+            <option value="on">Always ON (force)</option>
+            <option value="off">OFF (pilot / observe only)</option>
+          </select></div>
           <div><label>Grace window (minutes)</label><input id="gate-grace" type="number" min="0" style="width:120px" placeholder="0"></div>
           <button class="btn solid" id="gate-save">Save gate policy</button>
           <span class="mut" id="gate-msg"></span>
         </div>
-        <div class="mut" style="font-size:11.5px;margin-top:8px">When ON: an employee who opens the agent sees a "Punch in at the door" wall — tracking and the work clock start the instant their gate IN punch reaches SmartEPT (physical device or an IN punch pushed via the API). No punch = no login. The grace window lets a punch that lands a few minutes late still open the gate.</div>
+        <div class="mut" style="font-size:11.5px;margin-top:8px">When ON: an employee who opens the agent sees a "Punch in at the door" wall — tracking and the work clock start the instant their gate IN punch reaches SmartEPT (physical device or an IN punch pushed via the API). No punch = no login. The grace window lets a punch that lands a few minutes late still open the gate. Mid-day OUT punch = automatic out-of-office break + soft lock; the return punch closes it to the second (under 2 min merges away, over 45 min flagged, over 3 hours HR is emailed). OFF mode never gates anyone, whatever else is set.</div>
       </div>
       <div class="filters">
         <label>Date</label><input type="date" id="bio-date" style="min-width:0">
         <button class="btn acc" id="bio-load">Load</button>
       </div>
       <div class="card">
-        <h3>Biometric Device Setup <span class="hint">connect a cloud attendance API — punches import into Attendance &amp; payroll automatically every hour</span></h3>
-        <table><thead><tr><th>Provider</th><th>API</th><th>Hourly sync</th><th>Status</th><th>Last sync</th><th>Last result</th><th>Punches</th><th></th></tr></thead><tbody id="biodev-rows"></tbody></table>
+        <h3>Biometric Device Setup <span class="hint">connect a cloud attendance API — punches sync continuously (every 5 minutes) into Attendance, payroll and the Biometric Gate</span></h3>
+        <table><thead><tr><th>Provider</th><th>API</th><th>Auto sync</th><th>Status</th><th>Last sync</th><th>Last result</th><th>Punches</th><th></th></tr></thead><tbody id="biodev-rows"></tbody></table>
         <div style="margin-top:14px;max-width:560px">
-          <div class="fbool"><input type="checkbox" id="bd-sync"> <b>Enable automatic hourly sync</b></div>
+          <div class="fbool"><input type="checkbox" id="bd-sync"> <b>Enable automatic sync — continuous, every 5 minutes (like the heartbeat)</b></div>
           <label>Provider</label><input id="bd-provider" placeholder="etimeoffice">
           <div class="mut" style="font-size:11.5px;margin:2px 0 8px">Cloud attendance provider name.</div>
           <label>API base URL</label><input id="bd-base" placeholder="https://api.etimeoffice.com/api">
@@ -2332,11 +2337,14 @@ function initBiometric() {
   loadBiometric();
   employeesList().then((emps) => fillEmpPicker($('#bio-map-emp'), emps)).catch(() => {});
 }
+let GATE_COMPANY_ID = null;
 async function loadGatePolicy() {
   try {
     const g = (await api('/gate/policy')).data;
     $('#gate-enabled').checked = !!g.gate_enabled;
     $('#gate-grace').value = g.gate_grace_minutes || 0;
+    const me = ((await api('/companies')).data || [])[0];
+    if (me) { GATE_COMPANY_ID = me.id; $('#gate-mode').value = me.biometric_gate || 'auto'; }
   } catch (e) { $('#gate-msg').textContent = e.message; }
 }
 async function saveGatePolicy() {
@@ -2345,6 +2353,9 @@ async function saveGatePolicy() {
       gate_enabled: $('#gate-enabled').checked,
       gate_grace_minutes: Math.max(0, parseInt($('#gate-grace').value || '0', 10)),
     }) });
+    if (GATE_COMPANY_ID) {
+      await api('/companies/' + GATE_COMPANY_ID, { method: 'PUT', body: JSON.stringify({ biometric_gate: $('#gate-mode').value }) });
+    }
     toast('Gate policy saved');
   } catch (e) { $('#gate-msg').textContent = e.message; }
 }

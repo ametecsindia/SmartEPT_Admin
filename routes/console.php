@@ -30,6 +30,7 @@ Schedule::command('smartept:backup-database')->dailyAt('01:30');
 // 17-Jul: outbound integration push (SmartEPT → SmartPRS etc.) — previous day at 02:00.
 Schedule::command('smartept:push-integrations')->dailyAt('02:00');
 
-// 17-Jul: cloud biometric punch import (eTimeOffice-style APIs) — hourly, for
-// every device with "Enable automatic hourly sync" ticked on the Biometric screen.
-Schedule::command('smartept:biometric-sync')->hourly();
+// Cloud biometric punch import (eTimeOffice-style APIs). Ejaz 18-Jul: sync must be
+// CONTINUOUS like the heartbeat, not hourly — every 5 minutes for every device with
+// automatic sync ticked, so the Biometric Gate reacts to punches within minutes.
+Schedule::command('smartept:biometric-sync')->everyFiveMinutes();

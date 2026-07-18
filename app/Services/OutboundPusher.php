@@ -37,7 +37,7 @@ class OutboundPusher
             $out = $a->check_out_at ? Carbon::parse($a->check_out_at) : null;
             $bs = $breaks->get($a->employee_id, collect());
             $breakSecs = (int) $bs->sum(fn ($b) => $b->duration_seconds ?? 0);
-            $worked = ($in && $out) ? max(0, $out->diffInSeconds($in) - $breakSecs) : 0;
+            $worked = ($in && $out) ? max(0, $out->diffInSeconds($in, true) - $breakSecs) : 0;
 
             return [
                 'employee_code' => $a->employee?->employee_code,

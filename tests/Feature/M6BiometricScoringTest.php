@@ -54,7 +54,9 @@ class M6BiometricScoringTest extends TestCase
 
     public function test_daily_summary_command_writes_scores(): void
     {
-        $this->travelTo(now()->startOfDay()->addHours(10));
+        // Pin to a WEDNESDAY 10:00 — summaries are skipped on weekly-off days,
+        // so running the suite on a weekend used to flake this test.
+        $this->travelTo(now()->startOfWeek()->addDays(2)->addHours(10));
         $date = now()->toDateString();
         $employee = \App\Models\Employee::withoutGlobalScopes()->where('employee_code', 'E-1001')->firstOrFail();
 

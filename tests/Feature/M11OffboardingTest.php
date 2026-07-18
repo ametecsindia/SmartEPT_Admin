@@ -115,6 +115,23 @@ class M11OffboardingTest extends TestCase
         ])->assertCreated();
     }
 
+    public function test_deleted_employee_code_can_be_reused(): void
+    {
+        $admin = $this->login('admin@ametecs.io');
+
+        $created = $this->withToken($admin)->postJson('/api/employees', [
+            'employee_code' => 'E-REUSE-1', 'first_name' => 'Gulab', 'last_name' => 'Test',
+        ])->assertCreated();
+
+        $this->withToken($admin)->deleteJson('/api/employees/' . $created->json('data.id'))
+            ->assertStatus(204);
+
+        // Same employee ID for the replacement hire — must work (soft-deleted row freed it).
+        $this->withToken($admin)->postJson('/api/employees', [
+            'employee_code' => 'E-REUSE-1', 'first_name' => 'Rahim', 'last_name' => 'Replacement',
+        ])->assertCreated();
+    }
+
     public function test_rebind_respects_licence_seat_limit(): void
     {
         $this->registerAgent('OFF-DEV-4');

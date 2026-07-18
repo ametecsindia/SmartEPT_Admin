@@ -151,6 +151,9 @@ class BiometricCloudSync
         }
         if ($inserts || $corrections) {
             BiometricController::mergeIntoAttendance($d->company_id, array_merge($inserts, $corrections));
+            // Biometric Gate v1.1: cloud-synced punches drive the gate/auto-break
+            // engine exactly like pushed or imported ones.
+            BiometricController::processGatePunches($d->company_id, array_merge($inserts, $corrections));
         }
 
         $codes = array_slice(array_keys($unmatchedCodes), 0, 15);
