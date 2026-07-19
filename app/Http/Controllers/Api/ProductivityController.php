@@ -111,6 +111,10 @@ class ProductivityController extends Controller
                 $idle = (int) ($ac->idl ?? 0);
                 $present = ($a && $a->check_in_at)
                     ? max(0, (($a->check_out_at ? Carbon::parse($a->check_out_at) : now())->diffInSeconds(Carbon::parse($a->check_in_at), true))) : 0;
+                // If the attendance check-in span is missing/short, fall back to the
+                // tracked span (active + idle) so productivity reflects active-vs-total
+                // instead of dividing by an empty 'present' and showing a false 0%.
+                $present = max($present, $work + $idle);
                 $rows[] = $this->row($emp, $today, [
                     'first_in' => $a?->check_in_at, 'last_out' => $a?->check_out_at,
                     'present' => $present, 'work' => $work, 'idle' => $idle,
