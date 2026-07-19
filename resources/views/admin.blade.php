@@ -13,22 +13,25 @@
      only the design layer changed. Matches Central + Client Portal.
      ============================================================ */
   :root{
-    --canvas:#EEF3F6;--card:#FFFFFF;--card-2:#F7FAFB;--border:#E3E9EF;--hairline:#EEF2F6;
+    --canvas:#F1EFEA;--card:#FFFFFF;--card-2:#FAF9F5;--border:#E5E1D8;--hairline:#EDEAE2;
     --ink:#0F1E26;--ink-2:#4A5A66;--ink-3:#8494A0;
     --accent:#0E7C8F;--accent-2:#22B8CF;--accent-3:#31D2E8;--accent-weak:#E1F3F6;--accent-ink:#0A6273;
     --ok:#0A9464;--ok-w:#E3F6EE;--warn:#B7791F;--warn-w:#FBF3E2;--danger:#D22A4C;--danger-w:#FBE9ED;
     --info:#0B72C9;--info-w:#E6F1FB;--idle:#6D28D9;--idle-w:#F0EAFC;
     --navy:#052A33;--navy-2:#0B4A56;
     --font-head:'Plus Jakarta Sans','Inter','Segoe UI',sans-serif;
-    --shadow-1:0 1px 2px rgba(15,30,38,.05),0 4px 14px rgba(15,30,38,.05);
-    --shadow-2:0 4px 10px rgba(15,30,38,.07),0 14px 34px rgba(15,30,38,.09);
+    --shadow-1:0 1px 2px rgba(16,42,51,.05),0 6px 18px rgba(16,42,51,.07);
+    --shadow-2:0 6px 16px rgba(16,42,51,.09),0 22px 48px rgba(16,42,51,.13);
     --ring:0 0 0 3px rgba(34,184,207,.22);
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{scrollbar-color:#C6D2DA transparent;scrollbar-width:thin}
-  body{font-family:'Inter','Segoe UI',system-ui,Arial,sans-serif;background:
-    radial-gradient(900px 300px at 85% -80px, rgba(34,184,207,.10), transparent 60%),
-    var(--canvas);color:var(--ink);font-size:13.5px;-webkit-font-smoothing:antialiased}
+  body{font-family:'Inter','Segoe UI',system-ui,Arial,sans-serif;background-color:var(--canvas);
+    background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)' opacity='0.35'/%3E%3C/svg%3E"),
+    radial-gradient(900px 320px at 85% -80px, rgba(34,184,207,.09), transparent 60%);
+    background-blend-mode:soft-light,normal;background-attachment:fixed,fixed;
+    color:var(--ink);font-size:13.5px;-webkit-font-smoothing:antialiased}
   ::selection{background:rgba(34,184,207,.25)}
   ::-webkit-scrollbar{width:9px;height:9px}
   ::-webkit-scrollbar-thumb{background:#C6D2DA;border-radius:8px;border:2px solid var(--canvas)}
@@ -176,10 +179,14 @@
   .org-filter select{font-size:12px;padding:6px 10px;border-radius:9px;border:1px solid var(--border);
     background:var(--card);color:var(--ink);max-width:200px}
   .org-filter .of-scope{font-size:11.5px;color:var(--ink-3);margin-left:auto;font-weight:600}
+  #dash-org{position:sticky;top:56px;z-index:4;box-shadow:var(--shadow-1)}
+  .dash-charts .card{display:flex;flex-direction:column;max-height:400px}
+  .dash-charts .card h3{flex:none}
+  .dash-charts .tu-grid,.dash-charts .wf-wrap{overflow-y:auto;min-height:0}
 
   /* ---------- Cards & tables ---------- */
-  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 20px;margin-bottom:18px;
-    box-shadow:var(--shadow-1)}
+  .card{background:var(--card);border:1px solid var(--hairline);border-radius:18px;padding:19px 22px;margin-bottom:18px;
+    box-shadow:var(--shadow-1),inset 0 1px 0 rgba(255,255,255,.7)}
   .card h3{font-size:13.5px;font-weight:800;margin-bottom:14px;display:flex;justify-content:space-between;
     align-items:center;gap:10px;flex-wrap:wrap;color:var(--accent-ink)}
   .card h3 .hint{font-size:10.5px;color:var(--ink-3);font-weight:600;font-family:'Inter',sans-serif;letter-spacing:0}
