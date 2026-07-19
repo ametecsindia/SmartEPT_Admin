@@ -215,4 +215,30 @@ class UsageController extends Controller
         return response()->json(['date' => $date, 'data' => $rows]);
     }
 
+    /**
+     * GET /api/reports/time-utilization?date= — company-wide "where the hours went":
+     * top applications and top websites by total time, with category, for the day
+     * (report-scoped). Powers the dashboard time-utilization chart.
+     */
+    public function timeUtilization(Request $request): JsonResponse
+    {
+        $companyId = $request->user()->company_id;
+        $date = $request->query('date', now()->toDateString());
+        $visible = $this->visibleEmployeeIds($request->user());
+
+        $apps = EmployeeAppUsageLog::where('company_id', $companyId)
+            ->whereDate('start_at', $date)
+            ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
+            ->selectRaw('app_name, MIN(category) as category, SUM(duration_seconds) as secs')
+            ->groupBy('app_name')->orderByDesc('secs')->limit(12)->get();
+
+        $sites = EmployeeWebsiteUsageLog::where('company_id', $companyId)
+            ->whereDate('start_at', $date)
+            ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
+            ->selectRaw('COALESCE(domain, page_title) as site, MIN(category) as category, SUM(duration_seconds) as secs')
+            ->groupBy('site')->orderByDesc('secs')->limit(12)->get();
+
+        return response()->json(['date' => $date, 'apps' => $apps, 'sites' => $sites]);
+    }
+
 }

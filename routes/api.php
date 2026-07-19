@@ -150,6 +150,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ---- Usage + compliance reports (M4) ----
     Route::middleware('permission:activity.view')->group(function () {
         Route::get('reports/usage-summary', [UsageController::class, 'companySummary']); // 17-Jul all-employees default
+        Route::get('reports/time-utilization', [UsageController::class, 'timeUtilization']); // dashboard 'where the hours went'
         Route::get('reports/productivity', [ProductivityController::class, 'report']); // 17-Jul all-employee day-wise productivity
         Route::get('reports/employee/{employee}/app-usage', [UsageController::class, 'appReport']);
         Route::get('reports/employee/{employee}/website-usage', [UsageController::class, 'websiteReport']);

@@ -112,6 +112,26 @@
   .kpi .l{font-size:10.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.7px;font-weight:700}
   .kpi .v{font-size:27px;font-weight:800;margin-top:7px;font-family:var(--font-head);letter-spacing:-.02em}
 
+  /* ---------- Dashboard charts ---------- */
+  .dash-charts{display:grid;grid-template-columns:340px 1fr;gap:18px;margin-bottom:18px}
+  @media(max-width:920px){.dash-charts{grid-template-columns:1fr}}
+  .wf-wrap{display:flex;gap:18px;align-items:center}
+  .wf-leg{display:flex;flex-direction:column;gap:9px;flex:1;min-width:0}
+  .wf-leg .r{display:flex;align-items:center;gap:8px;font-size:12px}
+  .wf-leg .dot{width:10px;height:10px;border-radius:3px;flex:none}
+  .wf-leg .nm{color:var(--ink-2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wf-leg .ct{font-weight:800;font-variant-numeric:tabular-nums}
+  .wf-leg .pc{color:var(--ink-3);font-size:11px;font-variant-numeric:tabular-nums;min-width:38px;text-align:right}
+  .tu-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  @media(max-width:620px){.tu-grid{grid-template-columns:1fr}}
+  .tu-h{font-size:10.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--ink-3);font-weight:700;margin-bottom:12px}
+  .tu-row{display:grid;grid-template-columns:1fr auto;gap:3px 10px;margin-bottom:11px}
+  .tu-name{font-size:12px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tu-val{font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .tu-val .pc{color:var(--ink-3);font-weight:600;margin-left:5px}
+  .tu-track{grid-column:1/-1;height:7px;border-radius:4px;background:rgba(148,163,184,.20);overflow:hidden}
+  .tu-fill{height:100%;border-radius:4px;min-width:3px}
+
   /* ---------- Cards & tables ---------- */
   .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 20px;margin-bottom:18px;
     box-shadow:var(--shadow-1)}
@@ -294,6 +314,16 @@
     <!-- 1. DASHBOARD -->
     <div class="view active" id="v-dashboard">
       <div class="kpis" id="kpis"></div>
+      <div class="dash-charts">
+        <div class="card" style="margin-bottom:0">
+          <h3>Workforce status <span class="hint">live · share of tracked employees</span></h3>
+          <div class="wf-wrap"><div id="wf-donut"></div><div class="wf-leg" id="wf-leg"></div></div>
+        </div>
+        <div class="card" style="margin-bottom:0">
+          <h3>Time utilization — today <span class="hint">where work hours went · top apps &amp; sites · % of tracked time</span></h3>
+          <div class="tu-grid" id="tu-grid"><div class="mut" style="font-size:12px">Loading…</div></div>
+        </div>
+      </div>
       <div class="card">
         <h3>Live productivity — all employees <span class="hint">today · working vs present time · click Reports for the full range</span>
           <span class="row"><input id="dash-prod-q" placeholder="Search employee" autocomplete="off" style="width:170px;font-weight:400;font-size:12px;padding:5px 9px"></span>
@@ -1300,6 +1330,43 @@ function attachTableFilter(input, tbodySel) {
 }
 
 // ---- 1. dashboard ----
+// ---- dashboard mini-charts (inline SVG, CSP-safe) ----
+function catColor(c){
+  c=(c||'').toUpperCase();
+  if(['PRODUCTIVE','CLIENT_REQUIRED','COMMUNICATION'].includes(c)) return '#16A34A';
+  if(['NON_PRODUCTIVE','RESTRICTED'].includes(c)) return '#D97706';
+  if(c==='BLOCKED') return '#DC2626';
+  return '#64748B';
+}
+function svgDonut(segs, total){
+  const R=52, cx=64, cy=64, sw=19, C=2*Math.PI*R;
+  const ring='<circle cx="64" cy="64" r="'+R+'" fill="none" stroke="rgba(148,163,184,.18)" stroke-width="'+sw+'"/>';
+  let off=0, arcs='';
+  (segs||[]).forEach((seg)=>{
+    if(!seg.value) return;
+    const len=C*seg.value/total, gap=Math.min(2,len);
+    arcs+='<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="none" stroke="'+seg.color+'" stroke-width="'+sw
+      +'" stroke-dasharray="'+(len-gap)+' '+(C-(len-gap))+'" stroke-dashoffset="'+(-off)
+      +'" transform="rotate(-90 64 64)"><title>'+esc(seg.label)+': '+seg.value+' ('+Math.round(seg.value/total*100)+'%)</title></circle>';
+    off+=len;
+  });
+  return '<svg viewBox="0 0 128 128" width="132" height="132">'+ring+arcs
+    +'<text x="64" y="60" text-anchor="middle" font-size="26" font-weight="800" fill="var(--ink)" font-family="var(--font-head)">'+(total||0)+'</text>'
+    +'<text x="64" y="80" text-anchor="middle" font-size="8.5" letter-spacing="1" fill="var(--ink-3)">EMPLOYEES</text></svg>';
+}
+function utilBars(rows, label){
+  rows=(rows||[]).filter((r)=>+r.secs>0);
+  if(!rows.length) return '<div class="tu-h">'+label+'</div><div class="mut" style="font-size:12px">No activity tracked today.</div>';
+  const tot=rows.reduce((a,b)=>a+(+b.secs||0),0);
+  const max=rows.reduce((a,b)=>Math.max(a,+b.secs||0),1);
+  return '<div class="tu-h">'+label+'</div>'+rows.map((r)=>{
+    const secs=+r.secs||0, pc=tot?Math.round(secs/tot*100):0, w=Math.max(3,secs/max*100);
+    return '<div class="tu-row" title="'+esc(r.name)+' — '+secH(secs)+' ('+pc+'%)">'
+      +'<div class="tu-name">'+esc(r.name)+'</div>'
+      +'<div class="tu-val">'+secH(secs)+'<span class="pc">'+pc+'%</span></div>'
+      +'<div class="tu-track"><div class="tu-fill" style="width:'+w+'%;background:'+catColor(r.category)+'"></div></div></div>';
+  }).join('');
+}
 async function loadDashboard() {
   try {
     const d = await api('/dashboard/live-status');
@@ -1310,6 +1377,10 @@ async function loadDashboard() {
       ['Violations today', c.violations_today], ['Screenshots', c.screenshots_today],
     ];
     $('#kpis').innerHTML = cards.map(([l, v]) => '<div class="kpi"><div class="l">' + esc(l) + '</div><div class="v">' + (v ?? 0) + '</div></div>').join('');
+    const wf = [['Active', c.active_now, '#16A34A'], ['Idle', c.idle_now, '#D97706'], ['On break', c.on_break, '#EA580C'], ['Offline', c.offline, '#94A3B8']];
+    const wfTotal = c.total_employees || wf.reduce((a, [, v]) => a + (v || 0), 0);
+    $('#wf-donut').innerHTML = svgDonut(wf.map(([label, value, color]) => ({ label, value: value || 0, color })), wfTotal);
+    $('#wf-leg').innerHTML = wf.map(([l, v, col]) => '<div class="r"><span class="dot" style="background:' + col + '"></span><span class="nm">' + l + '</span><span class="ct">' + (v || 0) + '</span><span class="pc">' + (wfTotal ? Math.round((v || 0) / wfTotal * 100) : 0) + '%</span></div>').join('');
     $('#live-rows').innerHTML = d.employees.map((e) => {
       const cls = { ONLINE: 't-ok', IDLE: 't-idle', AWAY: 't-warn', OFFLINE: 't-off' }[e.status] || 't-off';
       return '<tr class="clk" data-id="' + e.employee_id + '" data-name="' + esc(e.name) + '">'
@@ -1319,6 +1390,14 @@ async function loadDashboard() {
     }).join('') || '<tr><td colspan="6" class="mut">No employees online yet.</td></tr>';
   } catch (e) {
     if (isDenied(e)) { $('#live-rows').innerHTML = deniedCard(); $('#kpis').innerHTML = ''; }
+  }
+  try {
+    const tu = await api('/reports/time-utilization?date=' + today());
+    const apps = (tu.apps || []).map((a) => ({ name: a.app_name, secs: a.secs, category: a.category }));
+    const sites = (tu.sites || []).map((x) => ({ name: x.site, secs: x.secs, category: x.category }));
+    $('#tu-grid').innerHTML = '<div>' + utilBars(apps, 'Top applications') + '</div><div>' + utilBars(sites, 'Top websites') + '</div>';
+  } catch (e) {
+    if (isDenied(e)) $('#tu-grid').innerHTML = '<div class="mut" style="font-size:12px">Your role cannot view activity data.</div>';
   }
   try {
     const pr = await api('/reports/productivity?from=' + today() + '&to=' + today());
