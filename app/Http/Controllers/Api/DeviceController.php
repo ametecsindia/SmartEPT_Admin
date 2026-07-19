@@ -132,16 +132,24 @@ class DeviceController extends Controller
             'app_version'    => ['nullable', 'string', 'max:32'],
             'service_version' => ['nullable', 'string', 'max:32'],
             'sync_pending'   => ['nullable', 'integer', 'min:0'],
+            'client_time'    => ['nullable', 'date'],
         ]);
 
         $device = EmployeeDevice::where('device_uuid', $data['device_uuid'])->firstOrFail();
+
+        // EPT-25: clock-skew tamper check. The agent stamps its local time; a large
+        // gap from server time usually means the PC clock was changed to fake hours.
+        $skew = isset($data['client_time'])
+            ? (int) abs(now()->diffInSeconds(\Illuminate\Support\Carbon::parse($data['client_time'])))
+            : null;
+        $health = ($skew !== null && $skew > 180) ? 'DEGRADED' : 'HEALTHY';
 
         $device->update([
             'current_status'    => (($data['status'] ?? 'ONLINE') === 'ACTIVE' ? 'ONLINE' : ($data['status'] ?? 'ONLINE')),
             'app_version'       => $data['app_version'] ?? $device->app_version,
             'service_version'   => $data['service_version'] ?? $device->service_version,
             'sync_pending_count' => $data['sync_pending'] ?? $device->sync_pending_count,
-            'agent_health'      => 'HEALTHY',
+            'agent_health'      => $health,
             'last_heartbeat_at' => now(),
         ]);
 
@@ -153,7 +161,7 @@ class DeviceController extends Controller
             $gate = app(\App\Services\GateService::class)->stateFor($device->employee);
         }
 
-        return response()->json(['ok' => true, 'server_time' => now()->toIso8601String(), 'gate' => $gate]);
+        return response()->json(['ok' => true, 'server_time' => now()->toIso8601String(), 'clock_skew_seconds' => $skew, 'gate' => $gate]);
     }
 
     /**
