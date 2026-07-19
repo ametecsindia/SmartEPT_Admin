@@ -114,6 +114,17 @@ class DashboardController extends Controller
             ->orderByDesc('last_heartbeat_at')
             ->get(['id', 'employee_id', 'device_uuid', 'computer_name', 'os_version', 'app_version', 'agent_health', 'compliance_status', 'current_status', 'sync_pending_count', 'last_heartbeat_at', 'last_sync_at']);
 
+        // EPT-25: agent-stopped alert. A force-killed agent stops sending heartbeats
+        // but its stored agent_health stays at the last value ('HEALTHY'). Flip it to
+        // STOPPED at read-time when the last heartbeat is stale (>10 min) so the admin
+        // sees the gap immediately. (Read-only override — not persisted.)
+        $staleAfter = now()->subMinutes(10);
+        $devices->each(function ($d) use ($staleAfter) {
+            if (! $d->last_heartbeat_at || $d->last_heartbeat_at->lt($staleAfter)) {
+                $d->agent_health = 'STOPPED';
+            }
+        });
+
         return response()->json(['data' => $devices]);
     }
 }
