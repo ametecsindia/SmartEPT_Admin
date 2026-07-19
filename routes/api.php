@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\LicenseController;
 use App\Http\Controllers\Api\OpsController;
+use App\Http\Controllers\Api\StorageConfigController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\OrgController;
@@ -87,6 +88,9 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,AUDITOR');
     Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN')->group(function () {
         Route::get('ops/storage-usage', [OpsController::class, 'storageUsage']);
+        Route::get('ops/storage-config', [StorageConfigController::class, 'show']);
+        Route::put('ops/storage-config', [StorageConfigController::class, 'save']);
+        Route::post('ops/storage-config/test', [StorageConfigController::class, 'test']);
         Route::get('ops/backups', [OpsController::class, 'backups']);
         Route::post('ops/backup', [OpsController::class, 'runBackup']);
         Route::post('ops/storage-cleanup', [OpsController::class, 'storageCleanup']); // 17-Jul bulk evidence/log cleanup

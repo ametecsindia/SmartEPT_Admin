@@ -16,7 +16,20 @@ class StorageService
 {
     public function disk(): string
     {
-        // 'local' works out of the box on Laravel/Laragon. Production sets this per company.
+        // Cloud Storage (GCS) when the admin has connected a bucket AND the disk is
+        // actually registered (AppServiceProvider registers it only when the SDK is
+        // installed + the key decrypts). Otherwise the local disk / configured default,
+        // so a half-set config never loses a screenshot.
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('settings')
+                && \App\Models\Setting::get('gcs_enabled') === '1'
+                && array_key_exists('gcs', config('filesystems.disks', []))) {
+                return 'gcs';
+            }
+        } catch (\Throwable $e) {
+            // fall through to the safe default
+        }
+
         return config('smartept.storage_disk', 'local');
     }
 
