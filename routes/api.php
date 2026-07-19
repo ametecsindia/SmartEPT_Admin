@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\ComplianceController;
 use App\Http\Controllers\Api\ConsentController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DeviceController;
+use App\Http\Controllers\Api\DiagnosticsController;
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\LicenseController;
 use App\Http\Controllers\Api\OpsController;
@@ -103,6 +104,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('gate/policy', [OpsController::class, 'updateGatePolicy']);
         Route::get('ops/agent-lock', [OpsController::class, 'agentLock']);   // agent exit/uninstall lock
         Route::put('ops/agent-lock', [OpsController::class, 'updateAgentLock']);
+
+        // ---- Help → Troubleshooting: live System Health + in-app log viewer ----
+        // (Ametecs troubleshooting-in-app standard — non-technical self-service.)
+        Route::get('ops/diagnostics', [DiagnosticsController::class, 'checks']);
+        Route::get('ops/logs', [DiagnosticsController::class, 'logs']);
     });
 
     // ---- Licence (R2-1): admin view/set key + force revalidation ----

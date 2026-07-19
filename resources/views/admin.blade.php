@@ -398,6 +398,7 @@
     <div class="nav" data-view="license"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="12" r="4.6"/><path d="M12.6 12H21M17.5 12v3.4M21 12v2.4"/></svg></span> Licence</div>
     <div class="nav" data-view="integrations"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg></span> API &amp; Integrations</div>
     <div class="nav" data-view="ops"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6.5 5 13L17 12h4"/></svg></span> Audit &amp; Ops</div>
+    <div class="nav" data-view="help"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.2 9.3a2.9 2.9 0 0 1 5.6 1c0 1.9-2.8 2.6-2.8 2.6"/><path d="M12 17h.01"/></svg></span> Help &amp; Troubleshooting</div>
     <div class="foot"><span id="who"></span><br><a id="signout" style="color:var(--ink-3);cursor:pointer">Sign out</a></div>
   </div>
   <div class="nav-backdrop" id="nav-backdrop"></div>
@@ -959,6 +960,214 @@
         <tbody id="au-rows"></tbody></table>
       </div>
     </div>
+
+    <!-- HELP & TROUBLESHOOTING (Ametecs troubleshooting-in-app standard) -->
+    <div class="view" id="v-help">
+      <style>
+        #v-help .dg-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+        @media(max-width:820px){#v-help .dg-grid{grid-template-columns:1fr}}
+        #v-help .dg-item{display:flex;gap:11px;align-items:flex-start;padding:12px 13px;border:1px solid var(--border);border-radius:11px;background:var(--card)}
+        #v-help .dg-item .dot{width:11px;height:11px;border-radius:50%;flex:none;margin-top:4px}
+        #v-help .dg-ok .dot{background:var(--ok)}#v-help .dg-warn .dot{background:var(--warn)}#v-help .dg-down .dot{background:var(--danger)}
+        #v-help .dg-item.dg-down{background:var(--danger-w);border-color:transparent}
+        #v-help .dg-item.dg-warn{background:var(--warn-w);border-color:transparent}
+        #v-help .dg-l b{font-size:12.5px;color:var(--ink)}
+        #v-help .dg-l p{margin:3px 0 0;font-size:11.5px;color:var(--ink-2);line-height:1.5}
+        #v-help .dg-l a{color:var(--accent);font-weight:700;cursor:pointer;font-size:11px;white-space:nowrap}
+        #v-help details.kb{border:1px solid var(--border);border-radius:11px;margin-bottom:9px;background:var(--card);overflow:hidden}
+        #v-help details.kb[open]{box-shadow:var(--shadow-1)}
+        #v-help details.kb>summary{cursor:pointer;padding:13px 15px;font-weight:700;font-size:12.5px;color:var(--ink);list-style:none;display:flex;align-items:center;gap:10px}
+        #v-help details.kb>summary::-webkit-details-marker{display:none}
+        #v-help details.kb>summary::after{content:'\25be';margin-left:auto;color:var(--ink-3);transition:transform .15s}
+        #v-help details.kb[open]>summary::after{transform:rotate(180deg)}
+        #v-help .kb-tag{font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;white-space:nowrap}
+        #v-help .kb-body{padding:2px 16px 15px;font-size:12px;line-height:1.6;color:var(--ink-2)}
+        #v-help .kb-body p{margin:7px 0}#v-help .kb-body b{color:var(--ink)}
+        #v-help .kb-body ol,#v-help .kb-body ul{margin:6px 0 6px 18px;padding:0}
+        #v-help .kb-body li{margin:3px 0}
+        #v-help .kb-body code{background:var(--card-2);padding:1.5px 6px;border-radius:5px;font-size:11px;font-family:ui-monospace,Menlo,Consolas,monospace}
+        #v-help .kb-esc{background:var(--accent-weak);border-radius:8px;padding:8px 11px;margin-top:10px!important;color:var(--accent-ink)}
+        #v-help .kb-flash{outline:2px solid var(--accent);outline-offset:1px}
+        #v-help .logbox{background:#0E1726;color:#D6E2F0;border-radius:11px;padding:14px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;line-height:1.55;max-height:440px;overflow:auto;white-space:pre-wrap;word-break:break-word;margin:0}
+      </style>
+
+      <div class="card">
+        <h3>System Health <span class="hint">one click checks the database, storage, agents, email &amp; more — green is good, amber needs attention, red needs a fix now</span></h3>
+        <div class="row" style="margin-bottom:12px">
+          <button class="btn solid" id="dg-run">Run checks</button>
+          <span class="tag" id="dg-overall" style="display:none"></span>
+          <span class="mut" id="dg-when"></span>
+        </div>
+        <div id="dg-results" class="dg-grid"><div class="mut">Press “Run checks” to test this SmartEPT server.</div></div>
+      </div>
+
+      <div class="card">
+        <h3>Known Issues — how to fix common problems <span class="hint">plain-language steps, no technical background needed</span></h3>
+        <div class="filters" style="margin-bottom:14px">
+          <input id="kb-search" placeholder="Search problems… e.g. screenshots, 500, slow, email">
+        </div>
+        <div id="kb-list">
+
+          <details class="kb" id="kb-db" data-kb="agent data screenshots stopped not arriving database sqlite mysql login token rejected uploads">
+            <summary><span class="kb-tag t-danger">Data &amp; agents</span> Agent data or screenshots stopped reaching the console</summary>
+            <div class="kb-body">
+              <p><b>What you see:</b> The agent looks fine on the PC, but new screenshots, attendance or activity stop appearing in the console.</p>
+              <p><b>Likely cause:</b> The web app lost its database settings and quietly fell back to an empty local database, so the agent’s login can no longer be verified and every upload is rejected.</p>
+              <p><b>How to check:</b> Run <b>System Health</b> above — the “Database connection” row will be red and say it connected to SQLite instead of MySQL.</p>
+              <p><b>How to fix:</b></p>
+              <ol>
+                <li>Open the <code>.env</code> file in the app folder and confirm <code>DB_CONNECTION=mysql</code> and <code>DB_DATABASE=smartept</code>.</li>
+                <li>Run <code>migrate.bat</code> in the app folder to make sure all tables exist.</li>
+                <li>In Laragon, do a full <b>Stop All</b> then <b>Start All</b> (not just reload).</li>
+                <li>Re-open the agent on one PC and sign in again; new data should appear within a minute.</li>
+              </ol>
+              <p class="kb-esc"><b>When to call Ametecs:</b> If the Database row is still red after these steps, contact support on WhatsApp <b>90000 98877</b> with a copy of the log (below).</p>
+            </div>
+          </details>
+
+          <details class="kb" id="kb-opcache" data-kb="changes not taking effect frozen opcache validate timestamps restart cache clear nothing happens">
+            <summary><span class="kb-tag t-warn">Updates not applying</span> My changes or fixes don’t take effect no matter what I do</summary>
+            <div class="kb-body">
+              <p><b>What you see:</b> You edit a file or change a setting, clear the cache, even restart — and the app still behaves the old way.</p>
+              <p><b>Likely cause:</b> PHP’s code cache (OPcache) is set to never re-read files, so it keeps serving a frozen copy of the code.</p>
+              <p><b>How to check:</b> Run <b>System Health</b> — the “PHP code cache (OPcache)” row will be amber.</p>
+              <p><b>How to fix:</b></p>
+              <ol>
+                <li>Open <code>php.ini</code> (Laragon → Menu → PHP → php.ini) and set <code>opcache.validate_timestamps=1</code>.</li>
+                <li>Save, then in Laragon do a full <b>Stop All</b> then <b>Start All</b> — a full stop, not a reload.</li>
+                <li>Re-run System Health; the OPcache row should turn green.</li>
+              </ol>
+              <p class="kb-esc"><b>When to call Ametecs:</b> If you can’t find php.ini or the row stays amber after a full restart, contact WhatsApp <b>90000 98877</b>.</p>
+            </div>
+          </details>
+
+          <details class="kb" id="kb-500" data-kb="500 internal server error undefined constant blank screen white page crash">
+            <summary><span class="kb-tag t-danger">A screen errors</span> A page shows “500” / “Internal Server Error”</summary>
+            <div class="kb-body">
+              <p><b>What you see:</b> A whole screen fails to load and shows a 500 error or “Internal Server Error”.</p>
+              <p><b>Likely cause:</b> Either a code/template error on that page, or the database problem described in the first card.</p>
+              <p><b>How to check:</b> Open the <b>Application log</b> below and load the last 100 lines — the newest <code>ERROR</code> line names the file and line number.</p>
+              <p><b>How to fix:</b> If the log points at the database, follow the first card. Otherwise use “Copy for developer” below and send the log to Ametecs — the file and line number let us fix it quickly.</p>
+              <p class="kb-esc"><b>When to call Ametecs:</b> Any 500 that isn’t the database — send the copied log to WhatsApp <b>90000 98877</b>.</p>
+            </div>
+          </details>
+
+          <details class="kb" id="kb-storage" data-kb="storage evidence folder not writable disk full screenshots not saving space nas share">
+            <summary><span class="kb-tag t-danger">Storage</span> Screenshots aren’t being saved / disk is full</summary>
+            <div class="kb-body">
+              <p><b>What you see:</b> Screenshots or webcam photos stop being saved even though agents are online.</p>
+              <p><b>Likely cause:</b> The evidence folder is not writable, missing, or the disk is out of space.</p>
+              <p><b>How to check:</b> Run <b>System Health</b> — the “Evidence storage folder” row shows the exact folder and whether it’s writable or nearly full.</p>
+              <p><b>How to fix:</b></p>
+              <ol>
+                <li>Free up disk space, or point storage at a bigger drive/NAS in <b>Audit &amp; Ops → Local / On-premise storage</b>.</li>
+                <li>Make sure the Windows service account can write to that folder.</li>
+                <li>Consider turning on automatic cleanup (Audit &amp; Ops) to keep the folder from filling up again.</li>
+              </ol>
+              <p class="kb-esc"><b>When to call Ametecs:</b> If the folder is writable and has space but screenshots still don’t save, contact WhatsApp <b>90000 98877</b>.</p>
+            </div>
+          </details>
+
+          <details class="kb" id="kb-license" data-kb="storage paused licence license key evaluation ended monitoring blocked screenshots paused validate">
+            <summary><span class="kb-tag t-warn">Licence</span> Recording is paused / “evaluation ended”</summary>
+            <div class="kb-body">
+              <p><b>What you see:</b> Monitoring or screenshot storage is paused, or a banner says the evaluation has ended.</p>
+              <p><b>Likely cause:</b> The licence key hasn’t been entered or validated, so recording is held until it is.</p>
+              <p><b>How to check:</b> Run <b>System Health</b> — the “Evidence recording” row will be amber and say storage is paused.</p>
+              <p><b>How to fix:</b> Open <b>Licence</b> in the menu, enter your key and press validate. Recording resumes immediately. Get a key from the client portal or WhatsApp <b>90000 98877</b>.</p>
+              <p class="kb-esc"><b>When to call Ametecs:</b> If your key won’t validate, contact WhatsApp <b>90000 98877</b>.</p>
+            </div>
+          </details>
+
+          <details class="kb" id="kb-migrate" data-kb="database updates pending migration migrate.bat feature missing new column table missing after update">
+            <summary><span class="kb-tag t-warn">After an update</span> A new feature is missing, or a screen errors after an update</summary>
+            <div class="kb-body">
+              <p><b>What you see:</b> After receiving an updated build, a new feature isn’t there, or a screen throws an error mentioning a missing column or table.</p>
+              <p><b>Likely cause:</b> The database updates that come with the new build haven’t been applied yet.</p>
+              <p><b>How to check:</b> Run <b>System Health</b> — the “Database updates” row will be amber with the number of pending updates.</p>
+              <p><b>How to fix:</b> Run <code>migrate.bat</code> in the app folder (or in Laragon Terminal: <code>cd /d C:\laragon\www\smartept</code> then <code>php artisan migrate</code>). Re-run System Health to confirm it turns green.</p>
+              <p class="kb-esc"><b>When to call Ametecs:</b> If migrate reports an error, copy it and send to WhatsApp <b>90000 98877</b>.</p>
+            </div>
+          </details>
+
+          <details class="kb" id="kb-agent-silent" data-kb="agent stopped reporting offline silent no heartbeat pc not checking in went offline">
+            <summary><span class="kb-tag t-warn">Agents</span> An agent stopped checking in</summary>
+            <div class="kb-body">
+              <p><b>What you see:</b> A monitored PC shows offline, or System Health says no agent has checked in recently.</p>
+              <p><b>Likely cause:</b> The PC is switched off, sleeping, off the network, or the agent was stopped.</p>
+              <p><b>How to check:</b> Open <b>Devices</b> to see each PC’s last check-in time.</p>
+              <p><b>How to fix:</b> Confirm the PC is on and online. If it’s in use but still silent, ask IT to reopen the SmartEPT agent from the Start Menu. Data recorded while offline syncs automatically once it returns.</p>
+              <p class="kb-esc"><b>When to call Ametecs:</b> If the agent is running and online but never checks in, contact WhatsApp <b>90000 98877</b>.</p>
+            </div>
+          </details>
+
+          <details class="kb" id="kb-agent-install" data-kb="agent not responding after install windows defender smartscreen unsigned first run scan">
+            <summary><span class="kb-tag t-warn">Agents</span> The agent “isn’t responding” right after installing</summary>
+            <div class="kb-body">
+              <p><b>What you see:</b> Just after installing the agent on a PC, it seems frozen or “not responding”.</p>
+              <p><b>Likely cause:</b> Windows Defender / SmartScreen scans a new app the first time it runs, which briefly holds it.</p>
+              <p><b>How to fix:</b> Wait about 30 seconds, then reopen the agent from the Start Menu — it settles on its own. This is a one-time, first-run delay.</p>
+              <p class="kb-esc"><b>When to call Ametecs:</b> If it’s still unresponsive after a couple of minutes and a reopen, contact WhatsApp <b>90000 98877</b>.</p>
+            </div>
+          </details>
+
+          <details class="kb" id="kb-agent-upgrade" data-kb="update agent over old preserves pairing config reinstall upgrade keeps device paired">
+            <summary><span class="kb-tag t-info">Good to know</span> Updating an agent keeps the PC paired</summary>
+            <div class="kb-body">
+              <p><b>What to expect:</b> Installing a newer agent over an existing one does <b>not</b> wipe its pairing or settings — the PC stays paired and keeps its identity.</p>
+              <p><b>So:</b> It’s safe to push agent updates to a fleet without re-pairing every machine.</p>
+              <p class="kb-esc"><b>Note:</b> Only a full uninstall clears pairing. Questions? WhatsApp <b>90000 98877</b>.</p>
+            </div>
+          </details>
+
+          <details class="kb" id="kb-mail" data-kb="email not sending smtp mail credentials not received password reset alert not delivered">
+            <summary><span class="kb-tag t-warn">Email</span> Credential or alert emails aren’t being delivered</summary>
+            <div class="kb-body">
+              <p><b>What you see:</b> New users don’t receive their sign-in email, or offline/violation alert emails never arrive.</p>
+              <p><b>Likely cause:</b> Email isn’t configured to actually send — it’s only being written to the log.</p>
+              <p><b>How to check:</b> Run <b>System Health</b> — the “Email sending” row will be amber.</p>
+              <p><b>How to fix:</b> Set real SMTP details in the <code>.env</code> file (<code>MAIL_MAILER=smtp</code>, <code>MAIL_HOST</code>, <code>MAIL_USERNAME</code>, <code>MAIL_PASSWORD</code>, <code>MAIL_PORT</code>), then do a full Laragon Stop All → Start All.</p>
+              <p class="kb-esc"><b>When to call Ametecs:</b> Ask WhatsApp <b>90000 98877</b> for the recommended SMTP settings for your setup.</p>
+            </div>
+          </details>
+
+          <details class="kb" id="kb-gcs" data-kb="cloud storage libraries not installed google gcs composer bucket enable">
+            <summary><span class="kb-tag t-warn">Cloud storage</span> Cloud Storage says “libraries not installed”</summary>
+            <div class="kb-body">
+              <p><b>What you see:</b> Turning on Google Cloud Storage in Audit &amp; Ops reports that the required libraries aren’t installed.</p>
+              <p><b>Likely cause:</b> The Google Cloud packages haven’t been added to this server yet.</p>
+              <p><b>How to fix:</b> Run <code>deployment\installers\ENABLE-CLOUD-STORAGE.bat</code>, or in Laragon Terminal: <code>cd /d C:\laragon\www\smartept</code> then <code>composer require google/cloud-storage league/flysystem-google-cloud-storage</code> (one command per line).</p>
+              <p class="kb-esc"><b>When to call Ametecs:</b> If composer errors, copy the message and send to WhatsApp <b>90000 98877</b>.</p>
+            </div>
+          </details>
+
+          <details class="kb" id="kb-composer" data-kb="composer does not contain valid json error variable one line cd terminal">
+            <summary><span class="kb-tag t-warn">Setup</span> Composer fails with “does not contain valid JSON”</summary>
+            <div class="kb-body">
+              <p><b>What you see:</b> Running a composer command errors with “composer.json does not contain valid JSON”.</p>
+              <p><b>Likely cause:</b> A batch variable was named <code>COMPOSER</code> (a reserved name), or a <code>cd</code> and a command were typed on the same line.</p>
+              <p><b>How to fix:</b> In Laragon Terminal, type one command per line, and never use a variable called <code>COMPOSER</code>. For example: <code>cd /d C:\laragon\www\smartept</code> on its own line, then the <code>composer require …</code> line.</p>
+              <p class="kb-esc"><b>When to call Ametecs:</b> Still stuck? WhatsApp <b>90000 98877</b>.</p>
+            </div>
+          </details>
+
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Application log <span class="hint">the most recent messages — copy them for the developer if you need help</span></h3>
+        <div class="row" style="margin-bottom:10px">
+          <label style="margin:0">Show last</label>
+          <select id="lg-lines" style="width:auto;min-width:90px"><option>100</option><option selected>200</option><option>500</option></select>
+          <label style="margin:0">lines</label>
+          <button class="btn" id="lg-load">Load log</button>
+          <button class="btn acc" id="lg-copy">Copy for developer</button>
+          <span class="mut" id="lg-meta"></span>
+        </div>
+        <pre id="lg-out" class="logbox">Press “Load log” to read the most recent messages.</pre>
+        <div class="mut" style="font-size:11px">Tip: if a screen just failed, load the log right after — the newest lines at the bottom describe what went wrong.</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1415,6 +1624,7 @@ const TITLES = {
   license: ['Licence', 'Key, plan, device seats & daily validation'],
   integrations: ['API & Integrations', 'Connect SmartEPT to SmartPRS & any external device or app'],
   ops: ['Audit & Ops', 'Who did what, storage growth & database backups'],
+  help: ['Help & Troubleshooting', 'System health, common fixes & the application log'],
 };
 $$('.nav').forEach((n) => n.onclick = () => show(n.dataset.view));
 (function(){ const a=document.getElementById('app'), t=document.getElementById('nav-toggle'), b=document.getElementById('nav-backdrop');
@@ -1441,6 +1651,7 @@ function show(v) {
   if (v === 'license') loadLicense();
   if (v === 'integrations') initIntegrations();
   if (v === 'ops') loadOps();
+  if (v === 'help') initHelp();
   { const a=document.getElementById('app'); if(a) a.classList.remove('nav-open'); }
   CURRENT = v;
 }
@@ -1466,8 +1677,77 @@ function refreshView() {
   else if (v === 'license') loadLicense();
   else if (v === 'integrations') initIntegrations();
   else if (v === 'ops') loadOps();
+  else if (v === 'help') runDiagnostics();
 }
 (function bindRefresh(){ const b = document.getElementById('btn-refresh'); if (b) b.onclick = refreshView; })();
+
+// ---- Help & Troubleshooting (system health self-check + known issues + log viewer) ----
+let helpBound = false;
+function initHelp() {
+  if (!helpBound) {
+    helpBound = true;
+    const run = $('#dg-run'); if (run) run.onclick = runDiagnostics;
+    const ll = $('#lg-load'); if (ll) ll.onclick = loadLog;
+    const lc = $('#lg-copy'); if (lc) lc.onclick = copyLog;
+    const s = $('#kb-search'); if (s) s.oninput = filterKb;
+  }
+  runDiagnostics();
+}
+async function runDiagnostics() {
+  const box = $('#dg-results'); if (!box) return;
+  box.innerHTML = '<div class="mut">Running checks…</div>';
+  const ov = $('#dg-overall'); ov.style.display = 'none'; $('#dg-when').textContent = '';
+  try {
+    const r = await api('/ops/diagnostics');
+    const M = { ok: ['t-ok', 'All good'], warn: ['t-warn', 'Needs attention'], down: ['t-danger', 'Action needed'] };
+    const o = M[r.overall] || M.ok;
+    ov.className = 'tag ' + o[0]; ov.textContent = o[1]; ov.style.display = '';
+    $('#dg-when').textContent = 'Checked ' + r.checked_at;
+    box.innerHTML = (r.checks || []).map((c) => {
+      const cls = c.status === 'ok' ? 'dg-ok' : (c.status === 'warn' ? 'dg-warn' : 'dg-down');
+      const fix = c.fix ? ' <a onclick="openKb(\'' + c.fix + '\')">How to fix this &rarr;</a>' : '';
+      return '<div class="dg-item ' + cls + '"><span class="dot"></span><div class="dg-l"><b>'
+        + esc(c.label) + '</b><p>' + esc(c.detail) + fix + '</p></div></div>';
+    }).join('');
+  } catch (e) {
+    const extra = e.status === 403 ? ' Sign in as a company admin to use System Health.' : '';
+    box.innerHTML = '<div class="mut" style="color:var(--danger)">Could not run checks: ' + esc(e.message) + '.' + extra + '</div>';
+  }
+}
+function openKb(id) {
+  const el = document.getElementById(id); if (!el) return;
+  el.open = true;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.classList.add('kb-flash'); setTimeout(() => el.classList.remove('kb-flash'), 1600);
+}
+function filterKb() {
+  const q = ($('#kb-search').value || '').toLowerCase().trim();
+  $$('#kb-list details.kb').forEach((d) => {
+    const hay = (d.getAttribute('data-kb') || '') + ' ' + d.textContent.toLowerCase();
+    d.style.display = (!q || hay.indexOf(q) !== -1) ? '' : 'none';
+  });
+}
+async function loadLog() {
+  const out = $('#lg-out'); if (!out) return;
+  out.textContent = 'Loading…'; $('#lg-meta').textContent = '';
+  try {
+    const n = $('#lg-lines').value || 200;
+    const r = await api('/ops/logs?lines=' + n);
+    if (!r.exists) { out.textContent = r.note || 'No log file yet.'; return; }
+    out.textContent = r.text || '(the log is empty)';
+    $('#lg-meta').textContent = r.path + ' · ' + r.size_human + ' · last ' + r.lines + ' lines';
+    out.scrollTop = out.scrollHeight;
+  } catch (e) {
+    out.textContent = 'Could not load the log: ' + e.message + (e.status === 403 ? ' (company admin only)' : '');
+  }
+}
+function copyLog() {
+  const t = $('#lg-out').textContent || '';
+  if (navigator.clipboard && t) {
+    navigator.clipboard.writeText(t).then(() => toast('Log copied — paste it to the developer.'),
+      () => toast('Copy failed — select the text and copy manually.'));
+  } else { toast('Nothing to copy yet — load the log first.'); }
+}
 
 // ---- shared caches ----
 let EMP_CACHE = null, ORG_CACHE = null, DEV_CACHE = null;
