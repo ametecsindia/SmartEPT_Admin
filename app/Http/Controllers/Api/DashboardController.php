@@ -23,7 +23,7 @@ class DashboardController extends Controller
     {
         $today = now()->toDateString();
         $onlineWindow = now()->subMinutes(3);
-        $visible = $this->visibleEmployeeIds($request->user());
+        $visible = $this->scopedEmployeeIds($request);
 
         $devices = EmployeeDevice::query()->get();
 
@@ -102,7 +102,7 @@ class DashboardController extends Controller
     /** GET /api/dashboard/device-health — agent + device health overview. */
     public function deviceHealth(Request $request): JsonResponse
     {
-        $visible = $this->visibleEmployeeIds($request->user());
+        $visible = $this->scopedEmployeeIds($request);
         $devices = EmployeeDevice::with('employee:id,first_name,last_name,employee_code')
             ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
             ->orderByDesc('last_heartbeat_at')

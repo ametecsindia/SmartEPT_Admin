@@ -132,6 +132,14 @@
   .tu-track{grid-column:1/-1;height:7px;border-radius:4px;background:rgba(148,163,184,.20);overflow:hidden}
   .tu-fill{height:100%;border-radius:4px;min-width:3px}
 
+  /* ---------- Dashboard org roll-up filter ---------- */
+  .org-filter{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;padding:11px 14px;
+    background:var(--card);border:1px solid var(--border);border-radius:13px;box-shadow:var(--shadow-1)}
+  .org-filter .of-l{font-size:10.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--ink-3);font-weight:700}
+  .org-filter select{font-size:12px;padding:6px 10px;border-radius:9px;border:1px solid var(--border);
+    background:var(--card);color:var(--ink);max-width:200px}
+  .org-filter .of-scope{font-size:11.5px;color:var(--ink-3);margin-left:auto;font-weight:600}
+
   /* ---------- Cards & tables ---------- */
   .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 20px;margin-bottom:18px;
     box-shadow:var(--shadow-1)}
@@ -313,6 +321,15 @@
 
     <!-- 1. DASHBOARD -->
     <div class="view active" id="v-dashboard">
+      <div class="org-filter" id="dash-org">
+        <span class="of-l">View</span>
+        <select id="dof-branch"><option value="">All branches</option></select>
+        <select id="dof-dept"><option value="">All departments</option></select>
+        <select id="dof-team"><option value="">All teams</option></select>
+        <select id="dof-emp"><option value="">All employees</option></select>
+        <button class="btn" id="dof-reset" type="button">Reset</button>
+        <span class="of-scope" id="dof-scope"></span>
+      </div>
       <div class="kpis" id="kpis"></div>
       <div class="dash-charts">
         <div class="card" style="margin-bottom:0">
@@ -1251,7 +1268,7 @@ function show(v) {
   $('#v-' + v).classList.add('active');
   $('#page-title').textContent = TITLES[v][0]; $('#page-sub').textContent = TITLES[v][1];
   clearInterval(poll);
-  if (v === 'dashboard') { loadDashboard(); poll = setInterval(loadDashboard, 15000); }
+  if (v === 'dashboard') { initDashOrgFilter(); loadDashboard(); poll = setInterval(loadDashboard, 15000); }
   if (v === 'attendance') initAttendance();
   if (v === 'screenshots') initScreenshots();
   if (v === 'usage') initUsage();
@@ -1367,9 +1384,57 @@ function utilBars(rows, label){
       +'<div class="tu-track"><div class="tu-fill" style="width:'+w+'%;background:'+catColor(r.category)+'"></div></div></div>';
   }).join('');
 }
+// ---- dashboard org roll-up (company > branch > department > team > individual) ----
+let DASH_ORG = { branch_id: '', department_id: '', team_id: '', employee_id: '' };
+let DASH_ORG_READY = false;
+function dashOrgQS() { return Object.entries(DASH_ORG).filter(([, v]) => v).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&'); }
+function dashOrgQ() { const q = dashOrgQS(); return q ? '?' + q : ''; }
+function dashOrgAmp() { const q = dashOrgQS(); return q ? '&' + q : ''; }
+async function initDashOrgFilter() {
+  if (DASH_ORG_READY) return;
+  const bSel = $('#dof-branch'), dSel = $('#dof-dept'), tSel = $('#dof-team'), eSel = $('#dof-emp');
+  if (!bSel) return;
+  let org, emps;
+  try { [org, emps] = await Promise.all([orgLists(), employeesList()]); } catch (e) { $('#dash-org').style.display = 'none'; return; }
+  const branches = org.branches || [], depts = org.departments || [], teams = org.teams || [];
+  emps = emps || [];
+  if (!branches.length && !depts.length && !teams.length && !emps.length) { $('#dash-org').style.display = 'none'; return; }
+  const opt = (v, l) => '<option value="' + v + '">' + esc(l) + '</option>';
+  const fill = (sel, rows, all, label) => { sel.innerHTML = opt('', all) + rows.map((r) => opt(r.id, label ? label(r) : r.name)).join(''); };
+  const repaintDept = () => {
+    const b = DASH_ORG.branch_id;
+    fill(dSel, depts.filter((d) => !b || String(d.branch_id) === String(b)), 'All departments');
+    dSel.value = DASH_ORG.department_id || '';
+  };
+  const repaintTeam = () => {
+    const d = DASH_ORG.department_id, b = DASH_ORG.branch_id;
+    const inBranch = (t) => { if (!b) return true; const dep = depts.find((x) => String(x.id) === String(t.department_id)); return dep && String(dep.branch_id) === String(b); };
+    fill(tSel, teams.filter((t) => (d ? String(t.department_id) === String(d) : inBranch(t))), 'All teams');
+    tSel.value = DASH_ORG.team_id || '';
+  };
+  const repaintEmp = () => {
+    const { branch_id: b, department_id: d, team_id: t } = DASH_ORG;
+    const rows = emps.filter((e) => (t ? String(e.team_id) === String(t) : d ? String(e.department_id) === String(d) : b ? String(e.branch_id) === String(b) : true));
+    fill(eSel, rows, 'All employees', (e) => fullName(e) + (e.employee_code ? ' (' + e.employee_code + ')' : ''));
+    eSel.value = DASH_ORG.employee_id || '';
+  };
+  const scope = () => {
+    const nm = (rows, id) => (rows.find((r) => String(r.id) === String(id)) || {}).name;
+    const emp = emps.find((e) => String(e.id) === String(DASH_ORG.employee_id));
+    const parts = [nm(branches, DASH_ORG.branch_id), nm(depts, DASH_ORG.department_id), nm(teams, DASH_ORG.team_id), emp ? fullName(emp) : null].filter(Boolean);
+    $('#dof-scope').textContent = parts.length ? 'Showing: ' + parts.join(' › ') : 'Showing: whole company';
+  };
+  fill(bSel, branches, 'All branches'); repaintDept(); repaintTeam(); repaintEmp(); scope();
+  bSel.onchange = () => { DASH_ORG = { branch_id: bSel.value, department_id: '', team_id: '', employee_id: '' }; repaintDept(); repaintTeam(); repaintEmp(); scope(); loadDashboard(); };
+  dSel.onchange = () => { DASH_ORG.department_id = dSel.value; DASH_ORG.team_id = ''; DASH_ORG.employee_id = ''; repaintTeam(); repaintEmp(); scope(); loadDashboard(); };
+  tSel.onchange = () => { DASH_ORG.team_id = tSel.value; DASH_ORG.employee_id = ''; repaintEmp(); scope(); loadDashboard(); };
+  eSel.onchange = () => { DASH_ORG.employee_id = eSel.value; scope(); loadDashboard(); };
+  $('#dof-reset').onclick = () => { DASH_ORG = { branch_id: '', department_id: '', team_id: '', employee_id: '' }; bSel.value = ''; repaintDept(); repaintTeam(); repaintEmp(); scope(); loadDashboard(); };
+  DASH_ORG_READY = true;
+}
 async function loadDashboard() {
   try {
-    const d = await api('/dashboard/live-status');
+    const d = await api('/dashboard/live-status' + dashOrgQ());
     const c = d.cards;
     const cards = [
       ['Employees', c.total_employees], ['Active now', c.active_now], ['Idle', c.idle_now],
@@ -1392,7 +1457,7 @@ async function loadDashboard() {
     if (isDenied(e)) { $('#live-rows').innerHTML = deniedCard(); $('#kpis').innerHTML = ''; }
   }
   try {
-    const tu = await api('/reports/time-utilization?date=' + today());
+    const tu = await api('/reports/time-utilization?date=' + today() + dashOrgAmp());
     const apps = (tu.apps || []).map((a) => ({ name: a.app_name, secs: a.secs, category: a.category }));
     const sites = (tu.sites || []).map((x) => ({ name: x.site, secs: x.secs, category: x.category }));
     $('#tu-grid').innerHTML = '<div>' + utilBars(apps, 'Top applications') + '</div><div>' + utilBars(sites, 'Top websites') + '</div>';
@@ -1400,7 +1465,7 @@ async function loadDashboard() {
     if (isDenied(e)) $('#tu-grid').innerHTML = '<div class="mut" style="font-size:12px">Your role cannot view activity data.</div>';
   }
   try {
-    const pr = await api('/reports/productivity?from=' + today() + '&to=' + today());
+    const pr = await api('/reports/productivity?from=' + today() + '&to=' + today() + dashOrgAmp());
     $('#dash-prod-rows').innerHTML = (pr.data || []).map((x) =>
       '<tr><td>' + esc(x.employee_code || '—') + '</td><td><b>' + esc(x.name) + '</b></td>'
       + '<td class="mut">' + esc(x.department || '—') + '</td>'
@@ -1414,7 +1479,7 @@ async function loadDashboard() {
     if (isDenied(e)) $('#dash-prod-rows').innerHTML = deniedCard();
   }
   try {
-    const h = await api('/dashboard/device-health');
+    const h = await api('/dashboard/device-health' + dashOrgQ());
     $('#dash-dev-rows').innerHTML = (h.data || []).map((v) => {
       const hc = { HEALTHY: 't-ok', DEGRADED: 't-warn', STOPPED: 't-danger' }[v.agent_health] || 't-off';
       const cc = { COMPLIANT: 't-ok', WARNING: 't-warn', NON_COMPLIANT: 't-danger', CRITICAL: 't-danger' }[v.compliance_status] || 't-off';

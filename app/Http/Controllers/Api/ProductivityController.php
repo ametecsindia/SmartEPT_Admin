@@ -36,7 +36,7 @@ class ProductivityController extends Controller
         $empId = $request->query('employee_id');
         $today = now()->toDateString();
 
-        $visible = $this->visibleEmployeeIds($request->user());
+        $visible = $this->scopedEmployeeIds($request);
         $employees = Employee::where('company_id', $companyId)
             ->when($empId, fn ($q) => $q->where('id', $empId))
             ->when($visible !== null, fn ($q) => $q->whereIn('id', $visible))

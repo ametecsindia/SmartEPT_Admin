@@ -224,7 +224,7 @@ class UsageController extends Controller
     {
         $companyId = $request->user()->company_id;
         $date = $request->query('date', now()->toDateString());
-        $visible = $this->visibleEmployeeIds($request->user());
+        $visible = $this->scopedEmployeeIds($request);
 
         $apps = EmployeeAppUsageLog::where('company_id', $companyId)
             ->whereDate('start_at', $date)

@@ -37,6 +37,38 @@ trait ScopesVisibleEmployees
             ->pluck('id')->all();
     }
 
+    /**
+     * EPT org roll-up: report-visible ids further narrowed by an optional org
+     * filter (?branch_id / ?department_id / ?team_id). Cascades company > branch
+     * > department > team. The filter can only NARROW: a manager's own scope
+     * still bounds the result, so it never widens visibility. Returns null only
+     * when the caller is unrestricted AND no org filter is applied.
+     */
+    protected function scopedEmployeeIds(Request $request): ?array
+    {
+        $base = $this->visibleEmployeeIds($request->user());
+
+        // Org roll-up cascades company > branch > department > team > individual.
+        // employee_id filters on the row id; the rest are org FKs on the employee.
+        $q = Employee::query();
+        $applied = false;
+        foreach (['branch_id' => 'branch_id', 'department_id' => 'department_id', 'team_id' => 'team_id', 'employee_id' => 'id'] as $param => $col) {
+            $val = $request->query($param);
+            if ($val !== null && $val !== '') {
+                $q->where($col, (int) $val);
+                $applied = true;
+            }
+        }
+        if (! $applied) {
+            return $base;                 // no org filter -> role scope only
+        }
+        $orgIds = $q->pluck('id')->all(); // BelongsToCompany already tenant-bounds this
+
+        return $base === null
+            ? $orgIds                                              // unrestricted role -> just the org subset
+            : array_values(array_intersect($base, $orgIds));      // manager -> narrow within their scope
+    }
+
     /** 403 unless the given employee id is within the caller's report scope. */
     protected function assertEmployeeVisible(Request $request, int $employeeId): void
     {
