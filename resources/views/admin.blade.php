@@ -98,6 +98,9 @@
   .help-i{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--accent);color:var(--accent);
     background:var(--accent-weak);font-weight:800;font-size:13px;cursor:pointer;flex:none;transition:transform .12s}
   .help-i:hover{transform:scale(1.08);background:var(--accent);color:#fff}
+  #btn-refresh{font-size:17px;font-weight:700;line-height:1}
+  .help-i.spin{animation:spin .65s linear}
+  @keyframes spin{to{transform:rotate(360deg)}}
   .view{display:none}
   .view.active{display:block;animation:viewin .18s ease}
   @keyframes viewin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -108,9 +111,30 @@
     overflow:hidden;box-shadow:var(--shadow-1);transition:transform .14s, box-shadow .14s}
   .kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow-2)}
   .kpi::before{content:'';position:absolute;left:0;top:12px;bottom:12px;width:3.5px;border-radius:0 4px 4px 0;
-    background:linear-gradient(180deg,var(--accent),var(--accent-3))}
+    background:linear-gradient(180deg,var(--kc,var(--accent)),var(--kc2,var(--accent-3)))}
   .kpi .l{font-size:10.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.7px;font-weight:700}
-  .kpi .v{font-size:27px;font-weight:800;margin-top:7px;font-family:var(--font-head);letter-spacing:-.02em}
+  .kpi .v{font-size:27px;font-weight:800;margin-top:7px;font-family:var(--font-head);letter-spacing:-.02em;color:var(--kc,var(--ink))}
+  /* EPT-23: colour-coded, clickable drill-down KPIs. --kc set per class below. */
+  .k-total{--kc:var(--accent);--kc2:var(--accent-2);--kcw:var(--accent-weak)}
+  .k-ok{--kc:var(--ok);--kc2:var(--ok);--kcw:var(--ok-w)}
+  .k-idle{--kc:var(--idle);--kc2:var(--idle);--kcw:var(--idle-w)}
+  .k-away{--kc:var(--warn);--kc2:var(--warn);--kcw:var(--warn-w)}
+  .k-off{--kc:var(--ink-3);--kc2:var(--ink-3);--kcw:#EDF1F4}
+  .k-break{--kc:var(--info);--kc2:var(--info);--kcw:var(--info-w)}
+  .k-cam{--kc:var(--danger);--kc2:var(--danger);--kcw:var(--danger-w)}
+  .k-viol{--kc:var(--danger);--kc2:var(--danger);--kcw:var(--danger-w)}
+  .k-shot{--kc:var(--info);--kc2:var(--info);--kcw:var(--info-w)}
+  .kpi.drill{cursor:pointer}
+  .kpi.drill .go{position:absolute;right:12px;top:14px;font-size:9.5px;font-weight:800;color:var(--kc,var(--accent));
+    opacity:0;transform:translateX(-3px);transition:opacity .14s,transform .14s;letter-spacing:.3px;text-transform:uppercase}
+  .kpi.drill:hover .go{opacity:.85;transform:translateX(0)}
+  .kpi.drill:hover{background:var(--kcw)}
+  .kpi.sel{background:var(--kcw);box-shadow:inset 0 0 0 1.5px var(--kc)}
+  .fchip{display:inline-flex;align-items:center;gap:7px;background:var(--kcw,var(--accent-weak));color:var(--kc,var(--accent-ink));
+    border:1px solid var(--kc,var(--accent));border-radius:20px;padding:3px 5px 3px 11px;font-size:11px;font-weight:700;vertical-align:middle}
+  .fchip .x{cursor:pointer;width:17px;height:17px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.07);font-size:11px;line-height:1}
+  .fchip .x:hover{background:rgba(0,0,0,.16)}
 
   /* ---------- Dashboard charts ---------- */
   .dash-charts{display:grid;grid-template-columns:340px 1fr;gap:18px;margin-bottom:18px}
@@ -316,7 +340,7 @@
   <div class="main">
     <div class="top">
       <div><h2 id="page-title">Live Dashboard</h2><div class="sub" id="page-sub">Real-time workforce status</div></div>
-      <div class="who"><span id="company-name">Ametecs Pvt Ltd</span><button class="help-i" id="btn-help" title="About this screen">ⓘ</button></div>
+      <div class="who"><span id="company-name">Ametecs Pvt Ltd</span><button class="help-i" id="btn-refresh" title="Refresh this screen">⟳</button><button class="help-i" id="btn-help" title="About this screen">ⓘ</button></div>
     </div>
 
     <!-- 1. DASHBOARD -->
@@ -351,9 +375,9 @@
         </div>
       </div>
       <div class="card">
-        <h3>Employees — live
+        <h3>Employees — live <span id="live-filter"></span>
           <span class="row">
-            <span class="hint">auto-refreshes every 15s · click a row for detail</span>
+            <span class="hint">auto-refreshes every 15s · click a KPI card to filter · click a row for detail</span>
             <button class="btn" data-export="productivity">Export productivity CSV</button>
             <button class="btn" data-export="attendance">Export attendance CSV</button>
           </span>
@@ -1306,6 +1330,29 @@ function show(v) {
   CURRENT = v;
 }
 
+// Refresh button — reloads the active view's data in place (keeps filters where possible).
+function refreshView() {
+  const b = document.getElementById('btn-refresh');
+  if (b) { b.classList.add('spin'); setTimeout(() => b.classList.remove('spin'), 700); }
+  const v = CURRENT;
+  if (v === 'dashboard') loadDashboard();
+  else if (v === 'attendance') initAttendance();
+  else if (v === 'screenshots') loadScreenshots();
+  else if (v === 'usage') initUsage();
+  else if (v === 'violations') initViolations();
+  else if (v === 'employees') loadEmployees();
+  else if (v === 'org') initOrg();
+  else if (v === 'users') loadUsers();
+  else if (v === 'devices') loadDevices();
+  else if (v === 'policies') initPolicies();
+  else if (v === 'biometric') initBiometric();
+  else if (v === 'reports') initReports();
+  else if (v === 'license') loadLicense();
+  else if (v === 'integrations') initIntegrations();
+  else if (v === 'ops') loadOps();
+}
+(function bindRefresh(){ const b = document.getElementById('btn-refresh'); if (b) b.onclick = refreshView; })();
+
 // ---- shared caches ----
 let EMP_CACHE = null, ORG_CACHE = null, DEV_CACHE = null;
 async function employeesList(force = false) {
@@ -1452,27 +1499,59 @@ async function initDashOrgFilter() {
   $('#dof-reset').onclick = () => { DASH_ORG = { branch_id: '', department_id: '', team_id: '', employee_id: '' }; bSel.value = ''; repaintDept(); repaintTeam(); repaintEmp(); scope(); loadDashboard(); };
   DASH_ORG_READY = true;
 }
+let DASH_EMP = [];      // last live-status employees payload (EPT-23 drill-down)
+let DASH_FILTER = null; // active KPI filter: null | 'all' | 'ONLINE' | 'IDLE' | 'AWAY' | 'OFFLINE'
+const KPI_STATUS = { ONLINE: 't-ok', IDLE: 't-idle', AWAY: 't-warn', OFFLINE: 't-off' };
+function renderLiveRows() {
+  const f = DASH_FILTER;
+  const active = f && f !== 'all' && KPI_STATUS[f];
+  const list = active ? DASH_EMP.filter((e) => e.status === f) : DASH_EMP;
+  if (active) {
+    const cc = { ONLINE: 'k-ok', IDLE: 'k-idle', AWAY: 'k-away', OFFLINE: 'k-off' }[f] || 'k-total';
+    const lbl = { ONLINE: 'Active now', IDLE: 'Idle', AWAY: 'Away', OFFLINE: 'Offline' }[f] || f;
+    $('#live-filter').innerHTML = '<span class="fchip ' + cc + '">' + esc(lbl) + ' · ' + list.length
+      + ' <span class="x" id="clr-filter" title="Clear filter">✕</span></span>';
+  } else {
+    $('#live-filter').innerHTML = '';
+  }
+  $('#live-rows').innerHTML = list.map((e) => {
+    const cls = KPI_STATUS[e.status] || 't-off';
+    return '<tr class="clk" data-id="' + e.employee_id + '" data-name="' + esc(e.name) + '">'
+      + '<td><span class="nm">' + esc(e.name) + '</span></td><td>' + esc(e.team || '—') + '</td>'
+      + '<td><span class="tag ' + cls + '">' + esc(e.status) + '</span></td>'
+      + '<td>' + secH(e.active_seconds) + '</td><td>' + secH(e.idle_seconds) + '</td><td>' + t(e.last_seen) + '</td></tr>';
+  }).join('') || '<tr><td colspan="6" class="mut">' + (active ? 'No employees match this filter right now.' : 'No employees online yet.') + '</td></tr>';
+}
 async function loadDashboard() {
   try {
     const d = await api('/dashboard/live-status' + dashOrgQ());
     const c = d.cards;
-    const cards = [
-      ['Employees', c.total_employees], ['Active now', c.active_now], ['Idle', c.idle_now],
-      ['On break', c.on_break], ['Offline', c.offline], ['Camera blocked', c.camera_blocked],
-      ['Violations today', c.violations_today], ['Screenshots', c.screenshots_today],
+    DASH_EMP = d.employees || [];
+    const KPI = [
+      ['Employees', c.total_employees, 'k-total', 'all'],
+      ['Active now', c.active_now, 'k-ok', 'ONLINE'],
+      ['Idle', c.idle_now, 'k-idle', 'IDLE'],
+      ['Away', c.away_now, 'k-away', 'AWAY'],
+      ['Offline', c.offline, 'k-off', 'OFFLINE'],
+      ['On break', c.on_break, 'k-break', 'view:attendance'],
+      ['Camera blocked', c.camera_blocked, 'k-cam', 'view:violations'],
+      ['Violations today', c.violations_today, 'k-viol', 'view:violations'],
+      ['Screenshots', c.screenshots_today, 'k-shot', 'view:screenshots'],
     ];
-    $('#kpis').innerHTML = cards.map(([l, v]) => '<div class="kpi"><div class="l">' + esc(l) + '</div><div class="v">' + (v ?? 0) + '</div></div>').join('');
+    $('#kpis').innerHTML = KPI.map(([l, v, cls, act]) => {
+      const isView = act.indexOf('view:') === 0;
+      const sel = (!isView && DASH_FILTER === act) ? ' sel' : '';
+      const go = isView ? 'Open →' : (act === 'all' ? 'View all →' : 'Filter →');
+      return '<div class="kpi drill ' + cls + sel + '" data-act="' + act + '" title="'
+        + esc(l) + ' — click to ' + (isView ? 'open that screen' : 'filter the list below') + '">'
+        + '<span class="go">' + go + '</span>'
+        + '<div class="l">' + esc(l) + '</div><div class="v">' + (v ?? 0) + '</div></div>';
+    }).join('');
     const wf = [['Active', c.active_now, '#16A34A'], ['Idle', c.idle_now, '#D97706'], ['On break', c.on_break, '#EA580C'], ['Offline', c.offline, '#94A3B8']];
     const wfTotal = c.total_employees || wf.reduce((a, [, v]) => a + (v || 0), 0);
     $('#wf-donut').innerHTML = svgDonut(wf.map(([label, value, color]) => ({ label, value: value || 0, color })), wfTotal);
     $('#wf-leg').innerHTML = wf.map(([l, v, col]) => '<div class="r"><span class="dot" style="background:' + col + '"></span><span class="nm">' + l + '</span><span class="ct">' + (v || 0) + '</span><span class="pc">' + (wfTotal ? Math.round((v || 0) / wfTotal * 100) : 0) + '%</span></div>').join('');
-    $('#live-rows').innerHTML = d.employees.map((e) => {
-      const cls = { ONLINE: 't-ok', IDLE: 't-idle', AWAY: 't-warn', OFFLINE: 't-off' }[e.status] || 't-off';
-      return '<tr class="clk" data-id="' + e.employee_id + '" data-name="' + esc(e.name) + '">'
-        + '<td><span class="nm">' + esc(e.name) + '</span></td><td>' + esc(e.team || '—') + '</td>'
-        + '<td><span class="tag ' + cls + '">' + esc(e.status) + '</span></td>'
-        + '<td>' + secH(e.active_seconds) + '</td><td>' + secH(e.idle_seconds) + '</td><td>' + t(e.last_seen) + '</td></tr>';
-    }).join('') || '<tr><td colspan="6" class="mut">No employees online yet.</td></tr>';
+    renderLiveRows();
   } catch (e) {
     if (isDenied(e)) { $('#live-rows').innerHTML = deniedCard(); $('#kpis').innerHTML = ''; }
   }
@@ -1516,6 +1595,23 @@ async function loadDashboard() {
 $('#live-rows').addEventListener('click', (e) => {
   const tr = e.target.closest('tr[data-id]');
   if (tr) openEmployee(Number(tr.dataset.id), tr.dataset.name);
+});
+// EPT-23: KPI card drill-down — status cards filter the live table, count cards jump to their screen.
+$('#kpis').addEventListener('click', (ev) => {
+  const k = ev.target.closest('.kpi.drill');
+  if (!k) return;
+  const act = k.dataset.act || '';
+  if (act.indexOf('view:') === 0) { show(act.slice(5)); return; }
+  DASH_FILTER = (DASH_FILTER === act) ? null : act; // toggle same card off
+  document.querySelectorAll('#kpis .kpi').forEach((x) => x.classList.toggle('sel', !!DASH_FILTER && x.dataset.act === DASH_FILTER));
+  renderLiveRows();
+  if (DASH_FILTER && DASH_FILTER !== 'all') $('#live-rows').closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+$('#live-filter').addEventListener('click', (ev) => {
+  if (ev.target.id !== 'clr-filter') return;
+  DASH_FILTER = null;
+  document.querySelectorAll('#kpis .kpi').forEach((x) => x.classList.remove('sel'));
+  renderLiveRows();
 });
 
 // ---- 2. screenshots ----
