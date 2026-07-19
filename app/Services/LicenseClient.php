@@ -77,6 +77,16 @@ class LicenseClient
                 'unreachable_since' => null,
                 'last_error' => null,
             ])->save();
+            // EPT-27: honour Central's storage governance — pause new screenshots at 100%.
+            try {
+                $st = $json['storage'] ?? null;
+                \App\Models\Setting::put('storage_paused', ($st && ! empty($st['pause_screenshots'])) ? '1' : '0');
+                if (is_array($st)) {
+                    \App\Models\Setting::put('storage_status', json_encode($st));
+                }
+            } catch (\Throwable $e) {
+                // never let governance break the phone-home
+            }
         } else {
             $reason = (string) ($json['reason'] ?? ('http_' . $resp->status()));
             // Central reasons: unknown_key | licence_expired | licence_suspended | licence_revoked | server_mismatch

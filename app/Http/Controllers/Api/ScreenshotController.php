@@ -44,6 +44,8 @@ class ScreenshotController extends Controller
         $bundle = $resolver->bundleForEmployee($employee);
         $shot = $bundle['policies']['screenshot'] ?? null;
         abort_if(! $shot || empty($shot['enabled']), 403, 'Screenshot capture is not enabled by policy.');
+        // EPT-27: storage quota full — pause NEW screenshots (activity tracking continues).
+        abort_if(\App\Models\Setting::get('storage_paused') === '1', 409, 'Storage is full — new screenshots are paused until space is freed. Activity tracking continues.');
 
         $file = $storage->storeUpload(
             $request->file('image'),
