@@ -188,6 +188,8 @@
   .qchip{width:auto;margin:0;padding:5px 10px;font-size:11.5px;font-weight:600;background:var(--card-2);
     border:1px solid var(--border);color:var(--ink-2);border-radius:16px;cursor:pointer;transition:all .12s}
   .qchip:hover{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-weak)}
+  .rst{font-weight:700;padding:5px 8px;max-width:150px}
+  .rst-ALLOWED{color:var(--ok)}.rst-TRACKED{color:var(--info)}.rst-BLOCKED{color:var(--warn)}.rst-VIOLATION{color:var(--danger)}
 
   /* ---------- Cards & tables ---------- */
   .card{background:var(--card);border:1px solid var(--hairline);border-radius:18px;padding:19px 22px;margin-bottom:18px;
@@ -383,6 +385,7 @@
     <div class="nav" data-view="users"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.4" r="3.6"/><path d="M4.8 20.4a7.2 7.2 0 0 1 14.4 0"/></svg></span> Users</div>
     <div class="nav" data-view="devices"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="12.5" rx="2"/><path d="M8.5 21h7M12 17v4"/></svg></span> Devices</div>
     <div class="nav" data-view="policies"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.5 3v5.2c0 4.8-3.2 8.2-7.5 9.8-4.3-1.6-7.5-5-7.5-9.8V6z"/><path d="M9 11.8l2.1 2.1 3.9-4.2"/></svg></span> Policies</div>
+    <div class="nav" data-view="rules"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h11M4 18h7"/><circle cx="18.5" cy="16.5" r="3"/><path d="M20.6 18.6 23 21"/></svg></span> App &amp; Web Rules</div>
     <div class="nav" data-view="biometric"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8A9 9 0 0 1 21 12c0 2.6-.4 5-1.2 7"/><path d="M3.6 8.4A9 9 0 0 0 3 12c0 2.8.6 5.2 1.6 7.2"/><path d="M12 8.4a3.6 3.6 0 0 1 3.6 3.6c0 2.3-.3 4.5-1 6.6"/><path d="M8.4 12a3.6 3.6 0 0 1 .4-1.7M8.6 15.6c.3 1.5.2 3-.2 4.6"/><path d="M12 12v2.4c0 1.7-.2 3.4-.7 5"/></svg></span> Biometric</div>
     <div class="navgrp">INSIGHT</div>
     <div class="nav" data-view="reports"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11.5M7.5 10l4.5 4.5L16.5 10"/><path d="M4 17v2.4A1.6 1.6 0 0 0 5.6 21h12.8a1.6 1.6 0 0 0 1.6-1.6V17"/></svg></span> Reports &amp; Exports</div>
@@ -677,6 +680,29 @@
             <div class="mut" id="as-log"></div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- 6b. APP & WEB RULES -->
+    <div class="view" id="v-rules">
+      <div class="filters">
+        <input id="rule-add-item" placeholder="app.exe  or  website.com" style="min-width:200px" autocomplete="off">
+        <select id="rule-add-type"><option value="app">Application</option><option value="site">Website</option></select>
+        <select id="rule-add-status"><option value="TRACKED">Tracked</option><option value="ALLOWED">Allowed</option><option value="BLOCKED">Blocked</option><option value="VIOLATION">Violation</option></select>
+        <button class="btn solid" id="rule-add-btn" type="button">+ Add</button>
+        <span class="row" style="margin-left:auto">
+          <select id="rule-action" title="What the agent does when a Blocked/Violation item is opened"><option value="WARN">On block: warn employee</option><option value="SCREENSHOT">On block: warn + screenshot</option><option value="NOTIFY">On block: notify manager</option><option value="CLOSE">On block: close the app</option></select>
+          <button class="btn" id="rule-seed" type="button">Load common defaults</button>
+          <button class="btn solid" id="rule-save" type="button">Save rules</button>
+        </span>
+      </div>
+      <div class="card">
+        <h3>Apps &amp; Websites Rules <span class="hint">what the agent tracks, allows, blocks or flags as a violation \u00b7 applies company-wide</span>
+          <input id="rule-q" placeholder="Search item" autocomplete="off" style="width:170px;font-weight:400;font-size:12px;margin-left:auto">
+        </h3>
+        <div style="overflow-x:auto"><table><thead><tr><th>Item</th><th>Type</th><th>Status</th><th></th></tr></thead><tbody id="rule-rows"></tbody></table></div>
+        <div class="mut" style="margin-top:10px;font-size:11.5px"><b>Allowed</b> = whitelisted/productive \u00b7 <b>Tracked</b> = monitored only \u00b7 <b>Blocked</b> = employee warned + logged as a violation \u00b7 <b>Violation</b> = blocked and flagged for review. Agents pick up changes on their next heartbeat (~30s).</div>
+        <div class="mut" id="rule-msg" style="margin-top:8px"></div>
       </div>
     </div>
 
@@ -1365,6 +1391,7 @@ const TITLES = {
   users: ['Users', 'Login accounts, roles & credentials'],
   devices: ['Devices', 'Registered endpoints & agent health'],
   policies: ['Policies', 'The control room — what is tracked, for whom'],
+  rules: ['App & Web Rules', 'Track, allow, block or flag apps & websites — company-wide'],
   biometric: ['Biometric', 'Cloud punch sync, mapping & reconciliation'],
   reports: ['Reports & Exports', 'CSV exports for Excel and payroll'],
   license: ['Licence', 'Key, plan, device seats & daily validation'],
@@ -1390,6 +1417,7 @@ function show(v) {
   if (v === 'users') loadUsers();
   if (v === 'devices') loadDevices();
   if (v === 'policies') initPolicies();
+  if (v === 'rules') initRules();
   if (v === 'biometric') initBiometric();
   if (v === 'reports') initReports();
   if (v === 'license') loadLicense();
@@ -1414,6 +1442,7 @@ function refreshView() {
   else if (v === 'users') loadUsers();
   else if (v === 'devices') loadDevices();
   else if (v === 'policies') initPolicies();
+  else if (v === 'rules') initRules();
   else if (v === 'biometric') initBiometric();
   else if (v === 'reports') initReports();
   else if (v === 'license') loadLicense();
@@ -2769,6 +2798,105 @@ $('#pol-save').onclick = async () => {
 $('#pol-cancel').onclick = () => renderPolicyForm($('#pol-type').value, null);
 $('#pol-new').onclick = () => renderPolicyForm($('#pol-type').value, null);
 $('#pol-form').addEventListener('click', (e) => { const c = e.target.closest('.qchip'); if (c) polQuickAdd(c.dataset.qf, c.dataset.qv); });
+
+// ---- App & Website Rules (dedicated screen) ----
+let RULES = [];
+let RULE_POL = { app: null, site: null };
+const RULE_ORDER = ['TRACKED', 'ALLOWED', 'BLOCKED', 'VIOLATION'];
+const RULE_LABEL = { TRACKED: 'Tracked', ALLOWED: 'Allowed', BLOCKED: 'Blocked', VIOLATION: 'Violation' };
+const RULE_TAG = { TRACKED: 't-info', ALLOWED: 't-ok', BLOCKED: 't-warn', VIOLATION: 't-danger' };
+const RULE_SEED = [
+  { item: 'excel.exe', kind: 'app', status: 'ALLOWED' }, { item: 'winword.exe', kind: 'app', status: 'ALLOWED' },
+  { item: 'code.exe', kind: 'app', status: 'ALLOWED' }, { item: 'teams.exe', kind: 'app', status: 'ALLOWED' },
+  { item: 'outlook.exe', kind: 'app', status: 'ALLOWED' }, { item: 'chrome.exe', kind: 'app', status: 'TRACKED' },
+  { item: 'whatsapp.exe', kind: 'app', status: 'BLOCKED' }, { item: 'discord.exe', kind: 'app', status: 'BLOCKED' },
+  { item: 'steam.exe', kind: 'app', status: 'VIOLATION' }, { item: 'spotify.exe', kind: 'app', status: 'TRACKED' },
+  { item: 'github.com', kind: 'site', status: 'ALLOWED' }, { item: 'stackoverflow.com', kind: 'site', status: 'ALLOWED' },
+  { item: 'youtube.com', kind: 'site', status: 'TRACKED' }, { item: 'gmail.com', kind: 'site', status: 'TRACKED' },
+  { item: 'facebook.com', kind: 'site', status: 'BLOCKED' }, { item: 'instagram.com', kind: 'site', status: 'BLOCKED' },
+  { item: 'x.com', kind: 'site', status: 'BLOCKED' }, { item: 'reddit.com', kind: 'site', status: 'BLOCKED' },
+  { item: 'tiktok.com', kind: 'site', status: 'VIOLATION' }, { item: 'netflix.com', kind: 'site', status: 'VIOLATION' },
+];
+function rulesFromPolicy(pol, kind) {
+  if (!pol) return [];
+  const allowed = (kind === 'app' ? pol.allowed_apps : pol.allowed_sites) || [];
+  const blocked = (kind === 'app' ? pol.blocked_apps : pol.blocked_sites) || [];
+  const cats = pol.categories || {};
+  const seen = new Set(); const out = [];
+  const add = (item, status) => { const k = String(item).toLowerCase(); if (!item || seen.has(k)) return; seen.add(k); out.push({ item: String(item), kind, status }); };
+  Object.keys(cats).forEach((it) => { const c = String(cats[it]).toUpperCase(); if (RULE_ORDER.includes(c)) add(it, c); });
+  allowed.forEach((it) => add(it, 'ALLOWED'));
+  blocked.forEach((it) => { const c = String(cats[it] || '').toUpperCase(); add(it, c === 'VIOLATION' ? 'VIOLATION' : 'BLOCKED'); });
+  return out;
+}
+async function initRules() {
+  $('#rule-rows').innerHTML = '<tr><td colspan="4" class="mut">Loading…</td></tr>';
+  try {
+    const [ap, wp] = await Promise.all([api('/policies/application'), api('/policies/website')]);
+    RULE_POL.app = (ap.data || [])[0] || null;
+    RULE_POL.site = (wp.data || [])[0] || null;
+    RULES = rulesFromPolicy(RULE_POL.app, 'app').concat(rulesFromPolicy(RULE_POL.site, 'site'));
+    const act = (RULE_POL.app && RULE_POL.app.action_on_blocked) || (RULE_POL.site && RULE_POL.site.action_on_blocked);
+    if (act) $('#rule-action').value = act;
+    renderRules();
+    if (!RULES.length) $('#rule-msg').innerHTML = 'No rules yet. Click <b>Load common defaults</b> to start, then <b>Save rules</b>.';
+  } catch (e) {
+    $('#rule-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="4" class="mut">' + esc(e.message) + '</td></tr>';
+  }
+}
+function renderRules() {
+  const q = ($('#rule-q').value || '').toLowerCase();
+  const list = RULES.map((r, i) => ({ r, i })).filter(({ r }) => !q || r.item.toLowerCase().includes(q));
+  $('#rule-rows').innerHTML = list.map(({ r, i }) => '<tr>'
+    + '<td><b>' + esc(r.item) + '</b></td>'
+    + '<td>' + (r.kind === 'app' ? 'Application' : 'Website') + '</td>'
+    + '<td><select data-rule-status="' + i + '" class="rst rst-' + r.status + '">'
+    + RULE_ORDER.map((sx) => '<option value="' + sx + '"' + (sx === r.status ? ' selected' : '') + '>' + RULE_LABEL[sx] + '</option>').join('')
+    + '</select></td>'
+    + '<td><button class="btn danger" data-rule-del="' + i + '" type="button">Remove</button></td></tr>').join('')
+    || '<tr><td colspan="4" class="mut">No rules match. Add one above or load defaults.</td></tr>';
+}
+function addRule() {
+  const item = ($('#rule-add-item').value || '').trim().toLowerCase();
+  if (!item) return;
+  const kind = $('#rule-add-type').value, status = $('#rule-add-status').value;
+  if (RULES.some((r) => r.item.toLowerCase() === item && r.kind === kind)) { toast('Already in the list'); return; }
+  RULES.push({ item, kind, status }); $('#rule-add-item').value = ''; renderRules();
+}
+async function saveRules() {
+  const action = $('#rule-action').value;
+  const build = (kind) => {
+    const allowed = [], blocked = [], categories = {};
+    RULES.filter((r) => r.kind === kind).forEach((r) => {
+      categories[r.item] = r.status;
+      if (r.status === 'ALLOWED') allowed.push(r.item);
+      if (r.status === 'BLOCKED' || r.status === 'VIOLATION') blocked.push(r.item);
+    });
+    return { allowed, blocked, categories };
+  };
+  const msg = $('#rule-msg'); msg.style.color = ''; msg.textContent = 'Saving…';
+  try {
+    const a = build('app');
+    const appBody = { name: (RULE_POL.app && RULE_POL.app.name) || 'Company App Rules', allowed_apps: a.allowed, blocked_apps: a.blocked, categories: a.categories, action_on_blocked: action };
+    if (RULE_POL.app) { await api('/policies/application/' + RULE_POL.app.id, { method: 'PUT', body: JSON.stringify(appBody) }); }
+    else { const r = await api('/policies/application', { method: 'POST', body: JSON.stringify(appBody) }); RULE_POL.app = r.data;
+      await api('/policies/assign', { method: 'POST', body: JSON.stringify({ policy_type: 'APPLICATION', policy_id: RULE_POL.app.id, assignable_type: 'COMPANY', assignable_id: ME.company_id }) }); }
+    const w = build('site');
+    const webBody = { name: (RULE_POL.site && RULE_POL.site.name) || 'Company Website Rules', allowed_sites: w.allowed, blocked_sites: w.blocked, categories: w.categories, action_on_blocked: action };
+    if (RULE_POL.site) { await api('/policies/website/' + RULE_POL.site.id, { method: 'PUT', body: JSON.stringify(webBody) }); }
+    else { const r = await api('/policies/website', { method: 'POST', body: JSON.stringify(webBody) }); RULE_POL.site = r.data;
+      await api('/policies/assign', { method: 'POST', body: JSON.stringify({ policy_type: 'WEBSITE', policy_id: RULE_POL.site.id, assignable_type: 'COMPANY', assignable_id: ME.company_id }) }); }
+    msg.style.color = 'var(--ok)'; msg.textContent = '\u2713 Saved & applied company-wide — agents pick it up on their next heartbeat (~30s).';
+    initRules();
+  } catch (e) { msg.style.color = 'var(--danger)'; msg.textContent = 'Error: ' + (e.message || e); }
+}
+$('#rule-add-btn').onclick = addRule;
+$('#rule-add-item').addEventListener('keydown', (e) => { if (e.key === 'Enter') addRule(); });
+$('#rule-save').onclick = saveRules;
+$('#rule-seed').onclick = () => { RULE_SEED.forEach((sd) => { if (!RULES.some((r) => r.item.toLowerCase() === sd.item && r.kind === sd.kind)) RULES.push({ item: sd.item, kind: sd.kind, status: sd.status }); }); renderRules(); toast('Loaded common defaults — review, then Save rules'); };
+$('#rule-q').addEventListener('input', renderRules);
+$('#rule-rows').addEventListener('change', (e) => { const s = e.target.closest('[data-rule-status]'); if (s) { RULES[+s.dataset.ruleStatus].status = s.value; s.className = 'rst rst-' + s.value; } });
+$('#rule-rows').addEventListener('click', (e) => { const d = e.target.closest('[data-rule-del]'); if (d) { RULES.splice(+d.dataset.ruleDel, 1); renderRules(); } });
 $('#pol-rows').addEventListener('click', async (e) => {
   const edit = e.target.closest('[data-pol-edit]');
   if (edit) {
