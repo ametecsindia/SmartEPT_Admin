@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role'       => \App\Http\Middleware\EnsureRole::class,
             'permission' => \App\Http\Middleware\EnsurePermission::class,
             'consent'    => \App\Http\Middleware\EnsureConsent::class,
+            'tracking-mode' => \App\Http\Middleware\EnforceTrackingMode::class,
             'licensed'   => \App\Http\Middleware\EnsureLicensed::class,
             'active-employee' => \App\Http\Middleware\EnsureActiveEmployment::class,
             'api-key'    => \App\Http\Middleware\ApiKeyAuth::class,

@@ -189,6 +189,8 @@ class EmployeeController extends Controller
             'smartdcm_user_id'     => ['nullable', 'string', 'max:64'],
             'monitoring_policy_id' => ['nullable', 'integer', Rule::exists('monitoring_policies', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
             'compliance_policy_id' => ['nullable', 'integer', Rule::exists('compliance_policies', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
+            // Tracking mode override (null = inherit from team/dept/branch/company).
+            'tracking_mode'        => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
         ]);
     }
 

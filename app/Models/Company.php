@@ -16,6 +16,7 @@ class Company extends Model
         'data_retention_days'     => 'integer',
         'agent_exit_lock_enabled' => 'boolean',
         'agent_exit_password'     => 'encrypted',
+        'exclude_ip_sites'        => 'boolean',
     ];
 
     public function branches()    { return $this->hasMany(Branch::class); }

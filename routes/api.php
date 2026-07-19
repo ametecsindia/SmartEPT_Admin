@@ -136,7 +136,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('gate-status', [AgentStatusController::class, 'gateStatus']);
 
         // Tracking ingestion (M2 + M3) — gated by recorded consent where policy requires it.
-        Route::middleware('consent')->group(function () {
+        Route::middleware(['tracking-mode', 'consent'])->group(function () {
             Route::post('attendance-event', [AttendanceController::class, 'store']);
             Route::post('activity-events', [ActivityController::class, 'activity']);
             Route::post('idle-event', [ActivityController::class, 'idle']);
@@ -275,6 +275,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN')->group(function () {
         Route::post('devices/{device}/unbind', [DeviceController::class, 'unbind']);
         Route::post('devices/{device}/rebind', [DeviceController::class, 'rebind']);
+        Route::put('devices/{device}/tracking-mode', [DeviceController::class, 'trackingMode']);
     });
 
     // ---- Policy Engine ----

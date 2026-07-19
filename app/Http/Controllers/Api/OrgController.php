@@ -82,12 +82,17 @@ class OrgController extends Controller
                 'city' => ['nullable', 'string'], 'state' => ['nullable', 'string'],
                 'country' => ['nullable', 'string'], 'public_ip_whitelist' => ['nullable', 'array'],
                 'timezone' => ['nullable', 'timezone'],   // EPT-20: per-branch override of company timezone
+                'tracking_mode' => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
             ],
-            'departments' => $base + ['branch_id' => ['nullable', 'integer', Rule::exists('branches', 'id')->where(fn ($q) => $q->where('company_id', $companyId))]],
+            'departments' => $base + [
+                'branch_id' => ['nullable', 'integer', Rule::exists('branches', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
+                'tracking_mode' => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
+            ],
             'teams' => $base + [
                 'department_id' => ['nullable', 'integer', Rule::exists('departments', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
                 'manager_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
                 'team_leader_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
+                'tracking_mode' => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
             ],
             'designations' => $base + ['level' => ['nullable', 'integer', 'min:0']],
             'shifts' => $base + [

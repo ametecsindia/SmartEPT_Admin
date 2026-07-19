@@ -3,7 +3,10 @@
 namespace App\Services;
 
 use App\Models\ApplicationPolicy;
+use App\Models\Branch;
 use App\Models\Company;
+use App\Models\Department;
+use App\Models\Team;
 use App\Models\AttendancePolicy;
 use App\Models\BreakPolicy;
 use App\Models\CompliancePolicy;
@@ -64,12 +67,21 @@ class PolicyResolver
         $monitoring = $policies['monitoring'] ?? null;
         $company = Company::find($employee->company_id);
 
+        // Tracking mode override (Ejaz 19-Jul): most specific level in the chain wins.
+        // Reflected into the policy flags too, so any server-side consumer that reads
+        // the flags stops capturing even if it ignores tracking_mode directly.
+        $trackingMode = $this->effectiveTrackingMode($employee, $device, $company);
+        $this->applyTrackingMode($policies, $trackingMode);
+
         return [
             'employee_id'     => $employee->id,
             'device_uuid'     => $device?->device_uuid,
             'company_id'      => $employee->company_id,
             'consent_required' => (bool) ($monitoring['consent_required'] ?? true),
             'policy_version'  => (int) ($monitoring['version'] ?? 1),
+            'tracking_mode'    => $trackingMode,
+            // Raw-IP / local-IP browsing: keep the time as "Unknown source", store no content.
+            'exclude_ip_sites' => (bool) ($company->exclude_ip_sites ?? true),
             'generated_at'    => now()->toIso8601String(),
             'agent'           => [
                 'exit_lock_enabled'    => (bool) ($company->agent_exit_lock_enabled ?? false),
@@ -78,6 +90,54 @@ class PolicyResolver
             ],
             'policies'        => $policies,
         ];
+    }
+
+    /**
+     * Effective tracking mode for an employee (optionally on a device), walking
+     * DEVICE > EMPLOYEE > TEAM > DEPARTMENT > BRANCH > COMPANY. First level that
+     * sets a valid mode wins; nothing set anywhere = FULL.
+     */
+    public function effectiveTrackingMode(Employee $employee, ?EmployeeDevice $device = null, ?Company $company = null): string
+    {
+        $candidates = [];
+        if ($device) { $candidates[] = $device->tracking_mode; }
+        $candidates[] = $employee->tracking_mode;
+        if ($employee->team_id)       { $candidates[] = optional(Team::withoutGlobalScopes()->find($employee->team_id))->tracking_mode; }
+        if ($employee->department_id) { $candidates[] = optional(Department::withoutGlobalScopes()->find($employee->department_id))->tracking_mode; }
+        if ($employee->branch_id)     { $candidates[] = optional(Branch::withoutGlobalScopes()->find($employee->branch_id))->tracking_mode; }
+        $candidates[] = ($company ?? Company::find($employee->company_id))?->tracking_mode;
+
+        foreach ($candidates as $m) {
+            $m = strtoupper(trim((string) $m));
+            if (in_array($m, ['FULL', 'PRESENCE_ONLY', 'EXCLUDED'], true)) {
+                return $m;
+            }
+        }
+
+        return 'FULL';
+    }
+
+    /** Fold a non-FULL tracking mode back into the resolved policy flags. */
+    private function applyTrackingMode(array &$policies, string $mode): void
+    {
+        if ($mode === 'FULL') {
+            return;
+        }
+
+        if (isset($policies['monitoring']) && is_array($policies['monitoring'])) {
+            $policies['monitoring']['app_usage_enabled'] = false;
+            $policies['monitoring']['website_usage_enabled'] = false;
+            if ($mode === 'EXCLUDED') {
+                $policies['monitoring']['tracking_enabled'] = false;
+            }
+        }
+        if (isset($policies['screenshot']) && is_array($policies['screenshot'])) {
+            $policies['screenshot']['enabled'] = false;
+        }
+        if (isset($policies['webcam']) && is_array($policies['webcam'])) {
+            $policies['webcam']['presence_enabled'] = false;
+            $policies['webcam']['photo_enabled'] = false;
+        }
     }
 
     /**

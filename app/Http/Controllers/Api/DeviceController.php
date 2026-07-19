@@ -220,6 +220,22 @@ class DeviceController extends Controller
         return response()->json(['data' => $device->fresh()]);
     }
 
+    /**
+     * PUT /api/devices/{device}/tracking-mode — set a per-device override
+     * (null = inherit from the employee / team / department / branch / company).
+     */
+    public function trackingMode(Request $request, EmployeeDevice $device): JsonResponse
+    {
+        $data = $request->validate([
+            'tracking_mode' => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
+        ]);
+
+        $device->update(['tracking_mode' => $data['tracking_mode'] ?? null]);
+        $this->audit($request, 'DEVICE_TRACKING_MODE', EmployeeDevice::class, $device->id, $data);
+
+        return response()->json(['data' => $device->fresh()]);
+    }
+
     private function resolveEmployee(Request $request): Employee
     {
         $user = $request->user();
