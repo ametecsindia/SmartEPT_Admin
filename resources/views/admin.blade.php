@@ -237,6 +237,35 @@
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
   .grid2 > .card{margin-bottom:0}
   @media(max-width:1100px){.grid2{grid-template-columns:1fr}.kpis{grid-template-columns:1fr 1fr}}
+  /* ---- Mobile ---- */
+  .ham{display:none;width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--ink);font-size:19px;line-height:1;cursor:pointer;align-items:center;justify-content:center;flex:none}
+  .nav-backdrop{display:none;position:fixed;inset:0;background:rgba(4,20,25,.5);z-index:8}
+  @media(max-width:860px){
+    .side{transform:translateX(-100%);transition:transform .26s ease;width:270px;z-index:20;box-shadow:0 0 50px rgba(0,0,0,.45)}
+    #app.nav-open .side{transform:translateX(0)}
+    #app.nav-open .nav-backdrop{display:block}
+    .main{margin-left:0;padding:0 14px 40px}
+    .ham{display:inline-flex}
+    .top{padding:14px 0 12px}
+    .top h2{font-size:18px}
+    .who{gap:8px}
+    .who #company-name{display:none}
+    #dash-org{top:64px}
+    .kpis{grid-template-columns:1fr 1fr;gap:12px}
+    .dash-charts{grid-template-columns:1fr}
+    .grid2{grid-template-columns:1fr}
+    .fgrid{grid-template-columns:1fr}
+    .filters input,.filters select{min-width:0;flex:1 1 140px}
+    .org-filter select{max-width:none;flex:1 1 44%}
+    .card{overflow-x:auto}
+    .card table{min-width:600px}
+    .modal{width:96vw}
+    .drawer{width:100vw;max-width:100vw}
+  }
+  @media(max-width:520px){
+    .kpis{grid-template-columns:1fr}
+    .top h2{font-size:16.5px}
+  }
 
   /* ---------- Screenshots ---------- */
   .shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:13px}
@@ -362,9 +391,10 @@
     <div class="nav" data-view="ops"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6.5 5 13L17 12h4"/></svg></span> Audit &amp; Ops</div>
     <div class="foot"><span id="who"></span><br><a id="signout" style="color:var(--ink-3);cursor:pointer">Sign out</a></div>
   </div>
+  <div class="nav-backdrop" id="nav-backdrop"></div>
   <div class="main">
     <div class="top">
-      <div><h2 id="page-title">Live Dashboard</h2><div class="sub" id="page-sub">Real-time workforce status</div></div>
+      <div style="display:flex;align-items:center;gap:12px"><button id="nav-toggle" class="ham" aria-label="Menu" title="Menu">☰</button><div><h2 id="page-title">Live Dashboard</h2><div class="sub" id="page-sub">Real-time workforce status</div></div></div>
       <div class="who"><span id="company-name">Ametecs Pvt Ltd</span><button class="help-i" id="btn-refresh" title="Refresh this screen">⟳</button><button class="help-i" id="btn-help" title="About this screen">ⓘ</button></div>
     </div>
 
@@ -1342,6 +1372,8 @@ const TITLES = {
   ops: ['Audit & Ops', 'Who did what, storage growth & database backups'],
 };
 $$('.nav').forEach((n) => n.onclick = () => show(n.dataset.view));
+(function(){ const a=document.getElementById('app'), t=document.getElementById('nav-toggle'), b=document.getElementById('nav-backdrop');
+  if(t) t.onclick=()=>a.classList.toggle('nav-open'); if(b) b.onclick=()=>a.classList.remove('nav-open'); })();
 function show(v) {
   $$('.nav').forEach((n) => n.classList.toggle('active', n.dataset.view === v));
   $$('.view').forEach((el) => el.classList.remove('active'));
@@ -1363,6 +1395,7 @@ function show(v) {
   if (v === 'license') loadLicense();
   if (v === 'integrations') initIntegrations();
   if (v === 'ops') loadOps();
+  { const a=document.getElementById('app'); if(a) a.classList.remove('nav-open'); }
   CURRENT = v;
 }
 
