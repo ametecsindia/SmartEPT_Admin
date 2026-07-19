@@ -46,6 +46,43 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * POST /api/auth/sso — one-click sign-in for a cloud tenant (EPT-27).
+     * Trades a SmartEPT Central-signed ticket (email.tid.exp, HMAC-signed with
+     * the shared SSO secret) for a normal Sanctum token — no password typed.
+     */
+    public function sso(Request $request): JsonResponse
+    {
+        $secret = (string) config('services.sso.secret');
+        abort_if($secret === '', 503, 'Single sign-on is not configured on this server.');
+
+        $ticket = (string) $request->input('ticket', '');
+        [$body, $sig] = array_pad(explode('.', $ticket, 2), 2, '');
+        abort_if($body === '' || $sig === '', 401, 'Malformed sign-in ticket.');
+        abort_unless(hash_equals(hash_hmac('sha256', $body, $secret), $sig), 401, 'Invalid sign-in ticket.');
+
+        $payload = json_decode(base64_decode(strtr($body, '-_', '+/')), true);
+        abort_unless(is_array($payload) && ! empty($payload['email']) && ! empty($payload['exp']), 401, 'Malformed sign-in ticket.');
+        abort_if((int) $payload['exp'] < time(), 401, 'This sign-in link has expired — open your console from the client portal again.');
+
+        $user = User::where('email', $payload['email'])->first();
+        abort_unless($user, 401, 'No matching account for this sign-in link.');
+        if ($user->status === 'DISABLED') {
+            return response()->json(['error' => ['code' => 'ACCOUNT_DISABLED', 'message' => 'This account is disabled.']], 403);
+        }
+
+        $user->forceFill(['last_login_at' => now()])->save();
+        $this->audit($request, 'SSO_LOGIN', User::class, $user->id, null, $user);
+
+        $abilities = ['role:' . ($user->roleSlug() ?? 'NONE')];
+        $token = $user->createToken('sso-web', $abilities)->plainTextToken;
+
+        return response()->json([
+            'token' => $token,
+            'user'  => $this->userPayload($user),
+        ]);
+    }
+
     /** GET /api/auth/me */
     public function me(Request $request): JsonResponse
     {

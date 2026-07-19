@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\OrgController;
 use App\Http\Controllers\Api\PolicyController;
 use App\Http\Controllers\Api\PresenceController;
+use App\Http\Controllers\Api\ProvisionController;
 use App\Http\Controllers\Api\ScreenshotController;
 use App\Http\Controllers\Api\SyncController;
 use App\Http\Controllers\Api\UsageController;
@@ -50,6 +51,9 @@ Route::get('ping', fn () => response()->json([
     'server_time' => now()->toIso8601String(),
 ]));
 Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+// Cloud multi-tenancy (EPT-27): secret-signed provisioning + signed-ticket SSO from Central.
+Route::post('provision', [ProvisionController::class, 'provision'])->middleware('throttle:30,1');
+Route::post('auth/sso', [AuthController::class, 'sso'])->middleware('throttle:10,1');
 
 // ---- Authenticated (any valid token) ----
 Route::middleware('auth:sanctum')->group(function () {

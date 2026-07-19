@@ -1605,8 +1605,24 @@ $('#signout').onclick = async () => {
   TOKEN = null; ME = null; sessionStorage.removeItem('ept_token');
   clearInterval(poll); $('#app').classList.add('hide'); $('#login').classList.remove('hide');
 };
-// Restore session on refresh.
+// Restore session on refresh — or sign in via a cloud SSO ticket (EPT-27).
 (async () => {
+  // A signed ?sso= ticket from SmartEPT Central signs the tenant admin straight in.
+  const ssoTicket = new URLSearchParams(location.search).get('sso');
+  if (ssoTicket) {
+    try {
+      const res = await api('/auth/sso', { method: 'POST', body: JSON.stringify({ ticket: ssoTicket }) });
+      TOKEN = res.token; ME = res.user;
+      sessionStorage.setItem('ept_token', TOKEN);
+      history.replaceState(null, '', location.pathname); // strip the ticket from the URL
+      enterApp();
+      return;
+    } catch (e) {
+      history.replaceState(null, '', location.pathname);
+      const le = $('#login-err'); if (le) le.textContent = e.message || 'Sign-in link invalid or expired.';
+      // fall through to the normal login screen
+    }
+  }
   const saved = sessionStorage.getItem('ept_token');
   if (!saved) return;
   TOKEN = saved;
