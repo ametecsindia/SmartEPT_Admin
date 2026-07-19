@@ -25,7 +25,7 @@
     --ring:0 0 0 3px rgba(34,184,207,.22);
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html{scrollbar-color:#C6D2DA transparent;scrollbar-width:thin;scrollbar-gutter:stable;overflow-x:clip}
+  html{scrollbar-color:#C6D2DA transparent;scrollbar-width:thin;overflow-x:clip}
   body{font-family:'Inter','Segoe UI',system-ui,Arial,sans-serif;background-color:var(--canvas);
     background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)' opacity='0.35'/%3E%3C/svg%3E"),
@@ -95,9 +95,12 @@
     background:var(--canvas);border-bottom:1px solid var(--border);margin-bottom:18px;z-index:30}
   .top h2{font-size:21px;font-weight:800}
   .top .sub{color:var(--ink-3);font-size:12px;margin-top:2px}
-  .who{font-size:12px;color:var(--ink-2);display:flex;align-items:center;gap:12px}
+  .top-l{display:flex;align-items:center;gap:12px;min-width:0;flex:1}
+  .top-l > div{min-width:0}
+  .top h2,.top .sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .who{font-size:12px;color:var(--ink-2);display:flex;align-items:center;gap:12px;flex:none}
   .who b{color:var(--ink)}
-  .help-i{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--accent);color:var(--accent);
+  .help-i{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--accent);color:var(--accent);flex:none;
     background:var(--accent-weak);font-weight:800;font-size:13px;cursor:pointer;flex:none;transition:transform .12s}
   .help-i:hover{transform:scale(1.08);background:var(--accent);color:#fff}
   #btn-refresh{font-size:17px;font-weight:700;line-height:1}
@@ -397,7 +400,7 @@
   <div class="nav-backdrop" id="nav-backdrop"></div>
   <div class="main">
     <div class="top">
-      <div style="display:flex;align-items:center;gap:12px"><button id="nav-toggle" class="ham" aria-label="Menu" title="Menu">☰</button><div><h2 id="page-title">Live Dashboard</h2><div class="sub" id="page-sub">Real-time workforce status</div></div></div>
+      <div class="top-l"><button id="nav-toggle" class="ham" aria-label="Menu" title="Menu">☰</button><div><h2 id="page-title">Live Dashboard</h2><div class="sub" id="page-sub">Real-time workforce status</div></div></div>
       <div class="who"><span id="company-name">Ametecs Pvt Ltd</span><button class="help-i" id="btn-refresh" title="Refresh this screen">⟳</button><button class="help-i" id="btn-help" title="About this screen">ⓘ</button></div>
     </div>
 
