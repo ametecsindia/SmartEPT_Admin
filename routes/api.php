@@ -137,6 +137,8 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // ---- Monitoring reports (M3): screenshots + presence timelines ----
+    Route::get('reports/screenshots', [ScreenshotController::class, 'companyDay'])
+        ->middleware('permission:screenshot.view');
     Route::get('reports/employee/{employee}/screenshots', [ScreenshotController::class, 'timeline'])
         ->middleware('permission:screenshot.view');
     Route::get('screenshots/{screenshot}/file', [ScreenshotController::class, 'file'])

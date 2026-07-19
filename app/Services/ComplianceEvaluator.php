@@ -17,6 +17,14 @@ class ComplianceEvaluator
         $needle = $this->normApp($appOrProcess);
         $action = strtoupper($policy['action_on_blocked'] ?? 'WARN');
 
+        // Allowed wins over blocked: an explicitly-allowed app is never a violation,
+        // so a team can keep a tool (e.g. AnyDesk) the company blocks generally.
+        foreach ((array) ($policy['allowed_apps'] ?? []) as $a) {
+            if ($needle !== '' && str_contains($needle, $this->normApp($a))) {
+                return ['category' => 'PRODUCTIVE', 'blocked' => false, 'action' => $action];
+            }
+        }
+
         foreach ((array) ($policy['blocked_apps'] ?? []) as $b) {
             if ($needle !== '' && str_contains($needle, $this->normApp($b))) {
                 return ['category' => 'BLOCKED', 'blocked' => true, 'action' => $action];
@@ -27,12 +35,6 @@ class ComplianceEvaluator
         foreach ((array) ($policy['categories'] ?? []) as $key => $cat) {
             if ($needle !== '' && str_contains($needle, $this->normApp((string) $key))) {
                 return ['category' => strtoupper($cat), 'blocked' => false, 'action' => $action];
-            }
-        }
-
-        foreach ((array) ($policy['allowed_apps'] ?? []) as $a) {
-            if ($needle !== '' && str_contains($needle, $this->normApp($a))) {
-                return ['category' => 'PRODUCTIVE', 'blocked' => false, 'action' => $action];
             }
         }
 
@@ -47,6 +49,13 @@ class ComplianceEvaluator
         $hay = strtolower(trim(($domain ?? '') . ' ' . ($title ?? '')));
         $action = strtoupper($policy['action_on_blocked'] ?? 'WARN');
 
+        // Allowed wins over blocked: an explicitly-allowed site is never a violation.
+        foreach ((array) ($policy['allowed_sites'] ?? []) as $a) {
+            if ($hay !== '' && str_contains($hay, $this->normSite($a))) {
+                return ['category' => 'PRODUCTIVE', 'blocked' => false, 'action' => $action];
+            }
+        }
+
         foreach ((array) ($policy['blocked_sites'] ?? []) as $b) {
             if ($hay !== '' && $this->siteMatches($hay, $this->normSite($b))) {
                 return ['category' => 'BLOCKED', 'blocked' => true, 'action' => $action];
@@ -56,12 +65,6 @@ class ComplianceEvaluator
         foreach ((array) ($policy['categories'] ?? []) as $key => $cat) {
             if ($hay !== '' && str_contains($hay, $this->normSite((string) $key))) {
                 return ['category' => strtoupper($cat), 'blocked' => false, 'action' => $action];
-            }
-        }
-
-        foreach ((array) ($policy['allowed_sites'] ?? []) as $a) {
-            if ($hay !== '' && str_contains($hay, $this->normSite($a))) {
-                return ['category' => 'PRODUCTIVE', 'blocked' => false, 'action' => $action];
             }
         }
 

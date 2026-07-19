@@ -99,6 +99,40 @@ class ScreenshotController extends Controller
     }
 
     /**
+     * GET /api/reports/screenshots?date= — company-wide screenshot wall for a day
+     * across every employee the caller may see (report scope). Metadata + protected
+     * file URLs only; images stream lazily via the per-file route. Newest first, capped.
+     */
+    public function companyDay(Request $request): JsonResponse
+    {
+        $date = $request->query('date', now()->toDateString());
+        $visible = $this->visibleEmployeeIds($request->user());
+
+        $logs = EmployeeScreenshotLog::query()
+            ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
+            ->whereDate('captured_at', $date)
+            ->with('employee:id,first_name,last_name,employee_code')
+            ->latest('captured_at')
+            ->limit(600)
+            ->get()
+            ->map(fn ($l) => [
+                'id'             => $l->id,
+                'employee_id'    => $l->employee_id,
+                'employee_name'  => $l->employee ? trim($l->employee->first_name . ' ' . $l->employee->last_name) : '—',
+                'employee_code'  => $l->employee?->employee_code,
+                'captured_at'    => $l->captured_at,
+                'active_app'     => $l->active_app,
+                'window_title'   => $l->window_title,
+                'trigger_reason' => $l->trigger_reason,
+                'url'            => route('screenshots.file', ['screenshot' => $l->id]),
+            ]);
+
+        $this->audit($request, 'EXPORT', EmployeeScreenshotLog::class, null, ['scope' => 'all', 'date' => $date]);
+
+        return response()->json(['date' => $date, 'count' => $logs->count(), 'data' => $logs]);
+    }
+
+    /**
      * GET /api/screenshots/{screenshot}/file
      * Streams the protected image and records the access (who/when/ip).
      */

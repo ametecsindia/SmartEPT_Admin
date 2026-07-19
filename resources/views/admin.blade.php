@@ -295,6 +295,15 @@
     <div class="view active" id="v-dashboard">
       <div class="kpis" id="kpis"></div>
       <div class="card">
+        <h3>Live productivity — all employees <span class="hint">today · working vs present time · click Reports for the full range</span>
+          <span class="row"><input id="dash-prod-q" placeholder="Search employee" autocomplete="off" style="width:170px;font-weight:400;font-size:12px;padding:5px 9px"></span>
+        </h3>
+        <div style="overflow-x:auto">
+        <table><thead><tr><th>Code</th><th>Employee</th><th>Dept</th><th>Present</th><th>Working</th><th>Idle</th><th>Breaks</th><th>Violations</th><th>Productivity</th></tr></thead>
+        <tbody id="dash-prod-rows"></tbody></table>
+        </div>
+      </div>
+      <div class="card">
         <h3>Employees — live
           <span class="row">
             <span class="hint">auto-refreshes every 15s · click a row for detail</span>
@@ -1303,6 +1312,20 @@ async function loadDashboard() {
     if (isDenied(e)) { $('#live-rows').innerHTML = deniedCard(); $('#kpis').innerHTML = ''; }
   }
   try {
+    const pr = await api('/reports/productivity?from=' + today() + '&to=' + today());
+    $('#dash-prod-rows').innerHTML = (pr.data || []).map((x) =>
+      '<tr><td>' + esc(x.employee_code || '—') + '</td><td><b>' + esc(x.name) + '</b></td>'
+      + '<td class="mut">' + esc(x.department || '—') + '</td>'
+      + '<td>' + hms(x.present_seconds) + '</td><td><b>' + hms(x.work_seconds) + '</b></td>'
+      + '<td>' + hms(x.idle_seconds) + '</td><td>' + x.break_count + '</td>'
+      + '<td>' + (x.violations ? '<span class="tag t-danger">' + x.violations + '</span>' : '0') + '</td>'
+      + '<td><b>' + Number(x.productivity).toFixed(0) + '%</b></td></tr>'
+    ).join('') || '<tr><td colspan="9" class="mut">No activity today yet.</td></tr>';
+    attachTableFilter($('#dash-prod-q'), '#dash-prod-rows');
+  } catch (e) {
+    if (isDenied(e)) $('#dash-prod-rows').innerHTML = deniedCard();
+  }
+  try {
     const h = await api('/dashboard/device-health');
     $('#dash-dev-rows').innerHTML = (h.data || []).map((v) => {
       const hc = { HEALTHY: 't-ok', DEGRADED: 't-warn', STOPPED: 't-danger' }[v.agent_health] || 't-off';
@@ -1330,18 +1353,51 @@ async function initScreenshots() {
   if (!$('#ss-date').value) $('#ss-date').value = today();
   try {
     const emps = await employeesList();
-    fillEmpPicker($('#ss-emp'), emps);
-    attachEmpSearch($('#ss-emp-q'), $('#ss-emp'), emps);
-    if ($('#ss-emp').value) loadScreenshots();
+    fillSelect($('#ss-emp'), emps, (e) => fullName(e) + ' (' + (e.employee_code || '#' + e.id) + ')', (e) => e.id, '— All employees —');
+    attachEmpSearch($('#ss-emp-q'), $('#ss-emp'), emps, '— All employees —');
+    loadScreenshots();
   } catch (e) {
     if (isDenied(e)) { $('#ss-grid').innerHTML = ''; showSsEmpty('Your role cannot view the employee list, so screenshots cannot be browsed.'); }
   }
 }
 function showSsEmpty(html) { const el = $('#ss-empty'); el.className = 'empty'; el.innerHTML = html; }
 function clearSsEmpty() { const el = $('#ss-empty'); el.className = 'hide'; el.innerHTML = ''; }
+// Company-wide screenshot wall (default 'All employees' view).
+async function loadAllScreenshots(date) {
+  const seq = ++SS_SEQ;
+  SS_URLS.forEach((u) => URL.revokeObjectURL(u)); SS_URLS = []; SS_META = {};
+  const grid = $('#ss-grid'); grid.innerHTML = '<div class="mut">Loading all employees…</div>'; clearSsEmpty();
+  $('#ss-title').textContent = 'Screenshot timeline — All employees · ' + date;
+  try {
+    const d = await api('/reports/screenshots?date=' + encodeURIComponent(date));
+    if (seq !== SS_SEQ) return;
+    const shots = d.data || [];
+    if (!shots.length) { grid.innerHTML = ''; showSsEmpty('<b>No screenshots for this day.</b><br>Screenshots appear here once the desktop agent uploads them for any employee whose policy has capture enabled.'); return; }
+    grid.innerHTML = shots.map((s) => {
+      SS_META[s.id] = s;
+      return '<div class="shotcard" data-shot="' + s.id + '">'
+        + '<div class="img" id="ss-img-' + s.id + '">loading…</div>'
+        + '<div class="m"><b>' + esc(s.employee_name || '—') + '</b> · ' + t(s.captured_at) + '<br>'
+        + esc(s.active_app || s.window_title || '—')
+        + ' · <span style="color:var(--ink-3)">' + esc(s.trigger_reason || '') + '</span></div></div>';
+    }).join('');
+    shots.forEach(async (s) => {
+      const slot = document.getElementById('ss-img-' + s.id);
+      try {
+        const blob = await apiBlob('/screenshots/' + s.id + '/file');
+        const url = URL.createObjectURL(blob);
+        if (seq !== SS_SEQ) { URL.revokeObjectURL(url); return; }
+        SS_URLS.push(url); SS_META[s.id].objectUrl = url;
+        if (slot) slot.innerHTML = '<img src="' + url + '" alt="Screenshot">';
+      } catch (e) { if (slot && seq === SS_SEQ) slot.textContent = e.status === 403 ? 'no access' : 'file missing'; }
+    });
+  } catch (e) {
+    grid.innerHTML = ''; showSsEmpty(isDenied(e) ? 'Your role cannot view screenshots.' : esc(e.message));
+  }
+}
 async function loadScreenshots() {
   const empId = $('#ss-emp').value, date = $('#ss-date').value || today();
-  if (!empId) return;
+  if (!empId) { loadAllScreenshots(date); return; }
   const seq = ++SS_SEQ;
   SS_URLS.forEach((u) => URL.revokeObjectURL(u)); SS_URLS = []; SS_META = {};
   const grid = $('#ss-grid'); grid.innerHTML = '<div class="mut">Loading…</div>'; clearSsEmpty();
