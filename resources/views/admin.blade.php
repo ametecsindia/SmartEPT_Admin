@@ -97,7 +97,8 @@
   .side .foot{flex:0 0 auto;font-size:11px;color:#7FA8AF;padding:12px 8px 2px;border-top:1px solid rgba(255,255,255,.09);line-height:1.7}
   .side .foot a{color:#A9CBD1!important}
   .side .foot a:hover{color:#fff!important}
-  .main{margin-left:232px;flex:1;padding:0 28px 44px;min-width:0}
+  .main{margin-left:232px;flex:1;padding:0 28px 44px;min-width:0;display:flex;flex-direction:column;min-height:100vh}
+  .page-copy{margin-top:auto;padding-top:18px;border-top:1px solid var(--border);text-align:center;font-size:10.5px;color:var(--ink-3);line-height:1.5}
   .top{display:flex;align-items:center;justify-content:space-between;padding:18px 0 14px;position:sticky;top:0;
     background:var(--canvas);border-bottom:1px solid var(--border);margin-bottom:18px;z-index:30}
   .top h2{font-size:21px;font-weight:800}
@@ -1174,6 +1175,7 @@
         <div class="mut" style="font-size:11px">Tip: if a screen just failed, load the log right after — the newest lines at the bottom describe what went wrong.</div>
       </div>
     </div>
+    <div class="page-copy">© 2026 SmartEPT, developed by Ametecs India Private Limited — all rights reserved.</div>
   </div>
 </div>
 
