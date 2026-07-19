@@ -135,6 +135,19 @@
   .fchip .x{cursor:pointer;width:17px;height:17px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
     background:rgba(0,0,0,.07);font-size:11px;line-height:1}
   .fchip .x:hover{background:rgba(0,0,0,.16)}
+  /* 50/50 colour KPI cards (Ejaz 19-Jul): a solid colour half holds the label, the big value fills the rest. */
+  .kpi{padding:0;display:flex;align-items:stretch;min-height:76px}
+  .kpi::before{display:none}
+  .kpi .kside{flex:0 0 46%;background:var(--kc,var(--accent));display:flex;align-items:center;padding:12px 14px}
+  .kpi .kside .l{color:#fff;font-size:11px;line-height:1.25;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin:0}
+  .kpi .kmain{flex:1;display:flex;align-items:center;padding:10px 18px;position:relative}
+  .kpi .kmain .v{font-size:34px;font-weight:800;color:var(--kc,var(--ink));margin:0;font-family:var(--font-head);letter-spacing:-.02em}
+  .kpi.drill .go{position:absolute;right:10px;top:8px;color:var(--kc,var(--accent));opacity:0;transform:none}
+  .kpi.drill:hover{background:var(--card)}
+  .kpi.drill:hover .go{opacity:.85}
+  .kpi.drill:hover .kmain{background:var(--kcw,var(--accent-weak))}
+  .kpi.sel{box-shadow:inset 0 0 0 2px var(--kc,var(--accent))}
+  .kpi.sel .kmain{background:var(--kcw,var(--accent-weak))}
 
   /* ---------- Dashboard charts ---------- */
   .dash-charts{display:grid;grid-template-columns:340px 1fr;gap:18px;margin-bottom:18px}
@@ -1545,7 +1558,6 @@ async function loadDashboard() {
       ['Away', c.away_now, 'k-away', 'AWAY'],
       ['Offline', c.offline, 'k-off', 'OFFLINE'],
       ['On break', c.on_break, 'k-break', 'view:attendance'],
-      ['Camera blocked', c.camera_blocked, 'k-cam', 'view:violations'],
       ['Violations today', c.violations_today, 'k-viol', 'view:violations'],
       ['Screenshots', c.screenshots_today, 'k-shot', 'view:screenshots'],
     ];
@@ -1555,8 +1567,8 @@ async function loadDashboard() {
       const go = isView ? 'Open →' : (act === 'all' ? 'View all →' : 'Filter →');
       return '<div class="kpi drill ' + cls + sel + '" data-act="' + act + '" title="'
         + esc(l) + ' — click to ' + (isView ? 'open that screen' : 'filter the list below') + '">'
-        + '<span class="go">' + go + '</span>'
-        + '<div class="l">' + esc(l) + '</div><div class="v">' + (v ?? 0) + '</div></div>';
+        + '<div class="kside"><div class="l">' + esc(l) + '</div></div>'
+        + '<div class="kmain"><span class="go">' + go + '</span><div class="v">' + (v ?? 0) + '</div></div></div>';
     }).join('');
     const wf = [['Active', c.active_now, '#16A34A'], ['Idle', c.idle_now, '#D97706'], ['On break', c.on_break, '#EA580C'], ['Offline', c.offline, '#94A3B8']];
     const wfTotal = c.total_employees || wf.reduce((a, [, v]) => a + (v || 0), 0);
