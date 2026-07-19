@@ -92,8 +92,7 @@
   .side .foot a:hover{color:#fff!important}
   .main{margin-left:232px;flex:1;padding:0 28px 44px;min-width:0}
   .top{display:flex;align-items:center;justify-content:space-between;padding:18px 0 14px;position:sticky;top:0;
-    background:linear-gradient(to bottom, var(--canvas) 82%, rgba(238,243,246,0));border-bottom:1px solid var(--border);
-    margin-bottom:22px;z-index:5;backdrop-filter:blur(3px)}
+    background:var(--canvas);border-bottom:1px solid var(--border);margin-bottom:18px;z-index:30}
   .top h2{font-size:21px;font-weight:800}
   .top .sub{color:var(--ink-3);font-size:12px;margin-top:2px}
   .who{font-size:12px;color:var(--ink-2);display:flex;align-items:center;gap:12px}
@@ -155,8 +154,8 @@
   /* ---------- Dashboard charts ---------- */
   .dash-charts{display:grid;grid-template-columns:340px 1fr;gap:18px;margin-bottom:18px}
   @media(max-width:920px){.dash-charts{grid-template-columns:1fr}}
-  .wf-wrap{display:flex;gap:18px;align-items:center}
-  .wf-leg{display:flex;flex-direction:column;gap:9px;flex:1;min-width:0}
+  .wf-wrap{display:flex;flex-direction:column;gap:16px;align-items:center;padding-top:4px}
+  .wf-leg{display:flex;flex-direction:column;gap:11px;width:100%;max-width:290px}
   .wf-leg .r{display:flex;align-items:center;gap:8px;font-size:12px}
   .wf-leg .dot{width:10px;height:10px;border-radius:3px;flex:none}
   .wf-leg .nm{color:var(--ink-2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -179,10 +178,16 @@
   .org-filter select{font-size:12px;padding:6px 10px;border-radius:9px;border:1px solid var(--border);
     background:var(--card);color:var(--ink);max-width:200px}
   .org-filter .of-scope{font-size:11.5px;color:var(--ink-3);margin-left:auto;font-weight:600}
-  #dash-org{position:sticky;top:56px;z-index:4;box-shadow:var(--shadow-1)}
+  #dash-org{position:sticky;top:74px;z-index:20;box-shadow:var(--shadow-1)}
   .dash-charts .card{display:flex;flex-direction:column;max-height:400px}
   .dash-charts .card h3{flex:none}
   .dash-charts .tu-grid,.dash-charts .wf-wrap{overflow-y:auto;min-height:0}
+  .quickpick{margin-top:2px}
+  .qp-l{font-size:11px;color:var(--ink-3);font-weight:700;margin-bottom:7px}
+  .qp-row{display:flex;flex-wrap:wrap;gap:6px}
+  .qchip{width:auto;margin:0;padding:5px 10px;font-size:11.5px;font-weight:600;background:var(--card-2);
+    border:1px solid var(--border);color:var(--ink-2);border-radius:16px;cursor:pointer;transition:all .12s}
+  .qchip:hover{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-weak)}
 
   /* ---------- Cards & tables ---------- */
   .card{background:var(--card);border:1px solid var(--hairline);border-radius:18px;padding:19px 22px;margin-bottom:18px;
@@ -1465,7 +1470,7 @@ function svgDonut(segs, total){
       +'" transform="rotate(-90 64 64)"><title>'+esc(seg.label)+': '+seg.value+' ('+Math.round(seg.value/total*100)+'%)</title></circle>';
     off+=len;
   });
-  return '<svg viewBox="0 0 128 128" width="132" height="132">'+ring+arcs
+  return '<svg viewBox="0 0 128 128" width="190" height="190">'+ring+arcs
     +'<text x="64" y="60" text-anchor="middle" font-size="26" font-weight="800" fill="var(--ink)" font-family="var(--font-head)">'+(total||0)+'</text>'
     +'<text x="64" y="80" text-anchor="middle" font-size="8.5" letter-spacing="1" fill="var(--ink-3)">EMPLOYEES</text></svg>';
 }
@@ -2663,7 +2668,26 @@ function renderPolicyForm(type, policy) {
     const typeAttr = f.t === 'num' ? 'number' : f.t === 'dec' ? 'number" step="0.05' : f.t === 'time' ? 'time' : 'text';
     const val = v == null ? '' : (f.t === 'time' ? String(v).slice(0, 5) : String(v));
     return wrap('<label>' + esc(f.l) + '</label><input type="' + typeAttr + '" id="' + id + '" value="' + esc(val) + '">');
-  }).join('');
+  }).join('') + polQuickPick(type);
+}
+const QUICK_LIB = {
+  website: { field: 'blocked_sites', label: 'Common distraction sites — click to add to Blocked (agent warns + logs a violation on next heartbeat)',
+    items: ['facebook.com', 'instagram.com', 'youtube.com', 'x.com', 'twitter.com', 'tiktok.com', 'reddit.com', 'netflix.com', 'hotstar.com', 'primevideo.com', 'web.whatsapp.com', 'telegram.org'] },
+  application: { field: 'blocked_apps', label: 'Common distraction apps — click to add to Blocked (agent warns + logs a violation on next heartbeat)',
+    items: ['whatsapp.exe', 'telegram.exe', 'discord.exe', 'steam.exe', 'epicgameslauncher.exe', 'spotify.exe', 'vlc.exe'] },
+};
+function polQuickPick(type) {
+  const q = QUICK_LIB[type]; if (!q) return '';
+  return '<div class="full quickpick"><div class="qp-l">' + esc(q.label) + '</div><div class="qp-row">'
+    + q.items.map((i) => '<button type="button" class="qchip" data-qf="' + q.field + '" data-qv="' + esc(i) + '">+ ' + esc(i) + '</button>').join('')
+    + '</div></div>';
+}
+function polQuickAdd(field, value) {
+  const el = document.getElementById('pf-' + field); if (!el) return;
+  const set = el.value.split(',').map((x) => x.trim()).filter(Boolean);
+  if (!set.some((x) => x.toLowerCase() === value.toLowerCase())) set.push(value);
+  el.value = set.join(', ');
+  el.style.borderColor = 'var(--accent)'; setTimeout(() => { el.style.borderColor = ''; }, 700);
 }
 function collectPolicyForm(type) {
   const body = {};
@@ -2711,6 +2735,7 @@ $('#pol-save').onclick = async () => {
 };
 $('#pol-cancel').onclick = () => renderPolicyForm($('#pol-type').value, null);
 $('#pol-new').onclick = () => renderPolicyForm($('#pol-type').value, null);
+$('#pol-form').addEventListener('click', (e) => { const c = e.target.closest('.qchip'); if (c) polQuickAdd(c.dataset.qf, c.dataset.qv); });
 $('#pol-rows').addEventListener('click', async (e) => {
   const edit = e.target.closest('[data-pol-edit]');
   if (edit) {
