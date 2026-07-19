@@ -2094,22 +2094,34 @@ async function loadScreenshots() {
     }).join('');
     // Evidence jump: highlight the capture taken at (or nearest to) the
     // violation moment, so "View evidence" lands on the exact screenshot.
-    if (window._EV_TIME) {
-      const target = new Date(String(window._EV_TIME).replace(' ', 'T')).getTime();
-      window._EV_TIME = null;
-      if (!isNaN(target)) {
-        let best = null, bestDiff = Infinity;
-        shots.forEach((s) => {
-          const t2 = new Date(String(s.captured_at).replace(' ', 'T')).getTime();
-          const diff = Math.abs(t2 - target);
-          if (diff < bestDiff) { bestDiff = diff; best = s; }
-        });
-        if (best && bestDiff <= 5 * 60 * 1000) {
-          const el = document.querySelector('[data-shot="' + best.id + '"]');
-          if (el) {
-            el.classList.add('ev-hit');
-            setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
-          }
+    if (window._EV_TIME || window._EV_DETECTED) {
+      // The agent captures a screenshot tagged BLOCKED_APP/BLOCKED_SITE with the
+      // offending app/site the instant a violation happens. Match on that FIRST
+      // (robust), and only use time as a tiebreaker — the violation timestamp and
+      // the screenshot clock can disagree (timezone / sync delay), so time alone
+      // used to land on the latest interval screenshot instead of the evidence.
+      const target = new Date(String(window._EV_TIME || '').replace(' ', 'T')).getTime();
+      const det = String(window._EV_DETECTED || '').toLowerCase().trim();
+      window._EV_TIME = null; window._EV_DETECTED = null;
+      const VIOL = ['VIOLATION', 'BLOCKED_APP', 'BLOCKED_SITE'];
+      const isViol = (s) => VIOL.indexOf(String(s.trigger_reason || '').toUpperCase()) !== -1;
+      const hay = (s) => ((s.active_app || '') + ' ' + (s.window_title || '') + ' ' + (s.website_domain || '')).toLowerCase();
+      const timeGap = (s) => { const t2 = new Date(String(s.captured_at).replace(' ', 'T')).getTime(); return (isNaN(t2) || isNaN(target)) ? Infinity : Math.abs(t2 - target); };
+      const nearest = (list) => list.slice().sort((a, b) => timeGap(a) - timeGap(b))[0] || null;
+
+      let best = null;
+      // 1) a violation-triggered capture whose tagged app/site matches the offender
+      if (det) best = nearest(shots.filter(isViol).filter((s) => hay(s).indexOf(det) !== -1));
+      // 2) any violation-triggered capture, nearest in time
+      if (!best) best = nearest(shots.filter(isViol));
+      // 3) last resort — nearest interval capture within 15 min (old behaviour)
+      if (!best) { const c = nearest(shots); if (c && timeGap(c) <= 15 * 60 * 1000) best = c; }
+
+      if (best) {
+        const el = document.querySelector('[data-shot="' + best.id + '"]');
+        if (el) {
+          el.classList.add('ev-hit');
+          setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
         }
       }
     }
@@ -2250,7 +2262,7 @@ async function loadViolations() {
       const sc = { LOW: 't-info', MEDIUM: 't-warn', HIGH: 't-danger', CRITICAL: 't-danger' }[v.severity] || 't-off';
       const date = v.started_at ? String(v.started_at).slice(0, 10) : today();
       const evidence = v.screenshot_captured
-        ? '<a data-ev-emp="' + (v.employee?.id ?? '') + '" data-ev-name="' + esc(fullName(v.employee)) + '" data-ev-date="' + esc(date) + '" data-ev-time="' + esc(String(v.started_at || '')) + '" style="cursor:pointer;font-weight:600">View evidence</a>'
+        ? '<a data-ev-emp="' + (v.employee?.id ?? '') + '" data-ev-name="' + esc(fullName(v.employee)) + '" data-ev-date="' + esc(date) + '" data-ev-time="' + esc(String(v.started_at || '')) + '" data-ev-detected="' + esc(String(v.detected_value || '')) + '" style="cursor:pointer;font-weight:600">View evidence</a>'
         : '<span class="mut">—</span>';
       return '<tr><td>' + dt(v.started_at) + '</td><td><span class="nm">' + esc(fullName(v.employee) || '—') + '</span></td>'
         + '<td>' + esc(v.event_category) + '</td><td>' + esc(String(v.event_type || '').replace(/_/g, ' ')) + '</td>'
@@ -2265,6 +2277,7 @@ $('#viol-rows').addEventListener('click', async (e) => {
   const a = e.target.closest('[data-ev-emp]');
   if (!a || !a.dataset.evEmp) return;
   window._EV_TIME = a.dataset.evTime || null; // highlight the exact capture
+  window._EV_DETECTED = a.dataset.evDetected || null; // the offending app/site, for a robust match
   show('screenshots');
   await initScreenshots();
   $('#ss-emp').value = a.dataset.evEmp;
