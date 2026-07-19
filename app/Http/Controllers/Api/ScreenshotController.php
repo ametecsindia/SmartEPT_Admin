@@ -47,6 +47,15 @@ class ScreenshotController extends Controller
         // EPT-27: storage quota full — pause NEW screenshots (activity tracking continues).
         abort_if(\App\Models\Setting::get('storage_paused') === '1', 409, 'Storage is full — new screenshots are paused until space is freed. Activity tracking continues.');
 
+        // EPT-20 fix: the agent stamps captured_at in the PC's LOCAL wall-clock time
+        // (agent idle.js fmt() uses getHours()), but timeline "today" windows compare
+        // in UTC. With a non-UTC tenant timezone (e.g. Asia/Kolkata) that dropped every
+        // capture past ~6pm local from the admin. Normalise the agent's local time to UTC.
+        $tz = \App\Models\Company::find($employee->company_id)?->timezone ?: config('app.timezone', 'UTC');
+        $capturedAt = ! empty($data['captured_at'])
+            ? \Illuminate\Support\Carbon::parse($data['captured_at'], $tz)->utc()
+            : now();
+
         $file = $storage->storeUpload(
             $request->file('image'),
             $employee->company_id,
@@ -60,7 +69,7 @@ class ScreenshotController extends Controller
             'employee_id'         => $employee->id,
             'device_uuid'         => $data['device_uuid'],
             'storage_file_id'     => $file->id,
-            'captured_at'         => $data['captured_at'] ?? now(),
+            'captured_at'         => $capturedAt,
             'active_app'          => $data['active_app'] ?? null,
             'window_title'        => $data['window_title'] ?? null,
             'website_domain'      => $data['website_domain'] ?? null,
