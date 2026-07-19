@@ -25,7 +25,7 @@
     --ring:0 0 0 3px rgba(34,184,207,.22);
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html{scrollbar-color:#C6D2DA transparent;scrollbar-width:thin}
+  html{scrollbar-color:#C6D2DA transparent;scrollbar-width:thin;scrollbar-gutter:stable}
   body{font-family:'Inter','Segoe UI',system-ui,Arial,sans-serif;background-color:var(--canvas);
     background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)' opacity='0.35'/%3E%3C/svg%3E"),
