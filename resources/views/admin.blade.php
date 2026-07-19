@@ -25,13 +25,13 @@
     --ring:0 0 0 3px rgba(34,184,207,.22);
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html{scrollbar-color:#C6D2DA transparent;scrollbar-width:thin;scrollbar-gutter:stable}
+  html{scrollbar-color:#C6D2DA transparent;scrollbar-width:thin;scrollbar-gutter:stable;overflow-x:clip}
   body{font-family:'Inter','Segoe UI',system-ui,Arial,sans-serif;background-color:var(--canvas);
     background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)' opacity='0.35'/%3E%3C/svg%3E"),
     radial-gradient(900px 320px at 85% -80px, rgba(34,184,207,.09), transparent 60%);
     background-blend-mode:soft-light,normal;background-attachment:fixed,fixed;
-    color:var(--ink);font-size:13.5px;-webkit-font-smoothing:antialiased}
+    color:var(--ink);font-size:13.5px;-webkit-font-smoothing:antialiased;overflow-x:clip}
   ::selection{background:rgba(34,184,207,.25)}
   ::-webkit-scrollbar{width:9px;height:9px}
   ::-webkit-scrollbar-thumb{background:#C6D2DA;border-radius:8px;border:2px solid var(--canvas)}
@@ -241,11 +241,11 @@
   @media(max-width:1100px){.grid2{grid-template-columns:1fr}.kpis{grid-template-columns:1fr 1fr}}
   /* ---- Mobile ---- */
   .ham{display:none;width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--ink);font-size:19px;line-height:1;cursor:pointer;align-items:center;justify-content:center;flex:none}
-  .nav-backdrop{display:none;position:fixed;inset:0;background:rgba(4,20,25,.5);z-index:8}
+  .nav-backdrop{position:fixed;inset:0;background:rgba(4,20,25,.5);z-index:100;opacity:0;visibility:hidden;transition:opacity .26s ease,visibility .26s}
   @media(max-width:860px){
-    .side{transform:translateX(-100%);transition:transform .26s ease;width:270px;z-index:20;box-shadow:0 0 50px rgba(0,0,0,.45)}
+    .side{transform:translateX(-100%);transition:transform .26s ease;width:270px;z-index:110;box-shadow:0 0 50px rgba(0,0,0,.45)}
     #app.nav-open .side{transform:translateX(0)}
-    #app.nav-open .nav-backdrop{display:block}
+    #app.nav-open .nav-backdrop{opacity:1;visibility:visible}
     .main{margin-left:0;padding:0 14px 40px}
     .ham{display:inline-flex}
     .top{padding:14px 0 12px}
