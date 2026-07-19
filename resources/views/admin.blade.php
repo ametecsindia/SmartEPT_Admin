@@ -996,9 +996,21 @@
         #v-help .kb-esc{background:var(--accent-weak);border-radius:8px;padding:8px 11px;margin-top:10px!important;color:var(--accent-ink)}
         #v-help .kb-flash{outline:2px solid var(--accent);outline-offset:1px}
         #v-help .logbox{background:#0E1726;color:#D6E2F0;border-radius:11px;padding:14px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;line-height:1.55;max-height:440px;overflow:auto;white-space:pre-wrap;word-break:break-word;margin:0}
+        #v-help .htabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--border)}
+        #v-help .htab{appearance:none;border:0;background:none;cursor:pointer;padding:9px 16px;font-size:12.5px;font-weight:700;color:var(--ink-3);border-bottom:2px solid transparent;margin-bottom:-1px}
+        #v-help .htab.on{color:var(--accent);border-bottom-color:var(--accent)}
+        #v-help .htab:hover{color:var(--ink)}
+        #v-help .htab-panel{display:none}
+        #v-help .htab-panel.on{display:block}
       </style>
 
-      <div class="card">
+      <div class="htabs">
+        <button class="htab on" data-ht="health" onclick="helpTab('health')">System Health</button>
+        <button class="htab" data-ht="fix" onclick="helpTab('fix')">Fix a problem</button>
+        <button class="htab" data-ht="log" onclick="helpTab('log')">Application log</button>
+      </div>
+
+      <div class="card htab-panel on" data-ht="health">
         <h3>System Health <span class="hint">one click checks the database, storage, agents, email &amp; more — green is good, amber needs attention, red needs a fix now</span></h3>
         <div class="row" style="margin-bottom:12px">
           <button class="btn solid" id="dg-run">Run checks</button>
@@ -1008,7 +1020,7 @@
         <div id="dg-results" class="dg-grid"><div class="mut">Press “Run checks” to test this SmartEPT server.</div></div>
       </div>
 
-      <div class="card">
+      <div class="card htab-panel" data-ht="fix">
         <h3>Known Issues — how to fix common problems <span class="hint">plain-language steps, no technical background needed</span></h3>
         <div class="filters" style="margin-bottom:14px">
           <input id="kb-search" placeholder="Search problems… e.g. screenshots, 500, slow, email">
@@ -1161,7 +1173,7 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card htab-panel" data-ht="log">
         <h3>Application log <span class="hint">the most recent messages — copy them for the developer if you need help</span></h3>
         <div class="row" style="margin-bottom:10px">
           <label style="margin:0">Show last</label>
@@ -1717,6 +1729,10 @@ function initHelp() {
   }
   runDiagnostics();
 }
+function helpTab(name) {
+  $$('#v-help .htab').forEach((b) => b.classList.toggle('on', b.dataset.ht === name));
+  $$('#v-help .htab-panel').forEach((p) => p.classList.toggle('on', p.dataset.ht === name));
+}
 async function runDiagnostics() {
   const box = $('#dg-results'); if (!box) return;
   box.innerHTML = '<div class="mut">Running checks…</div>';
@@ -1740,6 +1756,7 @@ async function runDiagnostics() {
 }
 function openKb(id) {
   const el = document.getElementById(id); if (!el) return;
+  helpTab('fix'); // the KB lives on the "Fix a problem" tab — switch to it first
   el.open = true;
   el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   el.classList.add('kb-flash'); setTimeout(() => el.classList.remove('kb-flash'), 1600);
