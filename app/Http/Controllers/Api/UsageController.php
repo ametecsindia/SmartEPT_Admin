@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Support\ScopesVisibleEmployees;
+use App\Support\ResolvesBusinessDay;
 use App\Models\Employee;
 use App\Models\EmployeeAppUsageLog;
 use App\Models\EmployeeDevice;
@@ -20,6 +21,7 @@ use Illuminate\Support\Facades\DB;
 class UsageController extends Controller
 {
     use ScopesVisibleEmployees;
+    use ResolvesBusinessDay;
     use ResolvesAgentContext;
 
     public function __construct(private PolicyResolver $resolver, private ComplianceEvaluator $evaluator) {}
@@ -138,10 +140,12 @@ class UsageController extends Controller
     public function appReport(Request $request, \App\Models\Employee $employee): JsonResponse
     {
         $this->assertEmployeeVisible($request, $employee->id);
-        $date = $request->query('date', now()->toDateString());
+        $tz = $this->bizTz($request);
+        $date = $request->query('date', $this->bizToday($tz));
+        $day = $this->dayUtcBounds($date, $tz);
 
         $rows = EmployeeAppUsageLog::where('employee_id', $employee->id)
-            ->whereDate('start_at', $date)
+            ->whereBetween('start_at', $day)
             ->selectRaw('app_name, category, SUM(duration_seconds) as seconds, MAX(compliance_status) as status')
             ->groupBy('app_name', 'category')
             ->orderByDesc('seconds')
@@ -154,10 +158,12 @@ class UsageController extends Controller
     public function websiteReport(Request $request, \App\Models\Employee $employee): JsonResponse
     {
         $this->assertEmployeeVisible($request, $employee->id);
-        $date = $request->query('date', now()->toDateString());
+        $tz = $this->bizTz($request);
+        $date = $request->query('date', $this->bizToday($tz));
+        $day = $this->dayUtcBounds($date, $tz);
 
         $rows = EmployeeWebsiteUsageLog::where('employee_id', $employee->id)
-            ->whereDate('start_at', $date)
+            ->whereBetween('start_at', $day)
             ->selectRaw('COALESCE(domain, page_title) as site, category, SUM(duration_seconds) as seconds, MAX(compliance_status) as status')
             ->groupBy('site', 'category')
             ->orderByDesc('seconds')
@@ -175,20 +181,22 @@ class UsageController extends Controller
     public function companySummary(Request $request): JsonResponse
     {
         $companyId = $request->user()->company_id;
-        $date = $request->query('date', now()->toDateString());
+        $tz = $this->bizTz($request);
+        $date = $request->query('date', $this->bizToday($tz));
+        $day = $this->dayUtcBounds($date, $tz);
 
         $apps = EmployeeAppUsageLog::where('company_id', $companyId)
-            ->whereDate('start_at', $date)
+            ->whereBetween('start_at', $day)
             ->selectRaw('employee_id, SUM(duration_seconds) as secs, SUM(compliance_status = "VIOLATION") as viol')
             ->groupBy('employee_id')->get()->keyBy('employee_id');
 
         $sites = EmployeeWebsiteUsageLog::where('company_id', $companyId)
-            ->whereDate('start_at', $date)
+            ->whereBetween('start_at', $day)
             ->selectRaw('employee_id, SUM(duration_seconds) as secs')
             ->groupBy('employee_id')->get()->keyBy('employee_id');
 
         $compl = EmployeeComplianceEvent::where('company_id', $companyId)
-            ->whereDate('started_at', $date)
+            ->whereBetween('started_at', $day)
             ->selectRaw('employee_id, COUNT(*) as c')
             ->groupBy('employee_id')->get()->keyBy('employee_id');
 
@@ -223,17 +231,19 @@ class UsageController extends Controller
     public function timeUtilization(Request $request): JsonResponse
     {
         $companyId = $request->user()->company_id;
-        $date = $request->query('date', now()->toDateString());
+        $tz = $this->bizTz($request);
+        $date = $request->query('date', $this->bizToday($tz));
+        $day = $this->dayUtcBounds($date, $tz);
         $visible = $this->scopedEmployeeIds($request);
 
         $apps = EmployeeAppUsageLog::where('company_id', $companyId)
-            ->whereDate('start_at', $date)
+            ->whereBetween('start_at', $day)
             ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
             ->selectRaw('app_name, MIN(category) as category, SUM(duration_seconds) as secs')
             ->groupBy('app_name')->orderByDesc('secs')->limit(12)->get();
 
         $sites = EmployeeWebsiteUsageLog::where('company_id', $companyId)
-            ->whereDate('start_at', $date)
+            ->whereBetween('start_at', $day)
             ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
             ->selectRaw('COALESCE(domain, page_title) as site, MIN(category) as category, SUM(duration_seconds) as secs')
             ->groupBy('site')->orderByDesc('secs')->limit(12)->get();

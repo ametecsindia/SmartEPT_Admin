@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Support\ScopesVisibleEmployees;
+use App\Support\ResolvesBusinessDay;
 use App\Models\Employee;
 use App\Models\EmployeeActivityEvent;
 use App\Models\EmployeeAttendanceLog;
@@ -28,13 +29,18 @@ use Illuminate\Support\Facades\DB;
 class ProductivityController extends Controller
 {
     use ScopesVisibleEmployees;
+    use ResolvesBusinessDay;
     public function report(Request $request): JsonResponse
     {
         $companyId = $request->user()->company_id;
-        $from = Carbon::parse($request->query('from', now()->toDateString()))->startOfDay();
-        $to = Carbon::parse($request->query('to', now()->toDateString()))->endOfDay();
+        $tz = $this->bizTz($request);
+        $today = $this->bizToday($tz);
+        $fromDate = $request->query('from', $today);      // local Y-m-d, for DATE columns + range gate
+        $toDate = $request->query('to', $today);
+        $from = Carbon::parse($fromDate, $tz)->startOfDay()->utc();   // UTC bounds, for timestamp columns
+        $to = Carbon::parse($toDate, $tz)->endOfDay()->utc();
         $empId = $request->query('employee_id');
-        $today = now()->toDateString();
+        $todayDay = $this->dayUtcBounds($today, $tz);
 
         $visible = $this->scopedEmployeeIds($request);
         $employees = Employee::where('company_id', $companyId)
@@ -63,7 +69,7 @@ class ProductivityController extends Controller
 
         // 1) Completed days from the daily-summary aggregate (fast + accurate).
         $summaries = EmployeeDailySummary::where('company_id', $companyId)
-            ->whereBetween('work_date', [$from->toDateString(), $to->toDateString()])
+            ->whereBetween('work_date', [$fromDate, $toDate])
             ->where('work_date', '!=', $today)
             ->when($empId, fn ($q) => $q->where('employee_id', $empId))
             ->get();
@@ -84,20 +90,20 @@ class ProductivityController extends Controller
         }
 
         // 2) TODAY computed live (if in range).
-        if ($from->toDateString() <= $today && $to->toDateString() >= $today) {
+        if ($fromDate <= $today && $toDate >= $today) {
             $att = EmployeeAttendanceLog::where('company_id', $companyId)
                 ->whereDate('work_date', $today)
                 ->when($empId, fn ($q) => $q->where('employee_id', $empId))
                 ->get()->keyBy('employee_id');
 
             $act = EmployeeActivityEvent::where('company_id', $companyId)
-                ->whereDate('started_at', $today)
+                ->whereBetween('started_at', $todayDay)
                 ->when($empId, fn ($q) => $q->where('employee_id', $empId))
                 ->selectRaw("employee_id, COALESCE(SUM(CASE WHEN event_type='ACTIVE' THEN duration_seconds ELSE 0 END),0) act, COALESCE(SUM(CASE WHEN event_type='IDLE' THEN duration_seconds ELSE 0 END),0) idl")
                 ->groupBy('employee_id')->get()->keyBy('employee_id');
 
             $viol = EmployeeComplianceEvent::where('company_id', $companyId)
-                ->whereDate('started_at', $today)
+                ->whereBetween('started_at', $todayDay)
                 ->when($empId, fn ($q) => $q->where('employee_id', $empId))
                 ->selectRaw('employee_id, COUNT(*) c')->groupBy('employee_id')->get()->keyBy('employee_id');
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Support\ScopesVisibleEmployees;
+use App\Support\ResolvesBusinessDay;
 use App\Models\Employee;
 use App\Models\EmployeeScreenshotLog;
 use App\Models\ScreenshotAccessLog;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\Storage;
 class ScreenshotController extends Controller
 {
     use ScopesVisibleEmployees;
+    use ResolvesBusinessDay;
     use ResolvesAgentContext;
 
     /**
@@ -75,10 +77,12 @@ class ScreenshotController extends Controller
     public function timeline(Request $request, Employee $employee): JsonResponse
     {
         $this->assertEmployeeVisible($request, $employee->id);
-        $date = $request->query('date', now()->toDateString());
+        $tz = $this->bizTz($request);
+        $date = $request->query('date', $this->bizToday($tz));
+        $day = $this->dayUtcBounds($date, $tz);
 
         $logs = EmployeeScreenshotLog::where('employee_id', $employee->id)
-            ->whereDate('captured_at', $date)
+            ->whereBetween('captured_at', $day)
             ->latest('captured_at')
             ->limit(500)
             ->get()
@@ -105,12 +109,14 @@ class ScreenshotController extends Controller
      */
     public function companyDay(Request $request): JsonResponse
     {
-        $date = $request->query('date', now()->toDateString());
+        $tz = $this->bizTz($request);
+        $date = $request->query('date', $this->bizToday($tz));
+        $day = $this->dayUtcBounds($date, $tz);
         $visible = $this->visibleEmployeeIds($request->user());
 
         $logs = EmployeeScreenshotLog::query()
             ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
-            ->whereDate('captured_at', $date)
+            ->whereBetween('captured_at', $day)
             ->with('employee:id,first_name,last_name,employee_code')
             ->latest('captured_at')
             ->limit(600)
