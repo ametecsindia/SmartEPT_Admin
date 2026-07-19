@@ -32,6 +32,16 @@ class LicenseClient
     }
 
     /** Validate the stored key against Central and cache the entitlement bundle. */
+    /** EPT-27: total evidence storage this installation is using, in GB (reported to Central on each phone-home). */
+    private function currentStorageGb(): float
+    {
+        try {
+            return round((int) \App\Models\StorageFile::sum('size_bytes') / (1024 ** 3), 3);
+        } catch (\Throwable $e) {
+            return 0.0;
+        }
+    }
+
     public function validate(?InstallationLicense $license = null): InstallationLicense
     {
         $license ??= InstallationLicense::current();
@@ -44,6 +54,7 @@ class LicenseClient
             $resp = Http::timeout(10)->acceptJson()->post($this->baseUrl() . '/api/v1/license/validate', [
                 'key' => $license->license_key,
                 'fingerprint' => $this->fingerprint(),
+                'storage_gb' => $this->currentStorageGb(),
             ]);
         } catch (\Throwable $e) {
             $license->forceFill([
