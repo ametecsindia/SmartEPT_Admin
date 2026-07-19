@@ -145,7 +145,7 @@ class UsageController extends Controller
         $day = $this->dayUtcBounds($date, $tz);
 
         $rows = EmployeeAppUsageLog::where('employee_id', $employee->id)
-            ->whereBetween('start_at', $day)
+            ->whereDate('start_at', $date)   // EPT-20: agent stores LOCAL time; match the local calendar day
             ->selectRaw('app_name, category, SUM(duration_seconds) as seconds, MAX(compliance_status) as status')
             ->groupBy('app_name', 'category')
             ->orderByDesc('seconds')
@@ -163,7 +163,7 @@ class UsageController extends Controller
         $day = $this->dayUtcBounds($date, $tz);
 
         $rows = EmployeeWebsiteUsageLog::where('employee_id', $employee->id)
-            ->whereBetween('start_at', $day)
+            ->whereDate('start_at', $date)   // EPT-20: agent stores LOCAL time; match the local calendar day
             ->selectRaw('COALESCE(domain, page_title) as site, category, SUM(duration_seconds) as seconds, MAX(compliance_status) as status')
             ->groupBy('site', 'category')
             ->orderByDesc('seconds')
@@ -186,17 +186,17 @@ class UsageController extends Controller
         $day = $this->dayUtcBounds($date, $tz);
 
         $apps = EmployeeAppUsageLog::where('company_id', $companyId)
-            ->whereBetween('start_at', $day)
+            ->whereDate('start_at', $date)   // EPT-20: agent stores LOCAL time; match the local calendar day
             ->selectRaw('employee_id, SUM(duration_seconds) as secs, SUM(compliance_status = "VIOLATION") as viol')
             ->groupBy('employee_id')->get()->keyBy('employee_id');
 
         $sites = EmployeeWebsiteUsageLog::where('company_id', $companyId)
-            ->whereBetween('start_at', $day)
+            ->whereDate('start_at', $date)   // EPT-20: agent stores LOCAL time; match the local calendar day
             ->selectRaw('employee_id, SUM(duration_seconds) as secs')
             ->groupBy('employee_id')->get()->keyBy('employee_id');
 
         $compl = EmployeeComplianceEvent::where('company_id', $companyId)
-            ->whereBetween('started_at', $day)
+            ->whereDate('started_at', $date)   // EPT-20: agent stores LOCAL time; match the local calendar day
             ->selectRaw('employee_id, COUNT(*) as c')
             ->groupBy('employee_id')->get()->keyBy('employee_id');
 
@@ -237,13 +237,13 @@ class UsageController extends Controller
         $visible = $this->scopedEmployeeIds($request);
 
         $apps = EmployeeAppUsageLog::where('company_id', $companyId)
-            ->whereBetween('start_at', $day)
+            ->whereDate('start_at', $date)   // EPT-20: agent stores LOCAL time; match the local calendar day
             ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
             ->selectRaw('app_name, MIN(category) as category, SUM(duration_seconds) as secs')
             ->groupBy('app_name')->orderByDesc('secs')->limit(12)->get();
 
         $sites = EmployeeWebsiteUsageLog::where('company_id', $companyId)
-            ->whereBetween('start_at', $day)
+            ->whereDate('start_at', $date)   // EPT-20: agent stores LOCAL time; match the local calendar day
             ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
             ->selectRaw('COALESCE(domain, page_title) as site, MIN(category) as category, SUM(duration_seconds) as secs')
             ->groupBy('site')->orderByDesc('secs')->limit(12)->get();

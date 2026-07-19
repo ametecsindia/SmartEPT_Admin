@@ -37,8 +37,8 @@ class ProductivityController extends Controller
         $today = $this->bizToday($tz);
         $fromDate = $request->query('from', $today);      // local Y-m-d, for DATE columns + range gate
         $toDate = $request->query('to', $today);
-        $from = Carbon::parse($fromDate, $tz)->startOfDay()->utc();   // UTC bounds, for timestamp columns
-        $to = Carbon::parse($toDate, $tz)->endOfDay()->utc();
+        $from = Carbon::parse($fromDate, $tz)->startOfDay();   // EPT-20: agent stores LOCAL time — local bounds match stored values
+        $to = Carbon::parse($toDate, $tz)->endOfDay();
         $empId = $request->query('employee_id');
         $todayDay = $this->dayUtcBounds($today, $tz);
 
@@ -97,13 +97,13 @@ class ProductivityController extends Controller
                 ->get()->keyBy('employee_id');
 
             $act = EmployeeActivityEvent::where('company_id', $companyId)
-                ->whereBetween('started_at', $todayDay)
+                ->whereDate('started_at', $today)   // EPT-20: agent stores LOCAL time
                 ->when($empId, fn ($q) => $q->where('employee_id', $empId))
                 ->selectRaw("employee_id, COALESCE(SUM(CASE WHEN event_type='ACTIVE' THEN duration_seconds ELSE 0 END),0) act, COALESCE(SUM(CASE WHEN event_type='IDLE' THEN duration_seconds ELSE 0 END),0) idl")
                 ->groupBy('employee_id')->get()->keyBy('employee_id');
 
             $viol = EmployeeComplianceEvent::where('company_id', $companyId)
-                ->whereBetween('started_at', $todayDay)
+                ->whereDate('started_at', $today)   // EPT-20: agent stores LOCAL time
                 ->when($empId, fn ($q) => $q->where('employee_id', $empId))
                 ->selectRaw('employee_id, COUNT(*) c')->groupBy('employee_id')->get()->keyBy('employee_id');
 

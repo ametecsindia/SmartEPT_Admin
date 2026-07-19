@@ -32,15 +32,15 @@ class DashboardController extends Controller
         $devices = EmployeeDevice::query()->get();
 
         $activeSecs = EmployeeActivityEvent::query()
-            ->whereBetween('started_at', $day)->where('event_type', 'ACTIVE')
+            ->whereDate('started_at', $today)->where('event_type', 'ACTIVE')   // EPT-20: agent stores LOCAL time
             ->select('employee_id', DB::raw('SUM(duration_seconds) as s'))
             ->groupBy('employee_id')->pluck('s', 'employee_id');
         $idleSecs = EmployeeActivityEvent::query()
-            ->whereBetween('started_at', $day)->where('event_type', 'IDLE')
+            ->whereDate('started_at', $today)->where('event_type', 'IDLE')   // EPT-20: agent stores LOCAL time
             ->select('employee_id', DB::raw('SUM(duration_seconds) as s'))
             ->groupBy('employee_id')->pluck('s', 'employee_id');
 
-        $onBreak = EmployeeBreakLog::whereNull('end_at')->whereBetween('start_at', $day)
+        $onBreak = EmployeeBreakLog::whereNull('end_at')->whereDate('start_at', $today)
             ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
             ->distinct()->count('employee_id');
 
@@ -79,9 +79,9 @@ class DashboardController extends Controller
             'away_now'          => $byStatus('AWAY'),
             'offline'           => $byStatus('OFFLINE'),
             'on_break'          => $onBreak,
-            'camera_blocked'    => EmployeePresenceEvent::whereBetween('started_at', $day)->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))->where('event_type', 'CAMERA_BLOCKED')->distinct()->count('employee_id'),
-            'violations_today'  => EmployeeComplianceEvent::whereBetween('started_at', $day)->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))->count(),
-            'screenshots_today' => EmployeeScreenshotLog::whereBetween('captured_at', $day)->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))->count(),
+            'camera_blocked'    => EmployeePresenceEvent::whereDate('started_at', $today)->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))->where('event_type', 'CAMERA_BLOCKED')->distinct()->count('employee_id'),
+            'violations_today'  => EmployeeComplianceEvent::whereDate('started_at', $today)->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))->count(),
+            'screenshots_today' => EmployeeScreenshotLog::whereDate('captured_at', $today)->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))->count(),
         ];
 
         return response()->json(['cards' => $cards, 'employees' => $rows->values()]);
@@ -99,9 +99,9 @@ class DashboardController extends Controller
             'date'              => $date,
             'employees'         => Employee::where('employment_status', 'ACTIVE')->when($visible !== null, fn ($q) => $q->whereIn('id', $visible))->count(),
             'devices'           => EmployeeDevice::when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))->count(),
-            'violations'        => EmployeeComplianceEvent::whereBetween('started_at', $day)->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))->count(),
-            'screenshots'       => EmployeeScreenshotLog::whereBetween('captured_at', $day)->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))->count(),
-            'active_hours_total' => round(((int) EmployeeActivityEvent::whereBetween('started_at', $day)->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))->where('event_type', 'ACTIVE')->sum('duration_seconds')) / 3600, 1),
+            'violations'        => EmployeeComplianceEvent::whereDate('started_at', $date)->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))->count(),
+            'screenshots'       => EmployeeScreenshotLog::whereDate('captured_at', $date)->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))->count(),
+            'active_hours_total' => round(((int) EmployeeActivityEvent::whereDate('started_at', $date)->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))->where('event_type', 'ACTIVE')->sum('duration_seconds')) / 3600, 1),
         ]);
     }
 
