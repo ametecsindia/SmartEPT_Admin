@@ -43,6 +43,10 @@ class CompanyController extends Controller
             'attendance_mode'     => ['nullable', 'in:BIOMETRIC,AGENT_ONLY'],
             // Biometric Gate: auto = follow device setup, on/off = explicit override.
             'biometric_gate'      => ['nullable', 'in:auto,on,off'],
+            // Privacy: skip capturing raw-IP / local-IP websites (logs them as "Unknown source").
+            'exclude_ip_sites'    => ['nullable', 'boolean'],
+            // Company-wide default tracking mode (org levels below can still override).
+            'tracking_mode'       => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
         ]);
 
         $company = Company::create($data);
@@ -68,6 +72,10 @@ class CompanyController extends Controller
             'attendance_mode'     => ['nullable', 'in:BIOMETRIC,AGENT_ONLY'],
             // Biometric Gate: auto = follow device setup, on/off = explicit override.
             'biometric_gate'      => ['nullable', 'in:auto,on,off'],
+            // Privacy: skip capturing raw-IP / local-IP websites (logs them as "Unknown source").
+            'exclude_ip_sites'    => ['nullable', 'boolean'],
+            // Company-wide default tracking mode (org levels below can still override).
+            'tracking_mode'       => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
         ]);
 
         $company->update($data);

@@ -584,6 +584,12 @@
         <h3>Company time zone <span class="hint">local day boundary for dashboards &amp; reports · individual branches can override below</span></h3>
         <div class="row"><select id="co-tz" style="max-width:280px"></select><button class="btn solid" id="co-tz-save">Save</button><span class="mut" id="co-tz-msg"></span></div>
       </div>
+      <div class="card" id="co-ipx-card">
+        <h3>Privacy — raw-IP &amp; local websites <span class="hint">for pages opened by a bare IP address (routers, NAS, internal tools, localhost)</span></h3>
+        <div class="fbool"><input type="checkbox" id="co-ipx"> <b>Don't capture raw-IP / local-IP websites</b> <span class="mut" style="font-size:11.5px">— the working-hours time still counts, but it's logged as “Unknown source” with no address, page title or screenshot</span></div>
+        <div class="row" style="margin-top:10px"><button class="btn solid" id="co-ipx-save">Save</button><span class="mut" id="co-ipx-msg"></span></div>
+        <div class="mut" style="font-size:11px;margin-top:6px">Best-effort from the browser window title until the URL-reporting browser extension ships. Set individual people or teams to “Do Not Track” under the tabs below or on the employee record.</div>
+      </div>
       <div class="tabs" id="org-tabs">
         <div class="tab active" data-org="branches">Branches</div>
         <div class="tab" data-org="departments">Departments</div>
@@ -1336,6 +1342,13 @@
         <div><label>Shift</label><select id="f-shift"></select></div>
         <div><label>Date of joining</label><input id="f-doj" type="date"></div>
         <div class="full"><label>Biometric ID (optional)</label><input id="f-bio" placeholder="ID on the punch device"></div>
+        <div class="full"><label>Tracking mode <span style="font-weight:400;color:var(--ink-3)">— what the agent captures on this person's PCs</span></label>
+          <select id="f-track">
+            <option value="">Inherit (from team / department / company)</option>
+            <option value="FULL">Full — capture everything</option>
+            <option value="PRESENCE_ONLY">Presence &amp; breaks only — no screenshots, no activity</option>
+            <option value="EXCLUDED">Do Not Track — capture nothing at all</option>
+          </select></div>
       </div>
       <div class="err" id="emp-m-err"></div>
     </div>
@@ -2320,6 +2333,12 @@ $('#viol-rows').addEventListener('click', async (e) => {
 
 // ---- 5. employees ----
 let EMP_EDIT_ID = null, EMP_DEV_COUNTS = null, EMP_SEARCH_TIMER = null;
+// Small badge shown when an employee is not on Full tracking (own override or inherited).
+function trackBadge(m) {
+  if (m === 'EXCLUDED') return ' <span class="tag t-off" title="Do Not Track — the agent captures nothing on this person\'s PCs">Not tracked</span>';
+  if (m === 'PRESENCE_ONLY') return ' <span class="tag t-warn" title="Presence &amp; breaks only — no screenshots or activity">Presence only</span>';
+  return '';
+}
 async function loadEmployees() {
   const q = $('#emp-q').value.trim();
   try {
@@ -2338,7 +2357,7 @@ async function loadEmployees() {
       const st = { ACTIVE: 't-ok', ON_LEAVE: 't-warn', RELIEVED: 't-off' }[e.employment_status] || 't-off';
       return '<tr class="clk" data-id="' + e.id + '" data-name="' + esc(fullName(e)) + '">'
         + '<td>' + esc(e.employee_code) + '</td>'
-        + '<td><span class="nm">' + esc(fullName(e)) + '</span></td>'
+        + '<td><span class="nm">' + esc(fullName(e)) + '</span>' + trackBadge(e.tracking_mode) + '</td>'
         + '<td>' + esc(e.email || '—') + '</td>'
         + '<td>' + esc(e.department?.name || '—') + '</td><td>' + esc(e.team?.name || '—') + '</td>'
         + '<td>' + esc(e.shift?.name || '—') + '</td>'
@@ -2406,11 +2425,12 @@ async function openEmpModal(id) {
       set('#f-desig', e.designation_id); set('#f-shift', e.shift_id);
       set('#f-doj', e.date_of_joining ? String(e.date_of_joining).slice(0, 10) : '');
       set('#f-bio', e.biometric_id);
+      set('#f-track', e.tracking_mode || '');
     } catch (err) { $('#emp-m-err').textContent = err.message; }
   } else {
     ['#f-first', '#f-last', '#f-code', '#f-email', '#f-mobile', '#f-doj', '#f-bio'].forEach((s) => set(s, ''));
     set('#f-status', 'ACTIVE');
-    ['#f-branch', '#f-dept', '#f-team', '#f-desig', '#f-shift'].forEach((s) => set(s, ''));
+    ['#f-branch', '#f-dept', '#f-team', '#f-desig', '#f-shift', '#f-track'].forEach((s) => set(s, ''));
   }
   $('#emp-ovl').classList.add('open');
 }
@@ -2545,11 +2565,11 @@ const TZ_LIST = ['UTC',
   'Australia/Perth','Australia/Sydney','Pacific/Auckland'];
 const ORG_DEFS = {
   branches:     { label: 'Branch',      cols: ['name','code','city','state','timezone'],
-                  fields: [['name','Name','text',1],['code','Code','text'],['city','City','text'],['state','State','text'],['timezone','Time zone (overrides company default)','tz']] },
+                  fields: [['name','Name','text',1],['code','Code','text'],['city','City','text'],['state','State','text'],['timezone','Time zone (overrides company default)','tz'],['tracking_mode','Tracking mode for this branch','trackmode']] },
   departments:  { label: 'Department',  cols: ['name','code','branch'],
-                  fields: [['name','Name','text',1],['code','Code','text'],['branch_id','Branch','select:branches']] },
+                  fields: [['name','Name','text',1],['code','Code','text'],['branch_id','Branch','select:branches'],['tracking_mode','Tracking mode for this department','trackmode']] },
   teams:        { label: 'Team',        cols: ['name','code','department'],
-                  fields: [['name','Name','text',1],['code','Code','text'],['department_id','Department','select:departments']] },
+                  fields: [['name','Name','text',1],['code','Code','text'],['department_id','Department','select:departments'],['tracking_mode','Tracking mode for this team','trackmode']] },
   designations: { label: 'Designation', cols: ['name','code','level'],
                   fields: [['name','Name','text',1],['code','Code','text'],['level','Level (0=junior)','num']] },
   shifts:       { label: 'Shift',       cols: ['name','code','timing'],
@@ -2588,6 +2608,23 @@ async function initOrg() {
           toast('Company time zone saved');
           $('#co-tz-msg').textContent = '✓ Saved — dashboards now use ' + sel.value + '.';
         } catch (e) { $('#co-tz-msg').textContent = '✕ ' + e.message; }
+      };
+    }
+  }
+  if (!window.COIPX_INIT) {
+    window.COIPX_INIT = true;
+    const box = $('#co-ipx');
+    if (box) {
+      (async () => {
+        try { const c = (await api('/companies/' + ME.company_id)).data; box.checked = c ? c.exclude_ip_sites !== false : true; }
+        catch (e) { const card = $('#co-ipx-card'); if (card) card.style.display = 'none'; }
+      })();
+      $('#co-ipx-save').onclick = async () => {
+        try {
+          await api('/companies/' + ME.company_id, { method: 'PUT', body: JSON.stringify({ exclude_ip_sites: box.checked }) });
+          toast('Saved');
+          $('#co-ipx-msg').textContent = '✓ Saved — applies after each PC’s agent next syncs its policy.';
+        } catch (e) { $('#co-ipx-msg').textContent = '✕ ' + e.message; }
       };
     }
   }
@@ -2632,6 +2669,12 @@ function orgField(f, val) {
   if (type === 'tz') {
     return '<label>' + label + star + '</label><select data-k="' + k + '"><option value="">— company default —</option>'
       + TZ_LIST.map((z) => '<option value="' + z + '"' + (val === z ? ' selected' : '') + '>' + z + '</option>').join('') + '</select>';
+  }
+  if (type === 'trackmode') {
+    const opts = [['', 'Inherit (from parent / company)'], ['FULL', 'Full — capture everything'],
+      ['PRESENCE_ONLY', 'Presence & breaks only — no screenshots or activity'], ['EXCLUDED', 'Do Not Track — capture nothing']];
+    return '<label>' + label + star + '</label><select data-k="' + k + '">'
+      + opts.map((o) => '<option value="' + o[0] + '"' + ((val || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>';
   }
   const t = type === 'num' ? 'number' : type === 'time' ? 'time' : 'text';
   return '<label>' + label + star + '</label><input data-k="' + k + '" type="' + t + '" value="' + esc(val == null ? '' : val) + '">';
@@ -2815,6 +2858,7 @@ $('#emp-m-save').onclick = async () => {
     shift_id: numOrNull('#f-shift'),
     date_of_joining: $('#f-doj').value || null,
     biometric_id: $('#f-bio').value.trim() || null,
+    tracking_mode: $('#f-track').value || null,
   };
   try {
     if (EMP_EDIT_ID) {
