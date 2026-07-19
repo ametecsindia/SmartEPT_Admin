@@ -502,6 +502,15 @@
           <div class="card" id="pol-form-card">
             <h3 id="pol-form-title">Create policy</h3>
             <div id="pol-form" class="fgrid"></div>
+            <div class="fgrid" style="margin-top:10px;border-top:1px solid var(--line);padding-top:12px">
+              <div><label>Apply to (optional)</label><select id="pol-scope-type">
+                <option value="">— Save only (assign below) —</option>
+                <option value="COMPANY">Company</option><option value="BRANCH">Branch</option>
+                <option value="DEPARTMENT">Department</option><option value="TEAM">Team</option>
+                <option value="EMPLOYEE">Employee</option><option value="DEVICE">Device</option>
+              </select></div>
+              <div><label>Target</label><div style="display:flex;gap:8px"><select id="pol-scope-target" style="flex:1"></select><button class="btn" id="pol-scope-add" type="button" style="display:none">+ New</button></div></div>
+            </div>
             <div class="row" style="margin-top:14px;justify-content:flex-end">
               <button class="btn" id="pol-cancel">Reset</button>
               <button class="btn solid" id="pol-save">Save policy</button>
@@ -517,7 +526,7 @@
                 <option value="DEPARTMENT">Department</option><option value="TEAM">Team</option>
                 <option value="EMPLOYEE">Employee</option><option value="DEVICE">Device</option>
               </select></div>
-              <div class="full"><label>Target</label><select id="as-target"></select></div>
+              <div class="full"><label>Target</label><div style="display:flex;gap:8px"><select id="as-target" style="flex:1"></select><button class="btn" id="as-target-add" type="button" style="display:none">+ New</button></div></div>
               <div><label>Effective from (optional)</label><input type="date" id="as-from"></div>
               <div><label>Effective to (optional)</label><input type="date" id="as-to"></div>
             </div>
@@ -2342,8 +2351,19 @@ $('#pol-save').onclick = async () => {
   try { body = collectPolicyForm(type); } catch (e) { $('#pol-err').textContent = e.message; return; }
   if (!body.name) { $('#pol-err').textContent = 'Policy name is required.'; return; }
   try {
+    let created = null;
     if (POL_EDIT_ID) await api('/policies/' + type + '/' + POL_EDIT_ID, { method: 'PUT', body: JSON.stringify(body) });
-    else await api('/policies/' + type, { method: 'POST', body: JSON.stringify(body) });
+    else { const r = await api('/policies/' + type, { method: 'POST', body: JSON.stringify(body) }); created = r.data; }
+    const stype = $('#pol-scope-type') ? $('#pol-scope-type').value : '';
+    const stgt = $('#pol-scope-target') ? $('#pol-scope-target').value : '';
+    if (!POL_EDIT_ID && created && stype && stgt) {
+      try {
+        await api('/policies/assign', { method: 'POST', body: JSON.stringify({
+          policy_type: type.toUpperCase(), policy_id: created.id, assignable_type: stype, assignable_id: Number(stgt),
+        }) });
+        toast('Policy created and applied to ' + stype.toLowerCase());
+      } catch (e) { $('#pol-err').textContent = 'Policy saved, but applying it failed: ' + e.message; }
+    }
     loadPolicies();
   } catch (e) { $('#pol-err').textContent = e.message; }
 };
@@ -2371,28 +2391,56 @@ function refreshAssignPolicyOptions() {
 async function initAssignPanel() {
   await refreshAssignTargets();
 }
-async function refreshAssignTargets() {
-  const kind = $('#as-type').value;
-  const sel = $('#as-target');
+async function populateTargets(kind, sel) {
   try {
     if (kind === 'COMPANY') {
       fillSelect(sel, [{ id: ME.company_id, name: ME.company || 'This company' }], (r) => r.name, (r) => r.id);
     } else if (kind === 'BRANCH' || kind === 'DEPARTMENT' || kind === 'TEAM') {
       const org = await orgLists();
       const rows = { BRANCH: org.branches, DEPARTMENT: org.departments, TEAM: org.teams }[kind] || [];
-      fillSelect(sel, rows, (r) => r.name, (r) => r.id, rows.length ? null : 'None defined yet');
+      fillSelect(sel, rows, (r) => r.name, (r) => r.id, rows.length ? null : 'None yet — click + New');
     } else if (kind === 'EMPLOYEE') {
       const emps = await employeesList();
       fillSelect(sel, emps, (e) => fullName(e) + ' (' + (e.employee_code || '#' + e.id) + ')', (e) => e.id, emps.length ? null : 'No employees yet');
     } else if (kind === 'DEVICE') {
       const devs = await devicesList();
       fillSelect(sel, devs, (d) => (d.computer_name || d.device_uuid) + ' — ' + (fullName(d.employee) || 'unassigned'), (d) => d.id, devs.length ? null : 'No devices yet');
+    } else {
+      fillSelect(sel, [], (x) => x, (x) => x);
     }
   } catch (e) {
     fillSelect(sel, [], (x) => x, (x) => x, isDenied(e) ? 'Your role cannot list these' : e.message);
   }
 }
+// Create a branch/department/team inline so empty levels are instantly usable.
+async function quickAddOrg(kind) {
+  const map = { BRANCH: 'branches', DEPARTMENT: 'departments', TEAM: 'teams' };
+  const ty = map[kind]; if (!ty) return null;
+  const name = prompt('Name of the new ' + kind.toLowerCase() + ':'); if (!name || !name.trim()) return null;
+  try { await api('/org/' + ty, { method: 'POST', body: JSON.stringify({ name: name.trim() }) }); }
+  catch (e) { alert(e.message); return null; }
+  await orgLists(true);
+  return name.trim();
+}
+async function refreshAssignTargets() {
+  const kind = $('#as-type').value;
+  await populateTargets(kind, $('#as-target'));
+  if ($('#as-target-add')) $('#as-target-add').style.display = ['BRANCH', 'DEPARTMENT', 'TEAM'].includes(kind) ? '' : 'none';
+}
 $('#as-type').addEventListener('change', refreshAssignTargets);
+if ($('#as-target-add')) $('#as-target-add').onclick = async () => {
+  const name = await quickAddOrg($('#as-type').value); if (!name) return;
+  await refreshAssignTargets(); toast('Created "' + name + '"');
+};
+if ($('#pol-scope-type')) $('#pol-scope-type').addEventListener('change', async () => {
+  const k = $('#pol-scope-type').value;
+  await populateTargets(k, $('#pol-scope-target'));
+  if ($('#pol-scope-add')) $('#pol-scope-add').style.display = ['BRANCH', 'DEPARTMENT', 'TEAM'].includes(k) ? '' : 'none';
+});
+if ($('#pol-scope-add')) $('#pol-scope-add').onclick = async () => {
+  const name = await quickAddOrg($('#pol-scope-type').value); if (!name) return;
+  await populateTargets($('#pol-scope-type').value, $('#pol-scope-target')); toast('Created "' + name + '"');
+};
 $('#as-save').onclick = async () => {
   const policyId = $('#as-policy').value, targetId = $('#as-target').value;
   if (!policyId || !targetId) { $('#as-log').textContent = 'Pick a policy and a target first.'; return; }
