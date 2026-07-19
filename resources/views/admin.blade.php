@@ -349,7 +349,7 @@
     <!-- 2. SCREENSHOTS -->
     <div class="view" id="v-screenshots">
       <div class="filters">
-        <label>Employee</label><select id="ss-emp"></select>
+        <label>Employee</label><input id="ss-emp-q" placeholder="Search name / code" autocomplete="off" style="min-width:0;width:160px"><select id="ss-emp" style="min-width:220px"></select>
         <label>Date</label><input type="date" id="ss-date" style="min-width:0">
         <button class="btn acc" id="ss-load">Load</button>
         <span class="tag t-info" style="margin-left:auto">EVERY VIEW IS AUDIT-LOGGED</span>
@@ -364,7 +364,7 @@
     <!-- 3. USAGE & COMPLIANCE -->
     <div class="view" id="v-usage">
       <div class="filters">
-        <label>Employee</label><select id="us-emp"></select>
+        <label>Employee</label><input id="us-emp-q" placeholder="Search name / code" autocomplete="off" style="min-width:0;width:160px"><select id="us-emp"></select>
         <label>Date</label><input type="date" id="us-date" style="min-width:0">
         <button class="btn acc" id="us-load">Load</button>
         <button class="btn" id="us-open-drawer">Open full profile</button>
@@ -393,7 +393,7 @@
     <!-- 4. VIOLATIONS -->
     <div class="view" id="v-violations">
       <div class="filters">
-        <label>Employee</label><select id="viol-emp" style="min-width:200px"><option value="">All employees</option></select>
+        <label>Employee</label><input id="viol-emp-q" placeholder="Search name / code" autocomplete="off" style="min-width:0;width:160px"><select id="viol-emp" style="min-width:200px"><option value="">All employees</option></select>
         <label>Date</label><input type="date" id="viol-date" style="min-width:0">
         <button class="btn acc" id="viol-load">Load</button>
         <button class="btn" id="viol-clear">Clear</button>
@@ -460,7 +460,7 @@
 
     <!-- 6. DEVICES -->
     <div class="view" id="v-devices">
-      <div class="card"><h3>Registered devices &amp; agent health</h3>
+      <div class="card"><h3>Registered devices &amp; agent health <input id="dev-q" placeholder="Search device / employee / OS" autocomplete="off" style="width:230px;font-weight:400;font-size:12px;margin-left:10px"></h3>
         <table><thead><tr><th>Device</th><th>Employee</th><th>OS</th><th>Agent ver</th><th>Agent health</th><th>Compliance</th><th>Status</th><th>Sync queue</th><th>Last heartbeat</th><th></th></tr></thead>
         <tbody id="dev-rows"></tbody></table>
       </div>
@@ -610,6 +610,7 @@
           <button class="btn" id="pr-week">This week</button>
           <button class="btn" id="pr-month">This month</button>
           <button class="btn acc" id="pr-load">Show</button>
+          <input id="pr-q" placeholder="Search employee" autocomplete="off" style="min-width:0;width:160px">
           <span style="flex:1"></span>
           <button class="btn" id="pr-csv">⇓ CSV</button>
           <button class="btn solid" id="pr-pdf">⇓ PDF</button>
@@ -1257,6 +1258,28 @@ function fillEmpPicker(sel, emps) {
   fillSelect(sel, emps, (e) => fullName(e) + ' (' + (e.employee_code || '#' + e.id) + ')', (e) => e.id, emps.length ? null : 'No employees yet');
   if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
 }
+// Wire a text box to type-to-filter an employee <select> (client-side over the cached list).
+function attachEmpSearch(input, sel, emps, allLabel) {
+  if (!input) return;
+  input.oninput = () => {
+    const q = input.value.trim().toLowerCase();
+    const list = q ? emps.filter((e) => (fullName(e) + ' ' + (e.employee_code || '')).toLowerCase().includes(q)) : emps;
+    if (allLabel != null) fillSelect(sel, list, (e) => fullName(e) + ' (' + (e.employee_code || '#' + e.id) + ')', (e) => e.id, allLabel);
+    else fillEmpPicker(sel, list);
+  };
+}
+// Filter visible table rows by free text (reusable across list screens).
+function attachTableFilter(input, tbodySel) {
+  if (!input) return;
+  const apply = () => {
+    const q = input.value.trim().toLowerCase();
+    document.querySelectorAll(tbodySel + ' tr').forEach((tr) => {
+      tr.style.display = (!q || tr.textContent.toLowerCase().includes(q)) ? '' : 'none';
+    });
+  };
+  input.oninput = apply;
+  apply();
+}
 
 // ---- 1. dashboard ----
 async function loadDashboard() {
@@ -1308,6 +1331,7 @@ async function initScreenshots() {
   try {
     const emps = await employeesList();
     fillEmpPicker($('#ss-emp'), emps);
+    attachEmpSearch($('#ss-emp-q'), $('#ss-emp'), emps);
     if ($('#ss-emp').value) loadScreenshots();
   } catch (e) {
     if (isDenied(e)) { $('#ss-grid').innerHTML = ''; showSsEmpty('Your role cannot view the employee list, so screenshots cannot be browsed.'); }
@@ -1401,6 +1425,7 @@ async function initUsage() {
     const emps = await employeesList();
     // Default view = ALL employees (17-Jul). "— All employees —" is the first option.
     fillSelect($('#us-emp'), emps, (e) => fullName(e) + ' (' + (e.employee_code || '#' + e.id) + ')', (e) => e.id, '— All employees —');
+    attachEmpSearch($('#us-emp-q'), $('#us-emp'), emps, '— All employees —');
     $('#us-emp').value = '';
     loadUsage();
   } catch (e) {
@@ -1478,6 +1503,7 @@ async function initViolations() {
       const sel = $('#viol-emp');
       sel.innerHTML = '<option value="">All employees</option>'
         + emps.map((e) => '<option value="' + e.id + '">' + esc(fullName(e) + ' (' + (e.employee_code || '#' + e.id) + ')') + '</option>').join('');
+      attachEmpSearch($('#viol-emp-q'), sel, emps, 'All employees');
     }).catch(() => {});
     $('#viol-load').onclick = loadViolations;
     $('#viol-emp').onchange = loadViolations;
@@ -2027,6 +2053,7 @@ async function loadDevices() {
             ? '<button class="btn" data-devact="rebind">Approve re-bind</button>'
             : '<button class="btn danger" data-devact="unbind">Unbind</button>') + '</td></tr>';
     }).join('') || '<tr><td colspan="10" class="mut">No devices registered. Devices appear when the SmartEPT desktop agent registers on an employee\'s PC.</td></tr>';
+    attachTableFilter($('#dev-q'), '#dev-rows');
   } catch (e) {
     $('#dev-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="10" class="mut">' + esc(e.message) + '</td></tr>';
   }
@@ -2580,6 +2607,7 @@ async function loadProductivity() {
       '<td data-sort="' + x.productivity + '"><b>' + Number(x.productivity).toFixed(0) + '%</b></td></tr>'
     ).join('') : '<tr><td colspan="15" class="mut">No activity in this range.</td></tr>';
     $('#pr-note').textContent = PROD_ROWS.length + ' rows · ' + from + ' → ' + to + ' · working = active tracked time; present = in-office span.';
+    attachTableFilter($('#pr-q'), '#pr-rows');
   } catch (e) { $('#pr-rows').innerHTML = '<tr><td colspan="15" class="mut">' + esc(e.message) + '</td></tr>'; }
 }
 // R4 item 6: extracted reports use hh:mm, not raw seconds/minutes.
