@@ -81,6 +81,7 @@ class OrgController extends Controller
             'branches' => $base + [
                 'city' => ['nullable', 'string'], 'state' => ['nullable', 'string'],
                 'country' => ['nullable', 'string'], 'public_ip_whitelist' => ['nullable', 'array'],
+                'timezone' => ['nullable', 'timezone'],   // EPT-20: per-branch override of company timezone
             ],
             'departments' => $base + ['branch_id' => ['nullable', 'integer', Rule::exists('branches', 'id')->where(fn ($q) => $q->where('company_id', $companyId))]],
             'teams' => $base + [

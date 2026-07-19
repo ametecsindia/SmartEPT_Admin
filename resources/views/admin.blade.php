@@ -484,6 +484,10 @@
         <div class="fbool"><input type="radio" name="attmode" id="attmode-agent" value="AGENT_ONLY"> <b>Without biometric device</b> <span class="mut" style="font-size:11.5px">— attendance comes purely from agent login/logout; the Biometric screen is hidden</span></div>
         <div class="row" style="margin-top:10px"><button class="btn solid" id="attmode-save">Save</button><span class="mut" id="attmode-msg"></span></div>
       </div>
+      <div class="card" id="co-tz-card">
+        <h3>Company time zone <span class="hint">local day boundary for dashboards &amp; reports · individual branches can override below</span></h3>
+        <div class="row"><select id="co-tz" style="max-width:280px"></select><button class="btn solid" id="co-tz-save">Save</button><span class="mut" id="co-tz-msg"></span></div>
+      </div>
       <div class="tabs" id="org-tabs">
         <div class="tab active" data-org="branches">Branches</div>
         <div class="tab" data-org="departments">Departments</div>
@@ -1972,9 +1976,15 @@ function renderApiDocs() {
 }
 
 // ---- organisation management (17-Jul) ----// ---- organisation management (17-Jul) ----
+const TZ_LIST = ['UTC',
+  'America/Los_Angeles','America/Denver','America/Chicago','America/New_York','America/Toronto','America/Mexico_City','America/Bogota','America/Sao_Paulo','America/Argentina/Buenos_Aires',
+  'Europe/London','Europe/Dublin','Europe/Lisbon','Europe/Paris','Europe/Madrid','Europe/Berlin','Europe/Rome','Europe/Amsterdam','Europe/Zurich','Europe/Athens','Europe/Istanbul','Europe/Moscow',
+  'Africa/Casablanca','Africa/Lagos','Africa/Cairo','Africa/Nairobi','Africa/Johannesburg',
+  'Asia/Jerusalem','Asia/Riyadh','Asia/Dubai','Asia/Karachi','Asia/Kolkata','Asia/Colombo','Asia/Kathmandu','Asia/Dhaka','Asia/Bangkok','Asia/Jakarta','Asia/Singapore','Asia/Kuala_Lumpur','Asia/Hong_Kong','Asia/Shanghai','Asia/Taipei','Asia/Manila','Asia/Tokyo','Asia/Seoul',
+  'Australia/Perth','Australia/Sydney','Pacific/Auckland'];
 const ORG_DEFS = {
-  branches:     { label: 'Branch',      cols: ['name','code','city','state'],
-                  fields: [['name','Name','text',1],['code','Code','text'],['city','City','text'],['state','State','text']] },
+  branches:     { label: 'Branch',      cols: ['name','code','city','state','timezone'],
+                  fields: [['name','Name','text',1],['code','Code','text'],['city','City','text'],['state','State','text'],['timezone','Time zone (overrides company default)','tz']] },
   departments:  { label: 'Department',  cols: ['name','code','branch'],
                   fields: [['name','Name','text',1],['code','Code','text'],['branch_id','Branch','select:branches']] },
   teams:        { label: 'Team',        cols: ['name','code','department'],
@@ -2001,6 +2011,24 @@ async function initOrg() {
         $('#attmode-msg').textContent = '✓ Saved.';
       } catch (e) { $('#attmode-msg').textContent = '✕ ' + e.message; }
     };
+  }
+  if (!window.COTZ_INIT) {
+    window.COTZ_INIT = true;
+    const sel = $('#co-tz');
+    if (sel) {
+      sel.innerHTML = TZ_LIST.map((z) => '<option value="' + z + '">' + z + '</option>').join('');
+      (async () => {
+        try { const c = (await api('/companies/' + ME.company_id)).data; if (c && c.timezone) sel.value = c.timezone; }
+        catch (e) { const card = $('#co-tz-card'); if (card) card.style.display = 'none'; }
+      })();
+      $('#co-tz-save').onclick = async () => {
+        try {
+          await api('/companies/' + ME.company_id, { method: 'PUT', body: JSON.stringify({ timezone: sel.value }) });
+          toast('Company time zone saved');
+          $('#co-tz-msg').textContent = '✓ Saved — dashboards now use ' + sel.value + '.';
+        } catch (e) { $('#co-tz-msg').textContent = '✕ ' + e.message; }
+      };
+    }
   }
   renderOrg();
 }
@@ -2039,6 +2067,10 @@ function orgField(f, val) {
     const list = (ORG_CACHE && ORG_CACHE[type.slice(7)]) || [];
     return '<label>' + label + star + '</label><select data-k="' + k + '"><option value="">— none —</option>'
       + list.map((r) => '<option value="' + r.id + '"' + (val == r.id ? ' selected' : '') + '>' + esc(r.name) + '</option>').join('') + '</select>';
+  }
+  if (type === 'tz') {
+    return '<label>' + label + star + '</label><select data-k="' + k + '"><option value="">— company default —</option>'
+      + TZ_LIST.map((z) => '<option value="' + z + '"' + (val === z ? ' selected' : '') + '>' + z + '</option>').join('') + '</select>';
   }
   const t = type === 'num' ? 'number' : type === 'time' ? 'time' : 'text';
   return '<label>' + label + star + '</label><input data-k="' + k + '" type="' + t + '" value="' + esc(val == null ? '' : val) + '">';
