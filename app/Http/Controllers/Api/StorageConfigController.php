@@ -32,6 +32,7 @@ class StorageConfigController extends Controller
             'has_key'       => (bool) Setting::get('gcs_key_json'),
             'sdk_installed' => $this->sdkInstalled(),
             'active_disk'   => app(StorageService::class)->disk(),
+            'local_path'    => Setting::get('storage_local_path') ?: '',
         ]);
     }
 
@@ -68,6 +69,49 @@ class StorageConfigController extends Controller
         Setting::put('gcs_enabled', $data['enabled'] ? '1' : '0');
 
         return response()->json(['ok' => true, 'active_disk' => app(StorageService::class)->disk()]);
+    }
+
+    /** PUT /api/ops/storage-local — set the on-premise / LAN / NAS storage folder. */
+    public function saveLocal(Request $request): JsonResponse
+    {
+        $data = $request->validate(['local_path' => ['nullable', 'string', 'max:500']]);
+        $path = trim($data['local_path'] ?? '');
+        if ($path !== '' && ($err = $this->checkWritable($path))) {
+            return response()->json(['message' => $err], 422);
+        }
+        Setting::put('storage_local_path', $path);
+
+        return response()->json(['ok' => true]);
+    }
+
+    /** POST /api/ops/storage-local/test — verify the folder exists and is writable. */
+    public function testLocal(Request $request): JsonResponse
+    {
+        $path = trim((string) $request->input('local_path'));
+        if ($path === '') {
+            return response()->json(['ok' => false, 'message' => 'Enter a folder path first (or leave blank to use the default app storage).']);
+        }
+        $err = $this->checkWritable($path);
+
+        return $err
+            ? response()->json(['ok' => false, 'message' => $err])
+            : response()->json(['ok' => true, 'message' => 'Folder is reachable and writable — new evidence will be stored here when cloud is off.']);
+    }
+
+    /** Create the folder if needed and confirm the server can write to it. */
+    private function checkWritable(string $path): ?string
+    {
+        $path = rtrim($path, '/\\');
+        if (! is_dir($path) && ! @mkdir($path, 0775, true) && ! is_dir($path)) {
+            return 'That folder does not exist and could not be created. Check the path (and that a network share is reachable).';
+        }
+        $probe = $path . DIRECTORY_SEPARATOR . '.smartept_write_test';
+        if (@file_put_contents($probe, 'ok') === false) {
+            return 'The folder exists but the server cannot write to it. Grant the Windows service account write access (or share write permission for a network path).';
+        }
+        @unlink($probe);
+
+        return null;
     }
 
     /** POST /api/ops/storage-config/test — verify the bucket is reachable. */

@@ -91,6 +91,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('ops/storage-config', [StorageConfigController::class, 'show']);
         Route::put('ops/storage-config', [StorageConfigController::class, 'save']);
         Route::post('ops/storage-config/test', [StorageConfigController::class, 'test']);
+        Route::put('ops/storage-local', [StorageConfigController::class, 'saveLocal']);
+        Route::post('ops/storage-local/test', [StorageConfigController::class, 'testLocal']);
         Route::get('ops/backups', [OpsController::class, 'backups']);
         Route::post('ops/backup', [OpsController::class, 'runBackup']);
         Route::post('ops/storage-cleanup', [OpsController::class, 'storageCleanup']); // 17-Jul bulk evidence/log cleanup

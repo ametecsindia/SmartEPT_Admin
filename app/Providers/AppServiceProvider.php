@@ -20,6 +20,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerGcsDisk();
+        $this->registerEvidenceDisk();
     }
 
     /**
@@ -28,6 +29,32 @@ class AppServiceProvider extends ServiceProvider
      * console (no gcsfuse). Every step is guarded so a missing package, un-migrated
      * DB, or bad key can NEVER stop the app from booting — it just falls back to local.
      */
+    /**
+     * The 'evidence' disk holds screenshots/webcam when NOT using cloud. Root
+     * defaults to storage/app; the admin can point it at a folder on the same
+     * server or a LAN/NAS share (Settings -> storage_local_path). Guarded so a
+     * bad path never breaks boot.
+     */
+    private function registerEvidenceDisk(): void
+    {
+        $root = storage_path('app');
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('settings')) {
+                $p = \App\Models\Setting::get('storage_local_path');
+                if ($p && trim($p) !== '') {
+                    $root = rtrim(trim($p), '/\\');
+                }
+            }
+        } catch (\Throwable $e) {
+            // keep the default root
+        }
+        config(['filesystems.disks.evidence' => [
+            'driver' => 'local',
+            'root'   => $root,
+            'throw'  => false,
+        ]]);
+    }
+
     private function registerGcsDisk(): void
     {
         try {

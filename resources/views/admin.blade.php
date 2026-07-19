@@ -919,6 +919,18 @@
         <div id="rt-out" style="margin-top:10px;font-size:11.5px;max-height:180px;overflow:auto"></div>
       </div>
       <div class="card">
+        <h3>Local / On-premise storage <span class="hint">keep screenshots &amp; evidence on this server, a LAN share or NAS — client data stays with the client</span></h3>
+        <div id="loc-status" class="mut" style="margin-bottom:10px"></div>
+        <label>Storage folder</label>
+        <input id="loc-path" autocomplete="off" placeholder="D:\\SmartEPT\\evidence   or   \\\\NAS\\smartept   (blank = default app storage)">
+        <div class="mut" style="font-size:11.5px;margin-top:6px">Same server: an absolute folder (e.g. <code>D:\\SmartEPT\\evidence</code>). Local network: a UNC share the server can reach (e.g. <code>\\\\NAS\\smartept</code>) — the Windows service account needs write access. Blank = the app default storage. Used automatically whenever Cloud Storage below is off.</div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn" id="loc-test">Test folder</button>
+          <button class="btn solid" id="loc-save">Save</button>
+          <span class="mut" id="loc-msg"></span>
+        </div>
+      </div>
+      <div class="card">
         <h3>Cloud Storage (Google Cloud) <span class="hint">keep screenshots &amp; evidence in your own GCS bucket — no server setup</span></h3>
         <div id="gcs-status" class="mut" style="margin-bottom:10px">…</div>
         <div class="fgrid" style="grid-template-columns:1fr 1fr">
@@ -3770,6 +3782,8 @@ async function loadStorageConfig() {
     const bits = ['Active store: <b>' + esc(c.active_disk === 'gcs' ? 'Google Cloud Storage' : 'This server (local disk)') + '</b>'];
     if (!c.sdk_installed) bits.push('<span style="color:#B45309">⚠ Cloud libraries not installed — IT runs <code>composer require google/cloud-storage league/flysystem-google-cloud-storage</code> once in the app folder to enable</span>');
     $('#gcs-status').innerHTML = bits.join(' · ');
+    $('#loc-path').value = c.local_path || '';
+    $('#loc-status').innerHTML = 'When Cloud Storage is off, new evidence is stored ' + (c.local_path ? 'in <b>' + esc(c.local_path) + '</b>' : 'on this server (default app storage)') + '.';
   } catch (e) { $('#gcs-status').textContent = e.message; }
 }
 $('#gcs-test').onclick = async () => {
@@ -3790,6 +3804,18 @@ $('#gcs-save').onclick = async () => {
     toast('Cloud storage settings saved');
     loadStorageConfig();
   } catch (e) { msg.style.color = '#B91C1C'; msg.textContent = e.message; }
+};
+$('#loc-test').onclick = async () => {
+  const m = $('#loc-msg'); m.style.color = ''; m.textContent = 'Testing…';
+  try { const r = await api('/ops/storage-local/test', { method: 'POST', body: JSON.stringify({ local_path: $('#loc-path').value.trim() }) });
+    m.textContent = r.message; m.style.color = r.ok ? '#15803D' : '#B45309'; }
+  catch (e) { m.textContent = e.message; m.style.color = '#B91C1C'; }
+};
+$('#loc-save').onclick = async () => {
+  const m = $('#loc-msg'); m.style.color = ''; m.textContent = 'Saving…';
+  try { await api('/ops/storage-local', { method: 'PUT', body: JSON.stringify({ local_path: $('#loc-path').value.trim() }) });
+    toast('Local storage folder saved'); m.textContent = ''; loadStorageConfig(); }
+  catch (e) { m.style.color = '#B91C1C'; m.textContent = e.message; }
 };
 // ---- storage cleanup (17-Jul) ----
 $('#ops-cleanup').onclick = () => {

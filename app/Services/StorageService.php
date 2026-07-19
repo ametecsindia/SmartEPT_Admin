@@ -30,7 +30,7 @@ class StorageService
             // fall through to the safe default
         }
 
-        return config('smartept.storage_disk', 'local');
+        return 'evidence';
     }
 
     public function storeUpload(UploadedFile $file, int $companyId, int $employeeId, string $type, ?int $retentionDays = null): StorageFile
