@@ -76,10 +76,14 @@
   .shell{display:flex;min-height:100vh}
   .side{width:232px;background:linear-gradient(178deg,var(--navy) 0%,#07333D 60%,#083A44 100%);
     border-right:none;position:fixed;height:100vh;padding:18px 13px 14px;display:flex;flex-direction:column;gap:2px;
-    overflow-y:auto;z-index:6;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent}
+    overflow:hidden;z-index:6}
+  .navwrap{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:2px;
+    margin:0 -4px;padding:2px 4px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent}
+  .navwrap::-webkit-scrollbar{width:5px}
+  .navwrap::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:3px}
   .side::-webkit-scrollbar{width:5px}
   .side::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border:none}
-  .side .lock{padding:4px 8px 16px;margin:0;border-bottom:1px solid rgba(255,255,255,.09)}
+  .side .lock{padding:4px 8px 16px;margin:0;border-bottom:1px solid rgba(255,255,255,.09);flex:0 0 auto}
   .side .lock h1{color:#fff}
   .side .lock small{color:#7FA8AF}
   .navgrp{font-size:9.5px;letter-spacing:2.2px;color:#5E858C;font-weight:800;margin:16px 12px 6px;font-family:var(--font-head)}
@@ -90,7 +94,7 @@
   .nav .ic{width:18px;height:18px;display:flex;align-items:center;justify-content:center;opacity:.9;flex:none}
   .nav .ic svg{width:16.5px;height:16.5px;display:block}
   .nav.active .ic{opacity:1}
-  .side .foot{margin-top:auto;font-size:11px;color:#7FA8AF;padding:12px 8px 2px;border-top:1px solid rgba(255,255,255,.09);line-height:1.7}
+  .side .foot{flex:0 0 auto;font-size:11px;color:#7FA8AF;padding:12px 8px 2px;border-top:1px solid rgba(255,255,255,.09);line-height:1.7}
   .side .foot a{color:#A9CBD1!important}
   .side .foot a:hover{color:#fff!important}
   .main{margin-left:232px;flex:1;padding:0 28px 44px;min-width:0}
@@ -379,6 +383,7 @@
 <div class="shell hide" id="app">
   <div class="side">
     <div class="lock" style="justify-content:center;padding-top:2px"><img src="/img/smartept-logo-h-dark.png" alt="SmartEPT by Ametecs" style="width:170px;max-width:94%;height:auto;display:block"></div>
+    <div class="navwrap">
     <div class="navgrp">MONITOR</div>
     <div class="nav active" data-view="dashboard"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/></svg></span> Live Dashboard</div>
     <div class="nav" data-view="attendance"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.4V12l3.2 1.9"/></svg></span> Attendance</div>
@@ -399,6 +404,7 @@
     <div class="nav" data-view="integrations"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg></span> API &amp; Integrations</div>
     <div class="nav" data-view="ops"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6.5 5 13L17 12h4"/></svg></span> Audit &amp; Ops</div>
     <div class="nav" data-view="help"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.2 9.3a2.9 2.9 0 0 1 5.6 1c0 1.9-2.8 2.6-2.8 2.6"/><path d="M12 17h.01"/></svg></span> Help &amp; Troubleshooting</div>
+    </div>
     <div class="foot"><span id="who"></span><br><a id="signout" style="color:var(--ink-3);cursor:pointer">Sign out</a></div>
   </div>
   <div class="nav-backdrop" id="nav-backdrop"></div>
