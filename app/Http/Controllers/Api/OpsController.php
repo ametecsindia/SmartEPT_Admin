@@ -242,6 +242,48 @@ class OpsController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    /** GET /api/ops/agent-lock — exit/uninstall lock status for the admin UI (never returns the plaintext). */
+    public function agentLock(Request $request): JsonResponse
+    {
+        $c = Company::findOrFail($request->user()->company_id);
+
+        return response()->json(['data' => [
+            'enabled'      => (bool) ($c->agent_exit_lock_enabled ?? false),
+            'password_set' => filled($c->agent_exit_password),
+        ]]);
+    }
+
+    /** PUT /api/ops/agent-lock — set/clear the agent exit & uninstall password. */
+    public function updateAgentLock(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'enabled'  => ['required', 'boolean'],
+            'password' => ['nullable', 'string', 'min:4', 'max:64'],
+            'clear'    => ['nullable', 'boolean'],
+        ]);
+
+        $c = Company::findOrFail($request->user()->company_id);
+        $c->agent_exit_lock_enabled = (bool) $data['enabled'];
+        if (! empty($data['clear'])) {
+            $c->agent_exit_password = null;
+            $c->agent_exit_lock_enabled = false;
+        } elseif (filled($data['password'] ?? null)) {
+            $c->agent_exit_password = $data['password'];
+        }
+
+        if ($c->agent_exit_lock_enabled && blank($c->agent_exit_password)) {
+            return response()->json(['message' => 'Set a password before enabling the exit & uninstall lock.'], 422);
+        }
+
+        $c->save();
+        $this->audit($request, 'UPDATE', Company::class, $c->id, [
+            'agent_exit_lock_enabled' => $c->agent_exit_lock_enabled,
+            'password_changed' => filled($data['password'] ?? null) || ! empty($data['clear']),
+        ]);
+
+        return response()->json(['ok' => true]);
+    }
+
     /** GET /api/ops/backups — newest first. */
     public function backups(): JsonResponse
     {

@@ -12,8 +12,10 @@ class Company extends Model
     protected $guarded = ['id'];
 
     protected $casts = [
-        'storage_settings'    => 'array',
-        'data_retention_days' => 'integer',
+        'storage_settings'        => 'array',
+        'data_retention_days'     => 'integer',
+        'agent_exit_lock_enabled' => 'boolean',
+        'agent_exit_password'     => 'encrypted',
     ];
 
     public function branches()    { return $this->hasMany(Branch::class); }

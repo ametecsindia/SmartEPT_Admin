@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ApplicationPolicy;
+use App\Models\Company;
 use App\Models\AttendancePolicy;
 use App\Models\BreakPolicy;
 use App\Models\CompliancePolicy;
@@ -61,6 +62,7 @@ class PolicyResolver
         }
 
         $monitoring = $policies['monitoring'] ?? null;
+        $company = Company::find($employee->company_id);
 
         return [
             'employee_id'     => $employee->id,
@@ -69,6 +71,11 @@ class PolicyResolver
             'consent_required' => (bool) ($monitoring['consent_required'] ?? true),
             'policy_version'  => (int) ($monitoring['version'] ?? 1),
             'generated_at'    => now()->toIso8601String(),
+            'agent'           => [
+                'exit_lock_enabled'    => (bool) ($company->agent_exit_lock_enabled ?? false),
+                'exit_password_sha256' => ($company && $company->agent_exit_lock_enabled && filled($company->agent_exit_password))
+                    ? hash('sha256', $company->agent_exit_password) : null,
+            ],
             'policies'        => $policies,
         ];
     }

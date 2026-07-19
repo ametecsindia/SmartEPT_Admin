@@ -99,6 +99,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('ops/purge-run', [OpsController::class, 'runPurge']);
         Route::get('gate/policy', [OpsController::class, 'gatePolicy']);       // Gate-to-PC USP
         Route::put('gate/policy', [OpsController::class, 'updateGatePolicy']);
+        Route::get('ops/agent-lock', [OpsController::class, 'agentLock']);   // agent exit/uninstall lock
+        Route::put('ops/agent-lock', [OpsController::class, 'updateAgentLock']);
     });
 
     // ---- Licence (R2-1): admin view/set key + force revalidation ----

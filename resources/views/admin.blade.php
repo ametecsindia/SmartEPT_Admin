@@ -544,6 +544,17 @@
 
     <!-- 6. DEVICES -->
     <div class="view" id="v-devices">
+      <div class="card" style="border:1px solid var(--accent);background:linear-gradient(120deg,var(--accent-weak),var(--card))">
+        <h3 style="color:var(--accent-ink)">🔒 Agent exit &amp; uninstall lock <span class="hint">stop employees quitting or removing the SmartEPT agent</span></h3>
+        <div class="fbool"><input type="checkbox" id="al-enabled"> <b>Require this password before the desktop agent can be quit, stopped, or uninstalled</b></div>
+        <div class="row" style="margin-top:10px;align-items:flex-end">
+          <div><label>Password</label><input id="al-pass" type="password" autocomplete="new-password" placeholder="Enter a password" style="min-width:240px"></div>
+          <button class="btn solid" id="al-save">Save lock password</button>
+          <button class="btn" id="al-clear" type="button">Clear password</button>
+          <span class="mut" id="al-msg"></span>
+        </div>
+        <div class="mut" style="font-size:11.5px;margin-top:8px">The agent receives only a one-way hash of this password — the plaintext never leaves this server. Share it only with IT/admins allowed to service a machine. Leave the field blank when saving to keep the current password; use <b>Clear password</b> to remove it and turn the lock off. Agents apply it on their next policy sync (~30s). <b>Note:</b> the installed agent build must support the lock for it to take effect.</div>
+      </div>
       <div class="card"><h3>Registered devices &amp; agent health <input id="dev-q" placeholder="Search device / employee / OS" autocomplete="off" style="width:230px;font-weight:400;font-size:12px;margin-left:10px"></h3>
         <table><thead><tr><th>Device</th><th>Employee</th><th>OS</th><th>Agent ver</th><th>Agent health</th><th>Compliance</th><th>Status</th><th>Sync queue</th><th>Last heartbeat</th><th></th></tr></thead>
         <tbody id="dev-rows"></tbody></table>
@@ -2382,7 +2393,31 @@ $('#emp-m-save').onclick = async () => {
 };
 
 // ---- 6. devices ----
+async function loadAgentLock() {
+  try {
+    const a = (await api('/ops/agent-lock')).data;
+    $('#al-enabled').checked = !!a.enabled;
+    $('#al-pass').value = '';
+    $('#al-pass').placeholder = a.password_set ? 'Password is set — leave blank to keep' : 'Enter a password';
+    const m = $('#al-msg'); m.style.color = ''; m.textContent = a.password_set ? 'A password is set.' : 'No password set yet.';
+  } catch (e) { const m = $('#al-msg'); if (m) { m.textContent = e.message; m.style.color = '#DC2626'; } }
+}
+async function saveAgentLock(clear) {
+  const m = $('#al-msg'); m.style.color = '';
+  try {
+    await api('/ops/agent-lock', { method: 'PUT', body: JSON.stringify({
+      enabled: $('#al-enabled').checked,
+      password: $('#al-pass').value || null,
+      clear: !!clear,
+    }) });
+    toast(clear ? 'Lock password cleared' : 'Agent lock saved');
+    loadAgentLock();
+  } catch (e) { m.textContent = e.message; m.style.color = '#DC2626'; }
+}
 async function loadDevices() {
+  loadAgentLock();
+  $('#al-save').onclick = () => saveAgentLock(false);
+  $('#al-clear').onclick = () => saveAgentLock(true);
   try {
     const [list, health] = await Promise.all([
       devicesList(true),
