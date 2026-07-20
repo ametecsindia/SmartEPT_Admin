@@ -1,0 +1,35 @@
+<?php
+header('Content-Type: text/plain');
+echo "=== SmartEPT diagnostics ===\n\n";
+
+echo "[OPcache]\n";
+echo "  loaded php.ini      : ".php_ini_loaded_file()."\n";
+echo "  scanned ini files   : ".(php_ini_scanned_files() ?: '(none)')."\n";
+echo "  opcache.enable      : ".var_export(ini_get('opcache.enable'),true)."\n";
+echo "  validate_timestamps : ".var_export(ini_get('opcache.validate_timestamps'),true)."\n";
+echo "  opcache_reset()     : ".(function_exists('opcache_reset') && @opcache_reset() ? "OK" : "blocked/failed")."\n";
+
+echo "\n[.env on disk]\n";
+$env=@file_get_contents(__DIR__.'/../.env');
+$g=function($k)use($env){return preg_match('/^'.$k.'=(.*)$/m',$env,$m)?trim($m[1]):'(missing)';};
+$host=$g('DB_HOST'); if($host==='(missing)')$host='127.0.0.1';
+$db=$g('DB_DATABASE'); $user=$g('DB_USERNAME'); $pass=$g('DB_PASSWORD'); if($pass==='(missing)')$pass='';
+echo "  DB_CONNECTION=".$g('DB_CONNECTION')."  DB_HOST=$host  DB_DATABASE=$db  DB_USERNAME=$user\n";
+
+echo "\n[Live MySQL test - bypasses Laravel & opcache]\n";
+try {
+  $pdo=new PDO("mysql:host=$host;dbname=$db",$user,$pass,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_TIMEOUT=>5]);
+  echo "  connect to '$db'          : OK\n";
+  $tok=$pdo->query("SHOW TABLES LIKE 'personal_access_tokens'")->fetch();
+  echo "  personal_access_tokens    : ".($tok?"EXISTS":"MISSING  -> run: php artisan migrate")."\n";
+  if($tok){echo "  active token rows         : ".$pdo->query("SELECT COUNT(*) FROM personal_access_tokens")->fetchColumn()."\n";}
+  $shot=$pdo->query("SHOW TABLES LIKE 'employee_screenshot_logs'")->fetch();
+  if($shot){
+    echo "  screenshots logged TODAY  : ".$pdo->query("SELECT COUNT(*) FROM employee_screenshot_logs WHERE captured_at>=CURDATE()")->fetchColumn()."\n";
+    echo "  latest screenshot in DB   : ".($pdo->query("SELECT MAX(captured_at) FROM employee_screenshot_logs")->fetchColumn()?:'(none)')."\n";
+  }
+} catch(Throwable $e){
+  echo "  MySQL ERROR               : ".$e->getMessage()."\n";
+  echo "  >> means MySQL is down, or db/user/password wrong. Start MySQL in Laragon.\n";
+}
+echo "\n=== end ===\n";
