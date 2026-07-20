@@ -882,6 +882,20 @@
         </div>
         <div class="mut" id="lic-msg">Paste the key from your SmartEPT order email or the client portal (Billing &amp; Licences). Without a key the server runs a 7-day free evaluation, then monitoring stops until a key is entered.</div>
       </div>
+      <div class="card"><h3>Offline licence file <span class="hint">no internet needed — a signed file locked to this PC</span></h3>
+        <p class="mut" style="margin-bottom:10px">Send this machine's fingerprint to Ametecs. They return a <code>license.lic</code> file locked to this PC — import it below to activate. Works fully offline (no SMARTEPT_LICENSE_URL, no SSL).</p>
+        <label>This machine's fingerprint</label>
+        <div class="row" style="margin:4px 0 14px">
+          <input id="lic-fp" readonly style="min-width:340px;font-family:ui-monospace,Menlo,Consolas,monospace" placeholder="—">
+          <button class="btn" id="lic-fp-copy">Copy</button>
+        </div>
+        <label>Import licence file (.lic)</label>
+        <div class="row" style="margin-top:4px">
+          <input type="file" id="lic-file" accept=".lic,.txt">
+          <button class="btn solid" id="lic-import">Import &amp; activate</button>
+        </div>
+        <div class="mut" id="lic-file-msg" style="margin-top:8px"></div>
+      </div>
     </div>
 
     <!-- 13. AUDIT & OPS (R2-4) -->
@@ -4091,6 +4105,7 @@ async function loadLicense() {
   const box = $('#lic-status');
   try {
     const d = await api('/license');
+    if ($('#lic-fp')) $('#lic-fp').value = d.machine_fingerprint || '';
     const pill = (txt, color) => `<span style="display:inline-block;padding:3px 10px;border-radius:999px;font-weight:700;font-size:12px;background:${color}22;color:${color}">${txt}</span>`;
     const STATUS_COLORS = { active: '#16A34A', expired: '#D97706', unconfigured: '#6B7B90' };
     const color = d.operational ? (STATUS_COLORS[d.status] || '#16A34A') : '#DC2626';
@@ -4109,7 +4124,7 @@ async function loadLicense() {
       ['Device seats', d.device_limit != null ? `${d.devices_registered} registered / ${d.device_limit} licensed` : `${d.devices_registered} registered`],
       ['Expires', d.expires_at ? `${d.expires_at} (+${d.grace_days} grace days)` : 'never (perpetual)'],
       ['Last check', d.last_checked_at || 'never'],
-      ['Central', d.central_url || 'not set (SMARTEPT_LICENSE_URL)'],
+      ['Source', d.source === 'file' ? 'Offline licence file (this PC)' : (d.central_url ? 'SmartEPT Central (online)' : '—')],
     ];
     box.innerHTML = '<table>' + rows.map(([k, v]) => `<tr><th style="text-align:left;white-space:nowrap;padding:6px 18px 6px 0">${k}</th><td>${v}</td></tr>`).join('') + '</table>'
       + (d.last_error ? `<div class="mut" style="color:#DC2626;margin-top:8px">Last error: ${d.last_error}</div>` : '');
@@ -4125,6 +4140,24 @@ $('#lic-save').onclick = async () => {
     $('#lic-key').value = '';
     loadLicense();
   } catch (e) { $('#lic-msg').textContent = e.message; }
+};
+$('#lic-fp-copy').onclick = () => {
+  navigator.clipboard.writeText($('#lic-fp').value || '').then(() => {
+    $('#lic-fp-copy').textContent = 'Copied'; setTimeout(() => $('#lic-fp-copy').textContent = 'Copy', 1200);
+  });
+};
+$('#lic-import').onclick = async () => {
+  const f = $('#lic-file').files[0];
+  if (!f) { $('#lic-file-msg').textContent = 'Choose a .lic file first.'; return; }
+  $('#lic-file-msg').textContent = 'Importing…';
+  try {
+    const token = (await f.text()).trim();
+    const d = await api('/license/import', { method: 'POST', body: JSON.stringify({ token }) });
+    $('#lic-file-msg').textContent = d.status === 'active'
+      ? '✓ Licence activated from file — monitoring is licensed.'
+      : ('File rejected: ' + (d.last_error || d.status) + (d.status === 'server_mismatch' ? ' (this file is locked to a different machine)' : ''));
+    loadLicense();
+  } catch (e) { $('#lic-file-msg').textContent = e.message; }
 };
 $('#lic-check').onclick = async () => {
   $('#lic-msg').textContent = 'Checking…';

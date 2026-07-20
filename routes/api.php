@@ -120,6 +120,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('license', [LicenseController::class, 'show']);
         Route::post('license', [LicenseController::class, 'store']);
         Route::post('license/validate', [LicenseController::class, 'revalidate']);
+        Route::post('license/import', [LicenseController::class, 'import']);
     });
 
     Route::prefix('agent')->middleware(['licensed', 'active-employee', 'throttle:600,1'])->group(function () {

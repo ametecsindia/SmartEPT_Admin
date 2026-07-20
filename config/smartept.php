@@ -25,6 +25,8 @@ return [
     // On-prem escape hatch: set SMARTEPT_LICENSE_VERIFY=false to skip TLS cert
     // verification on the licence phone-home (for local PCs with no CA bundle).
     'license_verify'    => filter_var(env('SMARTEPT_LICENSE_VERIFY', true), FILTER_VALIDATE_BOOLEAN),
+    // EPT-29: offline node-locked licence file. Blank = license.lic in the app root.
+    'license_file'      => env('SMARTEPT_LICENSE_FILE', ''),
 
     // R2-2 ops alerts: minutes of heartbeat silence before a device is flagged
     // OFFLINE + admins emailed, and the violations-per-hour spike threshold.
