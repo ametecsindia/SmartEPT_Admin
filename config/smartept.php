@@ -22,6 +22,9 @@ return [
     'smartprs_base_url' => env('SMARTPRS_BASE_URL'),
     'smartdcm_base_url' => env('SMARTDCM_BASE_URL'),
     'license_url'       => env('SMARTEPT_LICENSE_URL'),
+    // On-prem escape hatch: set SMARTEPT_LICENSE_VERIFY=false to skip TLS cert
+    // verification on the licence phone-home (for local PCs with no CA bundle).
+    'license_verify'    => filter_var(env('SMARTEPT_LICENSE_VERIFY', true), FILTER_VALIDATE_BOOLEAN),
 
     // R2-2 ops alerts: minutes of heartbeat silence before a device is flagged
     // OFFLINE + admins emailed, and the violations-per-hour spike threshold.

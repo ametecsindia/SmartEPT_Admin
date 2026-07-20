@@ -25,6 +25,21 @@ class LicenseClient
         return $url !== '' ? $url : null;
     }
 
+    /**
+     * The HTTP client for every Central phone-home. When SMARTEPT_LICENSE_VERIFY=false
+     * it skips TLS certificate verification — the on-prem escape hatch for a local PC
+     * whose PHP has no CA bundle (the usual "cURL error 60" on Windows/IIS).
+     */
+    private function http()
+    {
+        $req = Http::timeout(10)->acceptJson();
+        if (! config('smartept.license_verify', true)) {
+            $req = $req->withoutVerifying();
+        }
+
+        return $req;
+    }
+
     /** Stable anonymous identity of THIS server (no hostname leaves the box un-hashed). */
     public function fingerprint(): string
     {
@@ -51,7 +66,7 @@ class LicenseClient
         }
 
         try {
-            $resp = Http::timeout(10)->acceptJson()->post($this->baseUrl() . '/api/v1/license/validate', [
+            $resp = $this->http()->post($this->baseUrl() . '/api/v1/license/validate', [
                 'key' => $license->license_key,
                 'fingerprint' => $this->fingerprint(),
                 'storage_gb' => $this->currentStorageGb(),
@@ -134,7 +149,7 @@ class LicenseClient
         }
 
         try {
-            $resp = Http::timeout(10)->acceptJson()->post($this->baseUrl() . '/api/v1/license/device/activate', [
+            $resp = $this->http()->post($this->baseUrl() . '/api/v1/license/device/activate', [
                 'key' => $license->license_key,
                 'device_uid' => $deviceUid,
                 'hostname' => $hostname,
@@ -160,7 +175,7 @@ class LicenseClient
         }
 
         try {
-            $resp = Http::timeout(10)->acceptJson()->post($this->baseUrl() . '/api/v1/license/device/deactivate', [
+            $resp = $this->http()->post($this->baseUrl() . '/api/v1/license/device/deactivate', [
                 'key' => $license->license_key,
                 'device_uid' => $deviceUid,
             ]);
