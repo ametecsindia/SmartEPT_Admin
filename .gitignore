@@ -21,3 +21,8 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# scratch / FUSE mount artifacts (Cowork device bridge)
+_to_delete/
+.fuse_hidden*
+/individual
