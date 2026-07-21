@@ -34,3 +34,7 @@ Schedule::command('smartept:push-integrations')->dailyAt('02:00');
 // CONTINUOUS like the heartbeat, not hourly — every 5 minutes for every device with
 // automatic sync ticked, so the Biometric Gate reacts to punches within minutes.
 Schedule::command('smartept:biometric-sync')->everyFiveMinutes();
+
+// Section 2: advance meeting statuses + auto-close meeting sessions at the scheduled
+// end (so "Meeting" status ends on time even if the employee never presses End).
+Schedule::command('smartept:close-meetings')->everyMinute();

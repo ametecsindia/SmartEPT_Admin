@@ -401,6 +401,7 @@
     <div class="navgrp">MANAGE</div>
     <div class="nav" data-view="employees"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.2" r="3.4"/><path d="M2.8 20.2a6.2 6.2 0 0 1 12.4 0"/><circle cx="17.2" cy="9.4" r="2.6"/><path d="M16 15.6a5 5 0 0 1 5.2 4.6"/></svg></span> Employees</div>
     <div class="nav" data-view="org"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5M9 10h.01M15 10h.01M12 10h.01"/></svg></span> Organisation</div>
+    <div class="nav" data-view="meetings"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v3M16 3v3M8 13h3M8 16.5h6"/></svg></span> Meetings</div>
     <div class="nav" data-view="users"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.4" r="3.6"/><path d="M4.8 20.4a7.2 7.2 0 0 1 14.4 0"/></svg></span> Users</div>
     <div class="nav" data-view="devices"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="12.5" rx="2"/><path d="M8.5 21h7M12 17v4"/></svg></span> Devices</div>
     <div class="nav" data-view="policies"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.5 3v5.2c0 4.8-3.2 8.2-7.5 9.8-4.3-1.6-7.5-5-7.5-9.8V6z"/><path d="M9 11.8l2.1 2.1 3.9-4.2"/></svg></span> Policies</div>
@@ -739,6 +740,27 @@
         <div style="overflow-x:auto"><table><thead><tr><th>Item</th><th>Type</th><th>Status</th><th></th></tr></thead><tbody id="rule-rows"></tbody></table></div>
         <div class="mut" style="margin-top:10px;font-size:11.5px"><b>Allowed</b> = whitelisted/productive \u00b7 <b>Tracked</b> = monitored only \u00b7 <b>Blocked</b> = employee warned + logged as a violation \u00b7 <b>Violation</b> = blocked and flagged for review. Agents pick up changes on their next heartbeat (~30s).</div>
         <div class="mut" id="rule-msg" style="margin-top:8px"></div>
+      </div>
+    </div>
+
+    <!-- 7b. MEETINGS (Section 2) -->
+    <div class="view" id="v-meetings">
+      <div class="filters">
+        <select id="mtg-filter-status">
+          <option value="">All statuses</option>
+          <option value="SCHEDULED">Scheduled</option>
+          <option value="IN_PROGRESS">In progress</option>
+          <option value="COMPLETED">Completed</option>
+          <option value="CANCELLED">Cancelled</option>
+        </select>
+        <input id="mtg-from" type="date" title="From date">
+        <input id="mtg-to" type="date" title="To date">
+        <button class="btn" id="mtg-reload">Apply</button>
+        <button class="btn solid" id="mtg-new" style="margin-left:auto">+ Schedule meeting</button>
+      </div>
+      <div class="card"><h3>Meetings</h3>
+        <table><thead><tr><th>Title</th><th>Date</th><th>Time</th><th>Participants</th><th>Status</th><th></th></tr></thead>
+        <tbody id="mtg-rows"></tbody></table>
       </div>
     </div>
 
@@ -1335,6 +1357,47 @@
   </div>
 </div>
 
+<!-- MEETING SCHEDULE / EDIT (Section 2) -->
+<div class="ovl" id="mtg-ovl">
+  <div class="modal" style="width:700px">
+    <h3 id="mtg-modal-title">Schedule meeting</h3>
+    <label>Title</label><input id="mtg-title" maxlength="200" placeholder="e.g. Sprint planning">
+    <label>Purpose / description</label><textarea id="mtg-purpose" rows="2" maxlength="2000" style="width:100%;background:var(--card-2);border:1.5px solid var(--border-2);border-radius:9px;padding:9px 11px;color:var(--ink);font-family:inherit;font-size:13px;resize:vertical"></textarea>
+    <div class="grid2">
+      <div><label>Scheduled start</label><input id="mtg-start" type="datetime-local"></div>
+      <div><label>Scheduled end</label><input id="mtg-end" type="datetime-local"></div>
+    </div>
+    <label>Notes (optional)</label><textarea id="mtg-notes" rows="2" maxlength="2000" style="width:100%;background:var(--card-2);border:1.5px solid var(--border-2);border-radius:9px;padding:9px 11px;color:var(--ink);font-family:inherit;font-size:13px;resize:vertical"></textarea>
+    <label>Participants</label>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <select id="mtg-f-branch" style="flex:1;min-width:120px"></select>
+      <select id="mtg-f-dept" style="flex:1;min-width:120px"></select>
+      <select id="mtg-f-team" style="flex:1;min-width:120px"></select>
+      <input id="mtg-f-search" placeholder="Search name / code…" class="search" style="flex:2;min-width:140px">
+    </div>
+    <div class="row" style="justify-content:space-between;margin:8px 0 4px">
+      <span class="mut" id="mtg-part-count">0 selected</span>
+      <span style="font-size:12px"><a href="#" id="mtg-sel-all">Select shown</a> &nbsp;·&nbsp; <a href="#" id="mtg-sel-none">Clear all</a></span>
+    </div>
+    <div id="mtg-part-list" style="max-height:230px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:8px;background:var(--card-2)"></div>
+    <div class="err" id="mtg-err"></div>
+    <div class="row" style="justify-content:flex-end;gap:8px;margin-top:14px">
+      <button class="btn" id="mtg-close-btn">Close</button>
+      <button class="btn solid" id="mtg-save">Save meeting</button>
+    </div>
+  </div>
+</div>
+
+<!-- MEETING PARTICIPATION (Section 2) -->
+<div class="ovl" id="mtg-part-ovl">
+  <div class="modal" style="width:720px">
+    <h3 id="mtg-part-title">Participation</h3>
+    <table><thead><tr><th>Employee</th><th>Scheduled</th><th>Joined</th><th>Left</th><th>Time</th><th>Attendance</th></tr></thead>
+    <tbody id="mtg-part-rows"></tbody></table>
+    <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn" id="mtg-part-close">Close</button></div>
+  </div>
+</div>
+
 <!-- EMPLOYEE DRAWER -->
 <div class="drawer-backdrop" id="drawer-backdrop"></div>
 <div class="drawer" id="drawer">
@@ -1708,6 +1771,7 @@ const TITLES = {
   violations: ['Violations', 'Compliance events across the company'],
   employees: ['Employees', 'Directory & lifecycle'],
   org: ['Organisation', 'Branches, departments, teams, designations & shifts'],
+  meetings: ['Meetings', 'Schedule meetings & track participation'],
   users: ['Users', 'Login accounts, roles & credentials'],
   devices: ['Devices', 'Registered endpoints & agent health'],
   policies: ['Policies', 'The control room — what is tracked, for whom'],
@@ -1735,6 +1799,7 @@ function show(v) {
   if (v === 'violations') initViolations();
   if (v === 'employees') loadEmployees();
   if (v === 'org') initOrg();
+  if (v === 'meetings') initMeetings();
   if (v === 'users') loadUsers();
   if (v === 'devices') loadDevices();
   if (v === 'policies') initPolicies();
@@ -1761,6 +1826,7 @@ function refreshView() {
   else if (v === 'violations') initViolations();
   else if (v === 'employees') loadEmployees();
   else if (v === 'org') initOrg();
+  else if (v === 'meetings') initMeetings();
   else if (v === 'users') loadUsers();
   else if (v === 'devices') loadDevices();
   else if (v === 'policies') initPolicies();
@@ -3730,6 +3796,167 @@ document.addEventListener('click', async (e) => {
     loadMappings(); loadBiometric();
   } catch (err) { $('#bio-map-msg').textContent = '✕ ' + err.message; }
 });
+
+// ---- 7b. meetings (Section 2) ----
+let MTG_SEL = new Set();
+let MTG_EMPS = [];
+let MTG_EDIT_ID = null;
+
+function initMeetings() {
+  if (!window.MTG_INIT) {
+    window.MTG_INIT = true;
+    $('#mtg-reload').onclick = loadMeetings;
+    $('#mtg-new').onclick = () => openMeetingModal(null);
+    $('#mtg-close-btn').onclick = () => $('#mtg-ovl').classList.remove('open');
+    $('#mtg-part-close').onclick = () => $('#mtg-part-ovl').classList.remove('open');
+    $('#mtg-ovl').addEventListener('click', (e) => { if (e.target === $('#mtg-ovl')) $('#mtg-ovl').classList.remove('open'); });
+    $('#mtg-part-ovl').addEventListener('click', (e) => { if (e.target === $('#mtg-part-ovl')) $('#mtg-part-ovl').classList.remove('open'); });
+    $('#mtg-save').onclick = saveMeeting;
+    ['#mtg-f-branch', '#mtg-f-dept', '#mtg-f-team'].forEach((q) => $(q).addEventListener('change', renderPartList));
+    $('#mtg-f-search').addEventListener('input', renderPartList);
+    $('#mtg-sel-all').onclick = (e) => { e.preventDefault(); shownEmps().forEach((x) => MTG_SEL.add(x.id)); renderPartList(); };
+    $('#mtg-sel-none').onclick = (e) => { e.preventDefault(); MTG_SEL.clear(); renderPartList(); };
+    $('#mtg-part-list').addEventListener('change', (e) => {
+      const cb = e.target.closest('input[type=checkbox][data-emp]'); if (!cb) return;
+      const id = Number(cb.dataset.emp);
+      if (cb.checked) MTG_SEL.add(id); else MTG_SEL.delete(id);
+      updatePartCount();
+    });
+  }
+  loadMeetings();
+}
+
+const MTG_STATUS_TAG = { SCHEDULED: 't-warn', IN_PROGRESS: 't-ok', COMPLETED: 't-off', CANCELLED: 't-danger' };
+async function loadMeetings() {
+  const qs = new URLSearchParams();
+  if ($('#mtg-filter-status').value) qs.set('status', $('#mtg-filter-status').value);
+  if ($('#mtg-from').value) qs.set('from', $('#mtg-from').value);
+  if ($('#mtg-to').value) qs.set('to', $('#mtg-to').value);
+  try {
+    const d = await api('/meetings' + (qs.toString() ? '?' + qs : ''));
+    $('#mtg-rows').innerHTML = (d.data || []).map((m) => '<tr>'
+      + '<td><span class="nm">' + esc(m.title) + '</span>' + (m.purpose ? '<div class="mut" style="font-size:11px">' + esc(m.purpose.slice(0, 60)) + '</div>' : '') + '</td>'
+      + '<td>' + esc(m.meeting_date || '—') + '</td>'
+      + '<td>' + (m.start_at ? dt(m.start_at) : '—') + (m.end_at ? ' – ' + new Date(m.end_at.replace(' ', 'T')).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '') + '</td>'
+      + '<td>' + (m.participant_count ?? 0) + '</td>'
+      + '<td><span class="tag ' + (MTG_STATUS_TAG[m.status] || 't-off') + '">' + esc((m.status || '').replace('_', ' ')) + '</span></td>'
+      + '<td style="text-align:right;white-space:nowrap"><button class="btn" data-mtg-part="' + m.id + '">Participation</button> '
+      + ((m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS') ? '<button class="btn" data-mtg-edit="' + m.id + '">Edit</button> <button class="btn danger" data-mtg-cancel="' + m.id + '">Cancel</button>' : '')
+      + '</td></tr>').join('')
+      || '<tr><td colspan="6" class="mut">No meetings yet. Press "Schedule meeting" to create one.</td></tr>';
+  } catch (e) {
+    $('#mtg-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="6" class="mut">' + esc(e.message) + '</td></tr>';
+  }
+}
+
+// Row actions (event delegation so they survive re-render).
+document.addEventListener('click', async (e) => {
+  const ed = e.target.closest && e.target.closest('[data-mtg-edit]');
+  const cn = e.target.closest && e.target.closest('[data-mtg-cancel]');
+  const pt = e.target.closest && e.target.closest('[data-mtg-part]');
+  if (ed) { openMeetingModal(Number(ed.dataset.mtgEdit)); }
+  else if (cn) {
+    if (!window.confirm('Cancel this meeting? Participants lose the Meeting option immediately.')) return;
+    try { await api('/meetings/' + Number(cn.dataset.mtgCancel) + '/cancel', { method: 'POST' }); toast('Meeting cancelled'); loadMeetings(); }
+    catch (err) { alert(err.message); }
+  }
+  else if (pt) { openParticipation(Number(pt.dataset.mtgPart)); }
+});
+
+function mtgToLocalInput(s) { return s ? s.replace(' ', 'T').slice(0, 16) : ''; }
+
+async function openMeetingModal(id) {
+  MTG_EDIT_ID = id;
+  MTG_SEL = new Set();
+  $('#mtg-err').textContent = '';
+  $('#mtg-modal-title').textContent = id ? 'Edit meeting' : 'Schedule meeting';
+  try {
+    const org = await orgLists();
+    fillSelect($('#mtg-f-branch'), org.branches || [], (b) => b.name, (b) => b.id, 'All branches');
+    fillSelect($('#mtg-f-dept'), org.departments || [], (d) => d.name, (d) => d.id, 'All departments');
+    fillSelect($('#mtg-f-team'), org.teams || [], (t) => t.name, (t) => t.id, 'All teams');
+  } catch (e) { /* filters optional */ }
+  MTG_EMPS = await employeesList().catch(() => []);
+  if (id) {
+    try {
+      const m = (await api('/meetings/' + id)).data;
+      $('#mtg-title').value = m.title || '';
+      $('#mtg-purpose').value = m.purpose || '';
+      $('#mtg-start').value = mtgToLocalInput(m.start_at);
+      $('#mtg-end').value = mtgToLocalInput(m.end_at);
+      $('#mtg-notes').value = m.notes || '';
+      (m.participant_ids || []).forEach((x) => MTG_SEL.add(Number(x)));
+    } catch (e) { $('#mtg-err').textContent = e.message; }
+  } else {
+    $('#mtg-title').value = ''; $('#mtg-purpose').value = ''; $('#mtg-notes').value = '';
+    $('#mtg-start').value = ''; $('#mtg-end').value = '';
+  }
+  $('#mtg-f-search').value = '';
+  ['#mtg-f-branch', '#mtg-f-dept', '#mtg-f-team'].forEach((q) => { $(q).selectedIndex = 0; });
+  renderPartList();
+  $('#mtg-ovl').classList.add('open');
+}
+
+function shownEmps() {
+  const b = $('#mtg-f-branch').value, d = $('#mtg-f-dept').value, t = $('#mtg-f-team').value;
+  const q = $('#mtg-f-search').value.trim().toLowerCase();
+  return MTG_EMPS.filter((e) => {
+    if (b && String(e.branch_id || '') !== b) return false;
+    if (d && String(e.department_id || '') !== d) return false;
+    if (t && String(e.team_id || '') !== t) return false;
+    if (q && !((fullName(e) + ' ' + (e.employee_code || '')).toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+function renderPartList() {
+  const list = shownEmps();
+  $('#mtg-part-list').innerHTML = list.map((e) => '<label style="display:flex;align-items:center;gap:8px;padding:5px 4px;font-size:12.5px;cursor:pointer">'
+    + '<input type="checkbox" data-emp="' + e.id + '"' + (MTG_SEL.has(e.id) ? ' checked' : '') + ' style="width:auto;margin:0">'
+    + '<span>' + esc(fullName(e)) + ' <span class="mut">(' + esc(e.employee_code || ('#' + e.id)) + ')</span></span></label>').join('')
+    || '<div class="mut" style="padding:8px">No employees match the filter.</div>';
+  updatePartCount();
+}
+function updatePartCount() { $('#mtg-part-count').textContent = MTG_SEL.size + ' selected'; }
+
+async function saveMeeting() {
+  const body = {
+    title: $('#mtg-title').value.trim(),
+    purpose: $('#mtg-purpose').value.trim() || null,
+    start_at: $('#mtg-start').value,
+    end_at: $('#mtg-end').value,
+    notes: $('#mtg-notes').value.trim() || null,
+    participant_ids: [...MTG_SEL],
+  };
+  if (!body.title) { $('#mtg-err').textContent = 'Title is required.'; return; }
+  if (!body.start_at || !body.end_at) { $('#mtg-err').textContent = 'Start and end time are required.'; return; }
+  if (body.end_at <= body.start_at) { $('#mtg-err').textContent = 'End must be after start.'; return; }
+  if (!body.participant_ids.length) { $('#mtg-err').textContent = 'Select at least one participant.'; return; }
+  try {
+    if (MTG_EDIT_ID) await api('/meetings/' + MTG_EDIT_ID, { method: 'PUT', body: JSON.stringify(body) });
+    else await api('/meetings', { method: 'POST', body: JSON.stringify(body) });
+    $('#mtg-ovl').classList.remove('open');
+    toast('Meeting saved');
+    loadMeetings();
+  } catch (e) { $('#mtg-err').textContent = '✕ ' + e.message; }
+}
+
+const MTG_ATT_TAG = { ATTENDED: 't-ok', ABSENT: 't-danger', PENDING: 't-warn' };
+async function openParticipation(id) {
+  try {
+    const d = (await api('/meetings/' + id + '/participation')).data;
+    $('#mtg-part-title').textContent = 'Participation — ' + (d.meeting && d.meeting.title ? d.meeting.title : '');
+    $('#mtg-part-rows').innerHTML = (d.rows || []).map((r) => '<tr>'
+      + '<td><span class="nm">' + esc(r.name || ('#' + r.employee_id)) + '</span></td>'
+      + '<td>' + (r.scheduled_start ? dt(r.scheduled_start) : '—') + '</td>'
+      + '<td>' + (r.actual_start ? dt(r.actual_start) : '—') + '</td>'
+      + '<td>' + (r.actual_end ? dt(r.actual_end) : '—') + '</td>'
+      + '<td>' + mtgSecs(r.actual_seconds) + '</td>'
+      + '<td><span class="tag ' + (MTG_ATT_TAG[r.attendance] || 't-off') + '">' + esc(r.attendance) + '</span></td></tr>').join('')
+      || '<tr><td colspan="6" class="mut">No participants.</td></tr>';
+    $('#mtg-part-ovl').classList.add('open');
+  } catch (e) { alert(e.message); }
+}
+function mtgSecs(s) { s = s || 0; const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60); return h ? (h + 'h ' + m + 'm') : (m + 'm'); }
 
 // ---- 9. reports & exports ----
 // ---- Live productivity report (17-Jul) ----

@@ -161,7 +161,32 @@ class DeviceController extends Controller
             $gate = app(\App\Services\GateService::class)->stateFor($device->employee);
         }
 
-        return response()->json(['ok' => true, 'server_time' => now()->toIso8601String(), 'clock_skew_seconds' => $skew, 'gate' => $gate]);
+        // Section 2: piggyback the currently-joinable meeting (participant + in window +
+        // not cancelled) so the agent shows the Meeting button ONLY when authorised, and
+        // hides it within one heartbeat of a cancellation or the scheduled end.
+        $meeting = null;
+        if ($device->employee) {
+            $m = \App\Models\Meeting::currentJoinableFor($device->employee);
+            if ($m) {
+                $inSession = \App\Models\EmployeeMeetingSession::where('meeting_id', $m->id)
+                    ->where('employee_id', $device->employee->id)
+                    ->whereNull('actual_end_at')->exists();
+                $meeting = [
+                    'id'         => $m->id,
+                    'title'      => $m->title,
+                    'end_at'     => $m->end_at->toIso8601String(),
+                    'in_session' => $inSession,
+                ];
+            }
+        }
+
+        return response()->json([
+            'ok' => true,
+            'server_time' => now()->toIso8601String(),
+            'clock_skew_seconds' => $skew,
+            'gate' => $gate,
+            'meeting' => $meeting,
+        ]);
     }
 
     /**

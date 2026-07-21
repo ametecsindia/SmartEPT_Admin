@@ -22,6 +22,8 @@ use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\DiagnosticsController;
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\LicenseController;
+use App\Http\Controllers\Api\MeetingController;
+use App\Http\Controllers\Api\AgentMeetingController;
 use App\Http\Controllers\Api\OpsController;
 use App\Http\Controllers\Api\StorageConfigController;
 use App\Http\Controllers\Api\ReportController;
@@ -142,6 +144,8 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('activity-events', [ActivityController::class, 'activity']);
             Route::post('idle-event', [ActivityController::class, 'idle']);
             Route::post('break-event', [BreakController::class, 'store']);
+            // Section 2: put self into Meeting status (server-authorised).
+            Route::post('meeting-event', [AgentMeetingController::class, 'event']);
 
             // M3 — presence (metadata only) + screenshots/webcam (policy-gated media).
             Route::post('presence-event', [PresenceController::class, 'event']);
@@ -219,6 +223,16 @@ Route::middleware('auth:sanctum')->group(function () {
     });
     Route::get('reports/biometric-mismatch', [BiometricController::class, 'mismatch'])
         ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,HR_ADMIN,MANAGER,AUDITOR');
+
+    // ---- Meetings (Section 2) — HR / Admin / Manager / TL schedule + manage ----
+    Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,HR_ADMIN,MANAGER,TEAM_LEADER')->group(function () {
+        Route::get('meetings', [MeetingController::class, 'index']);
+        Route::post('meetings', [MeetingController::class, 'store']);
+        Route::get('meetings/{meeting}', [MeetingController::class, 'show']);
+        Route::put('meetings/{meeting}', [MeetingController::class, 'update']);
+        Route::post('meetings/{meeting}/cancel', [MeetingController::class, 'cancel']);
+        Route::get('meetings/{meeting}/participation', [MeetingController::class, 'participation']);
+    });
 
     // ---- Companies (tenant provisioning + profile) ----
     Route::get('companies', [CompanyController::class, 'index'])
