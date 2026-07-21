@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Company;
 use App\Models\EmployeeBreakLog;
 use App\Support\ResolvesAgentContext;
 use Illuminate\Http\JsonResponse;
@@ -30,11 +31,13 @@ class BreakController extends Controller
         $employee = $this->agentEmployee($request);
 
         $data = $request->validate([
-            'device_uuid' => ['required', 'string'],
-            'action'      => ['required', 'in:START,END'],
-            'break_type'  => ['nullable', 'in:TEA,LUNCH,BIO,MEETING,TRAINING,PRAYER,CUSTOM'],
-            'source'      => ['nullable', 'in:MANUAL,AUTO_IDLE,BIOMETRIC'],
-            'occurred_at' => ['nullable', 'date'],
+            'device_uuid'  => ['required', 'string'],
+            'action'       => ['required', 'in:START,END'],
+            'break_type'   => ['nullable', 'in:TEA,LUNCH,BIO,MEETING,TRAINING,PRAYER,CUSTOM'],
+            'source'       => ['nullable', 'in:MANUAL,AUTO_IDLE,BIOMETRIC'],
+            'occurred_at'  => ['nullable', 'date'],
+            // Section 3: the agent sends the mandatory reason when the break ran over.
+            'delay_reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $this->agentDevice($request, $employee);
@@ -72,18 +75,67 @@ class BreakController extends Controller
             return response()->json(['ok' => true, 'break_id' => $break->id], 201);
         }
 
-        // END: close ALL open breaks regardless of the type the agent sent.
+        // END: close ALL open breaks regardless of the type the agent sent. The server
+        // recomputes the permitted vs actual duration authoritatively (Section 3 — never
+        // trust the UI alone) and records the excess + the reason. A break that ran over
+        // its limit with NO reason is flagged PENDING for the admin to chase.
+        $company = Company::withoutGlobalScopes()->find($employee->company_id);
+        $reason = trim((string) ($data['delay_reason'] ?? ''));
+        $overWithoutReason = [];
+
         $closed = 0;
         EmployeeBreakLog::where('employee_id', $employee->id)
             ->whereNull('end_at')->get()
-            ->each(function ($o) use ($at, &$closed) {
-                $o->update([
-                    'end_at' => $at,
-                    'duration_seconds' => $o->start_at ? (int) $at->diffInSeconds($o->start_at, true) : null,
-                ]);
+            ->each(function ($o) use ($at, &$closed, $company, $reason, &$overWithoutReason) {
+                $dur = $o->start_at ? (int) $at->diffInSeconds($o->start_at, true) : null;
+                $permitted = $this->permittedSecondsFor($company, $o->break_type);
+                $excess = ($permitted && $dur !== null) ? max(0, $dur - $permitted) : 0;
+
+                $update = [
+                    'end_at'            => $at,
+                    'duration_seconds'  => $dur,
+                    'permitted_seconds' => $permitted,
+                    'excess_seconds'    => $excess,
+                ];
+                if ($excess > 0) {
+                    if ($reason !== '') {
+                        $update['delay_reason'] = $reason;
+                    }
+                    // Reason present → still surfaced for optional review; missing → chase it.
+                    $update['review_status'] = 'PENDING';
+                    if ($reason === '') {
+                        $overWithoutReason[] = $o->break_type;
+                    }
+                }
+
+                $o->update($update);
                 $closed++;
             });
 
-        return response()->json(['ok' => true, 'closed' => $closed], 200);
+        return response()->json([
+            'ok'      => true,
+            'closed'  => $closed,
+            // If any closed break was over-limit and no reason came with it, tell the
+            // agent so it can prompt (belt-and-braces; the agent normally prompts first).
+            'reason_required' => ! empty($overWithoutReason),
+            'over_types'      => $overWithoutReason,
+        ], 200);
+    }
+
+    /** Section 3: permitted seconds for a break type, from this company's limits. */
+    private function permittedSecondsFor(?Company $company, ?string $type): ?int
+    {
+        if (! $company) {
+            return null;
+        }
+        // "Other" is stored as CUSTOM. BIO/TRAINING/PRAYER/MEETING have no break limit.
+        $min = match ($type) {
+            'LUNCH'  => $company->break_limit_lunch_min ?? 30,
+            'TEA'    => $company->break_limit_tea_min ?? 10,
+            'CUSTOM' => $company->break_limit_other_min ?? 10,
+            default  => null,
+        };
+
+        return $min !== null ? (int) $min * 60 : null;
     }
 }

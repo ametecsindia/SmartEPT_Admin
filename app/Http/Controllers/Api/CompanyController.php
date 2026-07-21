@@ -76,10 +76,24 @@ class CompanyController extends Controller
             'exclude_ip_sites'    => ['nullable', 'boolean'],
             // Company-wide default tracking mode (org levels below can still override).
             'tracking_mode'       => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
+            // Section 3: per-company break-time limits (minutes). Positive, capped at 10h.
+            'break_limit_lunch_min' => ['nullable', 'integer', 'min:1', 'max:600'],
+            'break_limit_tea_min'   => ['nullable', 'integer', 'min:1', 'max:600'],
+            'break_limit_other_min' => ['nullable', 'integer', 'min:1', 'max:600'],
         ]);
 
+        // Section 3: record who changed a break limit and its old→new values.
+        $breakKeys = ['break_limit_lunch_min', 'break_limit_tea_min', 'break_limit_other_min'];
+        $before = $company->only($breakKeys);
+
         $company->update($data);
-        $this->audit($request, 'UPDATE', Company::class, $company->id, $data);
+
+        $meta = $data;
+        $changed = array_intersect_key($data, array_flip($breakKeys));
+        if ($changed) {
+            $meta['break_limits_before'] = array_intersect_key($before, $changed);
+        }
+        $this->audit($request, 'UPDATE', Company::class, $company->id, $meta);
 
         return response()->json(['data' => $company]);
     }

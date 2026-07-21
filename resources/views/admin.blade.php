@@ -591,6 +591,15 @@
         <h3>Company time zone <span class="hint">local day boundary for dashboards &amp; reports · individual branches can override below</span></h3>
         <div class="row"><select id="co-tz" style="max-width:280px"></select><button class="btn solid" id="co-tz-save">Save</button><span class="mut" id="co-tz-msg"></span></div>
       </div>
+      <div class="card" id="co-break-card">
+        <h3>Break time limits <span class="hint">permitted minutes per break — the agent asks the employee for a reason when a break runs over</span></h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;max-width:460px">
+          <div><label>Lunch (min)</label><input id="brk-lunch" type="number" min="1" max="600" value="30"></div>
+          <div><label>Tea (min)</label><input id="brk-tea" type="number" min="1" max="600" value="10"></div>
+          <div><label>Other (min)</label><input id="brk-other" type="number" min="1" max="600" value="10"></div>
+        </div>
+        <div class="row" style="margin-top:10px"><button class="btn solid" id="brk-save">Save</button><span class="mut" id="brk-msg"></span></div>
+      </div>
       <div class="card" id="co-ipx-card">
         <h3>Privacy — raw-IP &amp; local websites <span class="hint">for pages opened by a bare IP address (routers, NAS, internal tools, localhost)</span></h3>
         <div class="fbool"><input type="checkbox" id="co-ipx"> <b>Don't capture raw-IP / local-IP websites</b> <span class="mut" style="font-size:11.5px">— the working-hours time still counts, but it's logged as “Unknown source” with no address, page title or screenshot</span></div>
@@ -2645,6 +2654,32 @@ async function initOrg() {
         } catch (e) { $('#co-tz-msg').textContent = '✕ ' + e.message; }
       };
     }
+  }
+  if (!window.COBRK_INIT) {
+    window.COBRK_INIT = true;
+    // Section 3: load & save this company's break-time limits.
+    (async () => {
+      try {
+        const c = (await api('/companies/' + ME.company_id)).data;
+        if (c) {
+          if (c.break_limit_lunch_min) $('#brk-lunch').value = c.break_limit_lunch_min;
+          if (c.break_limit_tea_min) $('#brk-tea').value = c.break_limit_tea_min;
+          if (c.break_limit_other_min) $('#brk-other').value = c.break_limit_other_min;
+        }
+      } catch (e) { /* keep defaults */ }
+    })();
+    $('#brk-save').onclick = async () => {
+      const body = {
+        break_limit_lunch_min: Math.max(1, parseInt($('#brk-lunch').value, 10) || 30),
+        break_limit_tea_min: Math.max(1, parseInt($('#brk-tea').value, 10) || 10),
+        break_limit_other_min: Math.max(1, parseInt($('#brk-other').value, 10) || 10),
+      };
+      try {
+        await api('/companies/' + ME.company_id, { method: 'PUT', body: JSON.stringify(body) });
+        toast('Break limits saved');
+        $('#brk-msg').textContent = '✓ Saved.';
+      } catch (e) { $('#brk-msg').textContent = '✕ ' + e.message; }
+    };
   }
   if (!window.COIPX_INIT) {
     window.COIPX_INIT = true;

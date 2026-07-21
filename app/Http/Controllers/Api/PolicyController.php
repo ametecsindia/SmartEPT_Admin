@@ -147,7 +147,22 @@ class PolicyController extends Controller
             $device = EmployeeDevice::where('device_uuid', $request->query('device_uuid'))->first();
         }
 
-        return response()->json($resolver->bundleForEmployee($employee, $device));
+        $bundle = $resolver->bundleForEmployee($employee, $device);
+
+        // Section 3: hand the agent this company's break-time limits (seconds) so it can
+        // enforce the mandatory over-limit reason locally — works even while offline.
+        // "Other" is stored as break_type CUSTOM; expose both keys so the agent maps cleanly.
+        $company = Company::withoutGlobalScopes()->find($employee->company_id);
+        if (is_array($bundle) && $company) {
+            $bundle['break_limits'] = [
+                'LUNCH'  => (int) ($company->break_limit_lunch_min ?? 30) * 60,
+                'TEA'    => (int) ($company->break_limit_tea_min ?? 10) * 60,
+                'OTHER'  => (int) ($company->break_limit_other_min ?? 10) * 60,
+                'CUSTOM' => (int) ($company->break_limit_other_min ?? 10) * 60,
+            ];
+        }
+
+        return response()->json($bundle);
     }
 
     private function model(string $type): string
