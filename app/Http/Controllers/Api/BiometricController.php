@@ -83,8 +83,32 @@ class BiometricController extends Controller
             'biometric_employee_id' => ['required', 'string', 'max:64'],
             'employee_id'           => ['required', 'integer', Rule::exists('employees', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
             'biometric_device_id'   => ['nullable', 'integer'],
+            'force'                 => ['nullable', 'boolean'],
         ]);
 
+        // Section 9 rule: one employee holds ONE active biometric identity per company.
+        // If they already own a DIFFERENT active biometric ID, warn (409) and only
+        // proceed on an explicit force — then retire the old mapping.
+        $conflict = BiometricEmployeeMapping::where('employee_id', $data['employee_id'])
+            ->where('active', true)
+            ->where('biometric_employee_id', '!=', $data['biometric_employee_id'])
+            ->first();
+
+        if ($conflict && ! $request->boolean('force')) {
+            return response()->json([
+                'error' => [
+                    'code'    => 'EMPLOYEE_ALREADY_MAPPED',
+                    'message' => "This employee is already mapped to biometric ID {$conflict->biometric_employee_id}.",
+                    'existing_biometric_employee_id' => $conflict->biometric_employee_id,
+                ],
+            ], 409);
+        }
+        if ($conflict) {
+            $conflict->update(['active' => false]);
+        }
+
+        // The DB unique(company_id, biometric_employee_id) guarantees a biometric ID
+        // maps to exactly one row; updateOrCreate is company-scoped by the model.
         $map = BiometricEmployeeMapping::updateOrCreate(
             ['biometric_employee_id' => $data['biometric_employee_id']],
             ['employee_id' => $data['employee_id'], 'biometric_device_id' => $data['biometric_device_id'] ?? null, 'active' => true]
@@ -100,6 +124,96 @@ class BiometricController extends Controller
         $this->audit($request, 'ASSIGN', BiometricEmployeeMapping::class, $map->id, $data);
 
         return response()->json(['ok' => true, 'mapping_id' => $map->id], 201);
+    }
+
+    /** GET /api/integrations/biometric/mappings — current active biometric↔employee links. */
+    public function mappings(Request $request): JsonResponse
+    {
+        $rows = BiometricEmployeeMapping::with('employee:id,employee_code,first_name,last_name')
+            ->where('active', true)
+            ->orderBy('biometric_employee_id')
+            ->get()
+            ->map(fn ($m) => [
+                'id'                    => $m->id,
+                'biometric_employee_id' => $m->biometric_employee_id,
+                'employee_id'           => $m->employee_id,
+                'employee_name'         => $m->employee?->fullName(),
+                'biometric_device_id'   => $m->biometric_device_id,
+            ]);
+
+        return response()->json(['data' => $rows]);
+    }
+
+    /** GET /api/integrations/biometric/unmapped — distinct biometric IDs seen in punches but not linked. */
+    public function unmapped(Request $request): JsonResponse
+    {
+        $companyId = $request->user()->company_id;
+
+        $rows = BiometricLog::withoutGlobalScopes()
+            ->where('company_id', $companyId)
+            ->whereNull('employee_id')
+            ->selectRaw('biometric_employee_id, COUNT(*) as punches, MAX(punched_at) as last_seen')
+            ->groupBy('biometric_employee_id')
+            ->orderByDesc('punches')
+            ->limit(500)
+            ->get()
+            ->map(fn ($r) => [
+                'biometric_employee_id' => $r->biometric_employee_id,
+                'punches'               => (int) $r->punches,
+                'last_seen'             => $r->last_seen,
+            ]);
+
+        return response()->json(['data' => $rows]);
+    }
+
+    /** PUT /api/integrations/biometric/mappings/{mapping} — re-point a mapping to another employee. */
+    public function updateMapping(Request $request, BiometricEmployeeMapping $mapping): JsonResponse
+    {
+        $companyId = $request->user()->company_id;
+        $data = $request->validate([
+            'employee_id' => ['required', 'integer', Rule::exists('employees', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
+            'force'       => ['nullable', 'boolean'],
+        ]);
+
+        // Guard the one-employee-one-biometric rule here too (skip this same row).
+        $conflict = BiometricEmployeeMapping::where('employee_id', $data['employee_id'])
+            ->where('active', true)
+            ->where('id', '!=', $mapping->id)
+            ->first();
+        if ($conflict && ! $request->boolean('force')) {
+            return response()->json([
+                'error' => [
+                    'code'    => 'EMPLOYEE_ALREADY_MAPPED',
+                    'message' => "This employee is already mapped to biometric ID {$conflict->biometric_employee_id}.",
+                ],
+            ], 409);
+        }
+        if ($conflict) {
+            $conflict->update(['active' => false]);
+        }
+
+        $mapping->update(['employee_id' => $data['employee_id'], 'active' => true]);
+
+        // Re-point existing punches for this biometric ID to the new employee.
+        BiometricLog::withoutGlobalScopes()
+            ->where('company_id', $companyId)
+            ->where('biometric_employee_id', $mapping->biometric_employee_id)
+            ->update(['employee_id' => $data['employee_id']]);
+
+        $this->audit($request, 'UPDATE', BiometricEmployeeMapping::class, $mapping->id, $data);
+
+        return response()->json(['ok' => true]);
+    }
+
+    /** DELETE /api/integrations/biometric/mappings/{mapping} — remove a mapping (punch history kept). */
+    public function deleteMapping(Request $request, BiometricEmployeeMapping $mapping): JsonResponse
+    {
+        $this->audit($request, 'DELETE', BiometricEmployeeMapping::class, $mapping->id, [
+            'biometric_employee_id' => $mapping->biometric_employee_id,
+        ]);
+        $mapping->delete();
+
+        return response()->json(null, 204);
     }
 
     /**

@@ -203,6 +203,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('import', [BiometricController::class, 'import']);
         Route::post('map-employee', [BiometricController::class, 'mapEmployee']);
 
+        // Section 9: full mapping CRUD — list, discover unmapped IDs, re-point, remove.
+        Route::get('mappings', [BiometricController::class, 'mappings']);
+        Route::get('unmapped', [BiometricController::class, 'unmapped']);
+        Route::put('mappings/{mapping}', [BiometricController::class, 'updateMapping']);
+        Route::delete('mappings/{mapping}', [BiometricController::class, 'deleteMapping']);
+
         // Punch-device registry: physical readers AND cloud attendance APIs.
         Route::get('devices', [BiometricDeviceController::class, 'index']);
         Route::post('devices/test-connection', [BiometricDeviceController::class, 'testConnection']);

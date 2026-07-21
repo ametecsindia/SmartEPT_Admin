@@ -340,10 +340,17 @@
   .exp .row input{min-width:0;width:auto;flex:1;padding:8px 10px}
 
   /* ---------- Drawer ---------- */
+  /* Section 7: the drawer must sit ABOVE the sticky top bar (z-index:30) and the org
+     roll-up (z-index:20) — it was z-index:20 so its header slid under the page chrome.
+     Now it is a true top-level overlay (150) with a click-catching backdrop (140). */
+  .drawer-backdrop{position:fixed;inset:0;background:rgba(4,20,25,.5);backdrop-filter:blur(2px);
+    z-index:140;opacity:0;visibility:hidden;transition:opacity .2s ease,visibility .2s}
+  .drawer-backdrop.open{opacity:1;visibility:visible}
   .drawer{position:fixed;top:0;right:0;width:530px;max-width:92vw;height:100vh;background:var(--card);border-left:1px solid var(--border);
     box-shadow:-24px 0 60px rgba(5,42,51,.18);padding:22px;overflow-y:auto;transform:translateX(100%);
-    transition:transform .22s cubic-bezier(.2,.8,.3,1);z-index:20;border-radius:18px 0 0 18px}
+    transition:transform .22s cubic-bezier(.2,.8,.3,1);z-index:150;border-radius:18px 0 0 18px}
   .drawer.open{transform:none}
+  body.drawer-lock{overflow:hidden}
   .drawer .x{float:right;cursor:pointer;color:var(--ink-3);font-size:18px;width:30px;height:30px;text-align:center;
     line-height:30px;border-radius:8px;transition:background .12s}
   .drawer .x:hover{background:var(--card-2);color:var(--ink)}
@@ -795,11 +802,15 @@
           <div class="mut" id="bio-import-msg"></div>
         </div>
         <div class="card">
-          <h3>Map biometric ID → employee</h3>
+          <h3>Map biometric ID → employee <span class="hint">unmapped punches feed no one until the device ID is linked to a person</span></h3>
+          <label>Unmapped biometric IDs <span class="mut" style="font-weight:400">(seen in punches, not yet linked)</span></label>
+          <select id="bio-unmapped"><option value="">— pick an unmapped ID —</option></select>
           <label>Biometric employee ID (as on the device)</label><input id="bio-map-id" placeholder="e.g. 1043">
           <label>SmartEPT employee</label><select id="bio-map-emp"></select>
           <div class="row" style="margin-top:12px;justify-content:flex-end"><button class="btn solid" id="bio-map-save">Map</button></div>
           <div class="mut" id="bio-map-msg"></div>
+          <h3 style="margin-top:18px">Current mappings</h3>
+          <table><thead><tr><th>Biometric ID</th><th>Employee</th><th></th></tr></thead><tbody id="bio-map-rows"></tbody></table>
         </div>
       </div>
     </div>
@@ -1307,6 +1318,7 @@
 </div>
 
 <!-- EMPLOYEE DRAWER -->
+<div class="drawer-backdrop" id="drawer-backdrop"></div>
 <div class="drawer" id="drawer">
   <span class="x" id="drawer-x">✕</span>
   <h2 id="d-name" style="font-size:17px">Employee</h2>
@@ -1578,7 +1590,7 @@ async function api(path, opts = {}) {
     const msg = e?.error?.message || e?.message
       || (e?.errors ? Object.values(e.errors).flat().join(' ') : '')
       || ('HTTP ' + r.status);
-    const err = new Error(msg); err.status = r.status; throw err;
+    const err = new Error(msg); err.status = r.status; err.body = e; throw err;
   }
   return r.status === 204 ? null : r.json();
 }
@@ -3404,6 +3416,7 @@ function initBiometric() {
   $('#gate-save').onclick = saveGatePolicy;
   loadBioDevices();
   loadBiometric();
+  loadMappings(); // Section 9: existing mappings + unmapped-ID picker
   employeesList().then((emps) => fillEmpPicker($('#bio-map-emp'), emps)).catch(() => {});
 }
 let GATE_COMPANY_ID = null;
@@ -3606,17 +3619,64 @@ $('#bio-import').onclick = async () => {
     loadBiometric();
   } catch (e) { msg.textContent = '✕ ' + e.message; }
 };
-$('#bio-map-save').onclick = async () => {
+// Section 9: pick an unmapped ID from the dropdown → fills the manual field.
+document.addEventListener('change', (e) => {
+  if (e.target && e.target.id === 'bio-unmapped' && e.target.value) $('#bio-map-id').value = e.target.value;
+});
+
+async function mapBiometric(force) {
   const msg = $('#bio-map-msg');
   const bioId = $('#bio-map-id').value.trim(), empId = $('#bio-map-emp').value;
   if (!bioId || !empId) { msg.textContent = 'Enter the biometric ID and pick an employee.'; return; }
   try {
-    await api('/integrations/biometric/map-employee', { method: 'POST', body: JSON.stringify({ biometric_employee_id: bioId, employee_id: Number(empId) }) });
+    const body = { biometric_employee_id: bioId, employee_id: Number(empId) };
+    if (force) body.force = true;
+    await api('/integrations/biometric/map-employee', { method: 'POST', body: JSON.stringify(body) });
     msg.textContent = '✓ Mapped. Existing unmapped punches for this ID were back-filled.';
     $('#bio-map-id').value = '';
-    loadBiometric();
-  } catch (e) { msg.textContent = '✕ ' + e.message; }
-};
+    loadMappings(); loadBiometric();
+  } catch (e) {
+    // Section 9: one-employee-one-biometric warning → let the admin confirm a re-map.
+    const errObj = e.body && (e.body.error || e.body);
+    if (e.status === 409 && errObj && errObj.code === 'EMPLOYEE_ALREADY_MAPPED') {
+      if (window.confirm((errObj.message || e.message) + '\n\nRe-map this employee to the new biometric ID?')) return mapBiometric(true);
+      msg.textContent = 'Mapping cancelled.';
+      return;
+    }
+    msg.textContent = '✕ ' + e.message;
+  }
+}
+$('#bio-map-save').onclick = () => mapBiometric(false);
+
+// Section 9: list existing mappings (with remove) + refresh the unmapped-ID picker.
+async function loadMappings() {
+  try {
+    const r = await api('/integrations/biometric/mappings');
+    $('#bio-map-rows').innerHTML = (r.data || []).map((m) => '<tr>'
+      + '<td>' + esc(m.biometric_employee_id) + '</td>'
+      + '<td><span class="nm">' + esc(m.employee_name || ('#' + m.employee_id)) + '</span></td>'
+      + '<td style="text-align:right"><button class="btn ghost sm" data-map-del="' + m.id + '">Remove</button></td></tr>').join('')
+      || '<tr><td colspan="3" class="mut">No mappings yet. Link an unmapped biometric ID to a person above.</td></tr>';
+  } catch (e) {
+    $('#bio-map-rows').innerHTML = '<tr><td colspan="3" class="mut">' + esc(e.message) + '</td></tr>';
+  }
+  try {
+    const u = await api('/integrations/biometric/unmapped');
+    const sel = $('#bio-unmapped');
+    sel.innerHTML = '<option value="">— pick an unmapped ID —</option>'
+      + (u.data || []).map((x) => '<option value="' + esc(x.biometric_employee_id) + '">' + esc(x.biometric_employee_id) + ' (' + x.punches + ' punch' + (x.punches === 1 ? '' : 'es') + ')</option>').join('');
+  } catch (e) { /* keep the placeholder */ }
+}
+// Remove a mapping (event delegation so it survives table re-render).
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest && e.target.closest('[data-map-del]');
+  if (!btn) return;
+  if (!window.confirm('Remove this biometric mapping? Punch history is kept; new punches for this ID will be unmapped until re-linked.')) return;
+  try {
+    await api('/integrations/biometric/mappings/' + Number(btn.dataset.mapDel), { method: 'DELETE' });
+    loadMappings(); loadBiometric();
+  } catch (err) { $('#bio-map-msg').textContent = '✕ ' + err.message; }
+});
 
 // ---- 9. reports & exports ----
 // ---- Live productivity report (17-Jul) ----
@@ -3740,11 +3800,24 @@ async function openEmployee(id, name) {
   DID = id;
   $('#d-name').textContent = name; $('#d-sub').textContent = 'Employee #' + id + ' · today';
   $('#drawer').classList.add('open');
+  // Section 7: show the backdrop above the page and lock background scroll.
+  const bd = $('#drawer-backdrop'); if (bd) bd.classList.add('open');
+  document.body.classList.add('drawer-lock');
   $$('.tab').forEach((tb) => tb.classList.toggle('active', tb.dataset.tab === 'timeline'));
   loadTab('timeline');
 }
-function closeDrawer() { $('#drawer').classList.remove('open'); }
+function closeDrawer() {
+  $('#drawer').classList.remove('open');
+  const bd = $('#drawer-backdrop'); if (bd) bd.classList.remove('open');
+  document.body.classList.remove('drawer-lock');
+}
 $('#drawer-x').onclick = closeDrawer;
+// Section 7: clicking the backdrop (anywhere outside the panel) closes it; a click
+// inside the drawer never reaches the backdrop, so it stays open. Esc also closes.
+$('#drawer-backdrop').onclick = closeDrawer;
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $('#drawer').classList.contains('open')) closeDrawer();
+});
 $$('.tab').forEach((tb) => tb.onclick = () => {
   $$('.tab').forEach((x) => x.classList.remove('active')); tb.classList.add('active'); loadTab(tb.dataset.tab);
 });
