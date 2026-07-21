@@ -758,7 +758,16 @@
         <h3>Biometric Device Setup <span class="hint">connect a cloud attendance API — punches sync continuously (every 5 minutes) into Attendance, payroll and the Biometric Gate</span></h3>
         <table><thead><tr><th>Provider</th><th>API</th><th>Auto sync</th><th>Status</th><th>Last sync</th><th>Last result</th><th>Punches</th><th></th></tr></thead><tbody id="biodev-rows"></tbody></table>
         <div style="margin-top:14px;max-width:560px">
-          <div class="fbool"><input type="checkbox" id="bd-sync"> <b>Enable automatic sync — continuous, every 5 minutes (like the heartbeat)</b></div>
+          <label>Automatic sync <span class="hint">runs in the background via the scheduler — no need to open this tab and click Sync</span></label>
+          <select id="bd-mode">
+            <option value="INTERVAL">Automatic — every N minutes</option>
+            <option value="SCHEDULED">Automatic — at set daily times</option>
+            <option value="MANUAL">Manual only — sync when I click Sync</option>
+          </select>
+          <div class="grid2">
+            <div><label>Interval (minutes)</label><input id="bd-interval" type="number" min="1" max="1440" value="5"></div>
+            <div><label>Scheduled times <span class="mut" style="font-weight:400">(24h, comma-separated)</span></label><input id="bd-times" placeholder="09:00, 13:30"></div>
+          </div>
           <label>Provider</label><input id="bd-provider" placeholder="etimeoffice">
           <div class="mut" style="font-size:11.5px;margin:2px 0 8px">Cloud attendance provider name.</div>
           <label>API base URL</label><input id="bd-base" placeholder="https://api.etimeoffice.com/api">
@@ -3450,9 +3459,14 @@ async function loadBioDevices() {
     $('#biodev-rows').innerHTML = bdDevices.map((v) => '<tr>'
       + '<td><span class="nm">' + esc(v.provider || v.name) + '</span></td>'
       + '<td class="mut" style="max-width:200px;overflow:hidden;text-overflow:ellipsis">' + esc(v.api_base_url ? (v.api_base_url + (v.api_endpoint ? '/' + v.api_endpoint : '')) : (v.integration_method || '—')) + '</td>'
-      + '<td><span class="tag ' + (v.sync_enabled ? 't-ok' : 't-off') + '">' + (v.sync_enabled ? 'HOURLY' : 'OFF') + '</span></td>'
+      + '<td><span class="tag ' + (v.sync_mode === 'MANUAL' ? 't-off' : 't-ok') + '">'
+        + (v.sync_mode === 'INTERVAL' ? ('EVERY ' + (v.sync_interval_minutes || 5) + 'M')
+           : v.sync_mode === 'SCHEDULED' ? ('AT ' + ((v.sync_times || []).join(', ') || 'set times'))
+           : 'MANUAL') + '</span>'
+        + (v.next_sync_at ? '<div class="mut" style="font-size:10.5px">next ' + dt(v.next_sync_at) + '</div>' : '') + '</td>'
       + '<td><span class="tag ' + (v.status === 'ACTIVE' ? 't-ok' : 't-off') + '">' + esc(v.status) + '</span></td>'
-      + '<td>' + (v.last_sync_at ? dt(v.last_sync_at) : '—') + '</td>'
+      + '<td>' + (v.last_sync_ok_at ? dt(v.last_sync_ok_at) : (v.last_sync_at ? dt(v.last_sync_at) : '—'))
+        + (v.last_sync_at && (!v.last_sync_ok_at || v.last_sync_at > v.last_sync_ok_at) ? '<div class="mut" style="font-size:10.5px">tried ' + dt(v.last_sync_at) + '</div>' : '') + '</td>'
       + '<td class="mut" style="max-width:220px">' + esc(v.last_sync_result || '—') + '</td>'
       + '<td>' + (v.logs_count ?? 0) + '</td>'
       + '<td><button class="btn" data-bd-edit="' + v.id + '">Edit</button> <button class="btn" data-bd-del="' + v.id + '">Delete</button></td></tr>').join('')
@@ -3463,8 +3477,8 @@ async function loadBioDevices() {
 }
 function bdReset() {
   bdEditId = null;
-  ['#bd-provider', '#bd-base', '#bd-endpoint', '#bd-corp', '#bd-user', '#bd-pass', '#bd-filter', '#bd-prefix', '#bd-inmc', '#bd-outmc'].forEach((q) => { $(q).value = ''; });
-  $('#bd-sync').checked = false;
+  ['#bd-provider', '#bd-base', '#bd-endpoint', '#bd-corp', '#bd-user', '#bd-pass', '#bd-filter', '#bd-prefix', '#bd-inmc', '#bd-outmc', '#bd-times'].forEach((q) => { $(q).value = ''; });
+  $('#bd-mode').value = 'INTERVAL'; $('#bd-interval').value = '5';
   $('#bd-pass').placeholder = '••••••••';
   $('#bd-save').textContent = 'Save';
   $('#bd-msg').textContent = '';
@@ -3476,7 +3490,9 @@ function bdCollect() {
   const body = {
     provider: gv('#bd-provider'),
     name: gv('#bd-provider'),
-    sync_enabled: $('#bd-sync').checked,
+    sync_mode: $('#bd-mode').value,
+    sync_interval_minutes: Math.max(1, parseInt($('#bd-interval').value, 10) || 5),
+    sync_times: ($('#bd-times').value || '').split(',').map((s) => s.trim()).filter((s) => /^\d{1,2}:\d{2}$/.test(s)),
     api_base_url: gv('#bd-base'),
     api_endpoint: gv('#bd-endpoint'),
     corporate_id: gv('#bd-corp'),
@@ -3560,7 +3576,9 @@ $('#biodev-rows').addEventListener('click', async (ev) => {
     $('#bd-prefix').value = v.employee_id_prefix || '';
     $('#bd-inmc').value = v.in_machine_id || '';
     $('#bd-outmc').value = v.out_machine_id || '';
-    $('#bd-sync').checked = !!v.sync_enabled;
+    $('#bd-mode').value = v.sync_mode || (v.sync_enabled ? 'INTERVAL' : 'MANUAL');
+    $('#bd-interval').value = v.sync_interval_minutes || 5;
+    $('#bd-times').value = (v.sync_times || []).join(', ');
     $('#bd-save').textContent = 'Save changes';
     $('#bd-msg').textContent = 'Editing "' + (v.provider || v.name) + '" — change the fields and press Save changes.';
   }

@@ -33,9 +33,15 @@ class BiometricDeviceController extends Controller
                 'status'               => $d->status,
                 'branch_id'            => $d->branch_id,
                 'last_sync_at'         => $d->last_sync_at?->toDateTimeString(),
+                'last_sync_ok_at'      => $d->last_sync_ok_at?->toDateTimeString(),
+                'next_sync_at'         => $d->next_sync_at?->toDateTimeString(),
                 'last_sync_result'     => $d->last_sync_result,
+                'last_sync_counts'     => $d->last_sync_counts,
                 'logs_count'           => $d->logs_count,
                 'sync_enabled'         => (bool) $d->sync_enabled,
+                'sync_mode'            => $d->sync_mode ?: 'INTERVAL',
+                'sync_interval_minutes' => (int) ($d->sync_interval_minutes ?: 5),
+                'sync_times'           => $d->sync_times ?: [],
                 'provider'             => $d->provider,
                 'api_base_url'         => $d->api_base_url,
                 'api_endpoint'         => $d->api_endpoint,
@@ -136,6 +142,11 @@ class BiometricDeviceController extends Controller
             ],
             // Cloud attendance API (eTimeOffice-style) — Biometric Device Setup form.
             'sync_enabled'         => ['nullable', 'boolean'],
+            // Section 8: automatic sync mode + schedule.
+            'sync_mode'            => ['nullable', Rule::in(['INTERVAL', 'SCHEDULED', 'MANUAL'])],
+            'sync_interval_minutes' => ['nullable', 'integer', 'min:1', 'max:1440'],
+            'sync_times'           => ['nullable', 'array', 'max:24'],
+            'sync_times.*'         => ['string', 'regex:/^\d{1,2}:\d{2}$/'],
             'provider'             => ['nullable', 'string', 'max:120'],
             'api_base_url'         => ['nullable', 'string', 'max:500'],
             'api_endpoint'         => ['nullable', 'string', 'max:190'],
@@ -156,6 +167,12 @@ class BiometricDeviceController extends Controller
         // A blank password on edit means "keep the saved one" — never overwrite with null.
         if (blank($data['api_password'] ?? null)) {
             unset($data['api_password']);
+        }
+
+        // Section 8: keep the legacy auto flag consistent with the chosen mode so both
+        // the scheduler fallback and the "AUTO/OFF" chip agree — MANUAL == auto off.
+        if (isset($data['sync_mode'])) {
+            $data['sync_enabled'] = $data['sync_mode'] !== 'MANUAL';
         }
 
         return $data;
