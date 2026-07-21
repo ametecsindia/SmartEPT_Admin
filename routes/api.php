@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\LicenseController;
 use App\Http\Controllers\Api\MeetingController;
 use App\Http\Controllers\Api\AgentMeetingController;
+use App\Http\Controllers\Api\BreakReportController;
 use App\Http\Controllers\Api\OpsController;
 use App\Http\Controllers\Api\StorageConfigController;
 use App\Http\Controllers\Api\ReportController;
@@ -190,6 +191,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('dashboard/summary', [DashboardController::class, 'summary'])->middleware($mgr);
     Route::get('dashboard/device-health', [DashboardController::class, 'deviceHealth'])->middleware($mgr);
     Route::get('reports/employee/{employee}/timeline', [ReportController::class, 'timeline'])->middleware($mgr);
+    // Section 3 & 14: break report (permitted/actual/excess/reason) + meeting report.
+    Route::get('reports/breaks', [BreakReportController::class, 'index'])->middleware($mgr);
+    Route::get('reports/meetings', [MeetingController::class, 'report'])->middleware($mgr);
+    Route::put('reports/breaks/{break}/review', [BreakReportController::class, 'review'])
+        ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,HR_ADMIN');
     // Monthly payroll pack: per-employee counts + payable days for a month.
     Route::get('reports/monthly-summary', [MonthlyReportController::class, 'summary'])->middleware($mgr);
 

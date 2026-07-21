@@ -12,6 +12,7 @@ use App\Models\EmployeeBreakLog;
 use App\Models\EmployeeComplianceEvent;
 use App\Models\EmployeeDailySummary;
 use App\Models\EmployeeLoginSession;
+use App\Models\EmployeeMeetingSession;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -65,6 +66,15 @@ class ProductivityController extends Controller
             ->groupBy('employee_id', DB::raw('DATE(login_at)'))->get()
             ->keyBy(fn ($r) => $r->employee_id . '|' . $r->d);
 
+        // Section 14: Meeting time is PRODUCTIVE (never a break). Aggregate meeting
+        // session seconds per employee|date so it can be added to productive time.
+        $meetings = EmployeeMeetingSession::where('company_id', $companyId)
+            ->whereBetween('actual_start_at', [$from, $to])
+            ->when($empId, fn ($q) => $q->where('employee_id', $empId))
+            ->selectRaw('employee_id, DATE(actual_start_at) d, COALESCE(SUM(duration_seconds),0) secs')
+            ->groupBy('employee_id', DB::raw('DATE(actual_start_at)'))->get()
+            ->keyBy(fn ($r) => $r->employee_id . '|' . $r->d);
+
         $rows = [];
 
         // 1) Completed days from the daily-summary aggregate (fast + accurate).
@@ -85,6 +95,7 @@ class ProductivityController extends Controller
                 'idle' => $s->idle_seconds, 'break_secs' => $s->break_seconds,
                 'break_count' => $bk?->cnt ?? 0, 'timeouts' => ($timeouts[$s->employee_id . '|' . $d]->cnt ?? 0),
                 'non_productive' => $s->non_productive_seconds, 'violations' => $s->violation_count,
+                'meeting' => (int) ($meetings[$s->employee_id . '|' . $d]->secs ?? 0),
                 'score' => (float) $s->productivity_score, 'live' => false,
             ]);
         }
@@ -127,6 +138,7 @@ class ProductivityController extends Controller
                     'break_secs' => (int) ($bk?->secs ?? 0), 'break_count' => (int) ($bk?->cnt ?? 0),
                     'timeouts' => ($timeouts[$emp->id . '|' . $today]->cnt ?? 0),
                     'non_productive' => 0, 'violations' => (int) ($viol[$emp->id]->c ?? 0),
+                    'meeting' => (int) ($meetings[$emp->id . '|' . $today]->secs ?? 0),
                     'score' => $present > 0 ? round($work / max($present, 1) * 100, 1) : 0, 'live' => true,
                 ]);
             }
@@ -159,6 +171,10 @@ class ProductivityController extends Controller
             'timeouts' => (int) $m['timeouts'],
             'non_productive_seconds' => (int) $m['non_productive'],
             'violations' => (int) $m['violations'],
+            // Section 14: Meeting time is productive, kept separate from breaks. The
+            // productive figure adds meeting time to tracked active time.
+            'meeting_seconds' => (int) ($m['meeting'] ?? 0),
+            'productive_seconds' => (int) $m['work'] + (int) ($m['meeting'] ?? 0),
             'productivity' => (float) $m['score'],
             'live' => (bool) $m['live'],
         ];

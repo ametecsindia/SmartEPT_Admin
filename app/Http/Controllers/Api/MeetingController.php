@@ -170,6 +170,37 @@ class MeetingController extends Controller
         ]]);
     }
 
+    /** GET /api/reports/meetings — company-wide meeting attendance report. */
+    public function report(Request $request): JsonResponse
+    {
+        $meetings = Meeting::withCount('participants')
+            ->when($request->from, fn ($q, $v) => $q->whereDate('start_at', '>=', $v))
+            ->when($request->to, fn ($q, $v) => $q->whereDate('start_at', '<=', $v))
+            ->when($request->status, fn ($q, $v) => $q->where('status', $v))
+            ->orderByDesc('start_at')
+            ->limit(1000)
+            ->get();
+
+        $sessions = EmployeeMeetingSession::whereIn('meeting_id', $meetings->pluck('id'))
+            ->selectRaw('meeting_id, COUNT(DISTINCT employee_id) attended, COALESCE(SUM(duration_seconds),0) secs')
+            ->groupBy('meeting_id')->get()->keyBy('meeting_id');
+
+        $rows = $meetings->map(fn ($m) => [
+            'id'                => $m->id,
+            'title'             => $m->title,
+            'date'              => $m->meeting_date?->toDateString(),
+            'start_at'          => $m->start_at?->toDateTimeString(),
+            'end_at'            => $m->end_at?->toDateTimeString(),
+            'status'            => $this->liveStatus($m),
+            'participants'      => $m->participants_count,
+            'attended'          => (int) ($sessions[$m->id]->attended ?? 0),
+            'scheduled_seconds' => ($m->start_at && $m->end_at) ? (int) $m->end_at->diffInSeconds($m->start_at, true) : null,
+            'actual_seconds'    => (int) ($sessions[$m->id]->secs ?? 0),
+        ]);
+
+        return response()->json(['data' => $rows]);
+    }
+
     // ---- helpers ----
 
     private function validateMeeting(Request $request, int $companyId): array

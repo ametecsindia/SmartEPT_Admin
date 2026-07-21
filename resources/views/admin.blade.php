@@ -875,11 +875,44 @@
         <table id="pr-table"><thead><tr>
           <th>Date</th><th>Code</th><th>Employee</th><th>Dept</th>
           <th>Logged in</th><th>Logged out</th><th>Present</th><th>Working</th><th>Idle</th>
-          <th>Breaks</th><th>Break time</th><th>Time-outs</th><th>Non-prod.</th><th>Violations</th><th>Prod. %</th>
-        </tr></thead><tbody id="pr-rows"><tr><td colspan="15" class="mut">Pick a range and press Show.</td></tr></tbody></table>
+          <th>Breaks</th><th>Break time</th><th>Meeting</th><th>Time-outs</th><th>Non-prod.</th><th>Violations</th><th>Prod. %</th>
+        </tr></thead><tbody id="pr-rows"><tr><td colspan="16" class="mut">Pick a range and press Show.</td></tr></tbody></table>
         </div>
         <div class="mut" id="pr-note" style="margin-top:8px"></div>
       </div>
+
+      <!-- Section 3 & 14: Break report -->
+      <div class="card">
+        <h3>Break report <span class="hint">permitted vs actual, excess &amp; the employee's reason · Meeting is never a break</span></h3>
+        <div class="filters" style="border:none;box-shadow:none;padding:0;background:none;margin-bottom:12px">
+          <label>From</label><input type="date" id="br-from" style="min-width:0">
+          <label>To</label><input type="date" id="br-to" style="min-width:0">
+          <select id="br-type"><option value="">All break types</option><option value="LUNCH">Lunch</option><option value="TEA">Tea</option><option value="CUSTOM">Other</option></select>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px"><input type="checkbox" id="br-exceeded" style="width:auto;margin:0"> Exceeded only</label>
+          <button class="btn acc" id="br-load">Show</button>
+          <span style="flex:1"></span>
+          <button class="btn" id="br-csv">⇓ CSV</button>
+        </div>
+        <div style="overflow-x:auto">
+        <table><thead><tr><th>Date</th><th>Employee</th><th>Type</th><th>Start</th><th>End</th><th>Permitted</th><th>Actual</th><th>Excess</th><th>Reason</th><th>Review</th></tr></thead>
+        <tbody id="br-rows"><tr><td colspan="10" class="mut">Pick a range and press Show.</td></tr></tbody></table>
+        </div>
+      </div>
+
+      <!-- Section 14: Meeting report -->
+      <div class="card">
+        <h3>Meeting report <span class="hint">scheduled vs actual attendance · meeting time is productive</span></h3>
+        <div class="filters" style="border:none;box-shadow:none;padding:0;background:none;margin-bottom:12px">
+          <label>From</label><input type="date" id="mr-from" style="min-width:0">
+          <label>To</label><input type="date" id="mr-to" style="min-width:0">
+          <button class="btn acc" id="mr-load">Show</button>
+        </div>
+        <div style="overflow-x:auto">
+        <table><thead><tr><th>Meeting</th><th>Date</th><th>Status</th><th>Participants</th><th>Attended</th><th>Scheduled</th><th>Actual total</th></tr></thead>
+        <tbody id="mr-rows"><tr><td colspan="7" class="mut">Pick a range and press Show.</td></tr></tbody></table>
+        </div>
+      </div>
+
       <div class="exp-grid">
         <div class="exp"><b>Attendance report</b>
           <p>Punch in/out, agent login, late marks, source — day-wise per employee. CSV opens directly in Excel.</p>
@@ -3979,7 +4012,7 @@ function prSetRange(from, to) { $('#pr-from').value = from; $('#pr-to').value = 
 function isoDate(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 async function loadProductivity() {
   const from = $('#pr-from').value || today(), to = $('#pr-to').value || today();
-  $('#pr-rows').innerHTML = '<tr><td colspan="15" class="mut">Loading…</td></tr>';
+  $('#pr-rows').innerHTML = '<tr><td colspan="16" class="mut">Loading…</td></tr>';
   try {
     const r = await api('/reports/productivity?from=' + from + '&to=' + to);
     PROD_ROWS = r.data || [];
@@ -3996,14 +4029,15 @@ async function loadProductivity() {
       '<td data-sort="' + x.idle_seconds + '">' + hms(x.idle_seconds) + '</td>' +
       '<td data-sort="' + x.break_count + '">' + x.break_count + '</td>' +
       '<td data-sort="' + x.break_seconds + '">' + hms(x.break_seconds) + '</td>' +
+      '<td data-sort="' + (x.meeting_seconds || 0) + '">' + (x.meeting_seconds ? hms(x.meeting_seconds) : '—') + '</td>' +
       '<td data-sort="' + x.timeouts + '">' + x.timeouts + '</td>' +
       '<td data-sort="' + x.non_productive_seconds + '">' + hms(x.non_productive_seconds) + '</td>' +
       '<td data-sort="' + x.violations + '">' + (x.violations ? '<span class="tag t-danger">' + x.violations + '</span>' : '0') + '</td>' +
       '<td data-sort="' + x.productivity + '"><b>' + Number(x.productivity).toFixed(0) + '%</b></td></tr>'
-    ).join('') : '<tr><td colspan="15" class="mut">No activity in this range.</td></tr>';
+    ).join('') : '<tr><td colspan="16" class="mut">No activity in this range.</td></tr>';
     $('#pr-note').textContent = PROD_ROWS.length + ' rows · ' + from + ' → ' + to + ' · working = active tracked time; present = in-office span.';
     attachTableFilter($('#pr-q'), '#pr-rows');
-  } catch (e) { $('#pr-rows').innerHTML = '<tr><td colspan="15" class="mut">' + esc(e.message) + '</td></tr>'; }
+  } catch (e) { $('#pr-rows').innerHTML = '<tr><td colspan="16" class="mut">' + esc(e.message) + '</td></tr>'; }
 }
 // R4 item 6: extracted reports use hh:mm, not raw seconds/minutes.
 const hhmm = (sec) => { const m = Math.max(0, Math.round((sec || 0) / 60)); return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
@@ -4044,6 +4078,13 @@ function initReports() {
   $('#pr-csv').onclick = prCSV;
   $('#pr-pdf').onclick = prPDF;
   loadProductivity();
+  // Section 3 & 14: break + meeting reports.
+  if (!$('#br-from').value) { $('#br-from').value = today(); $('#br-to').value = today(); }
+  if (!$('#mr-from').value) { $('#mr-from').value = today(); $('#mr-to').value = today(); }
+  $('#br-load').onclick = loadBreakReport;
+  $('#br-csv').onclick = () => downloadCsv(breakReportQs() + '&format=csv', 'break_report_' + $('#br-from').value + '.csv');
+  $('#mr-load').onclick = loadMeetingReport;
+  loadBreakReport(); loadMeetingReport();
   const d = today(), m = d.slice(0, 7);
   [['#rp-att-from', d], ['#rp-att-to', d], ['#rp-prod-from', d], ['#rp-prod-to', d],
    ['#rp-comp-from', d], ['#rp-comp-to', d], ['#rp-sum-from', d], ['#rp-sum-to', d],
@@ -4081,6 +4122,70 @@ async function loadMonthlySummary() {
   }
 }
 $('#rp-ms').onclick = loadMonthlySummary;
+
+// ---- Section 3 & 14: break report ----
+function breakReportQs() {
+  const qs = new URLSearchParams();
+  qs.set('from', $('#br-from').value || today());
+  qs.set('to', $('#br-to').value || today());
+  if ($('#br-type').value) qs.set('break_type', $('#br-type').value);
+  if ($('#br-exceeded').checked) qs.set('exceeded', '1');
+  return '/reports/breaks?' + qs.toString();
+}
+const brMin = (s) => s == null ? '—' : (Math.round((s / 60) * 10) / 10) + 'm';
+const BR_REV_TAG = { PENDING: 't-warn', REVIEWED: 't-ok', NONE: 't-off' };
+async function loadBreakReport() {
+  try {
+    const d = await api(breakReportQs());
+    $('#br-rows').innerHTML = (d.data || []).map((r) => '<tr>'
+      + '<td>' + esc(r.date || '—') + '</td>'
+      + '<td><span class="nm">' + esc(r.name || '—') + '</span></td>'
+      + '<td>' + esc(r.break_type) + '</td>'
+      + '<td>' + (r.start_at ? dt(r.start_at) : '—') + '</td>'
+      + '<td>' + (r.end_at ? dt(r.end_at) : '—') + '</td>'
+      + '<td>' + brMin(r.permitted_seconds) + '</td>'
+      + '<td>' + brMin(r.actual_seconds) + '</td>'
+      + '<td>' + (r.excess_seconds > 0 ? '<span class="tag t-danger">' + brMin(r.excess_seconds) + '</span>' : '—') + '</td>'
+      + '<td class="mut" style="max-width:220px">' + esc(r.delay_reason || '—') + '</td>'
+      + '<td><button class="btn" data-br-review="' + r.id + '" data-br-status="' + (r.review_status || 'NONE') + '"><span class="tag ' + (BR_REV_TAG[r.review_status] || 't-off') + '">' + esc(r.review_status || 'NONE') + '</span></button></td></tr>').join('')
+      || '<tr><td colspan="10" class="mut">No breaks in this range.</td></tr>';
+  } catch (e) {
+    $('#br-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="10" class="mut">' + esc(e.message) + '</td></tr>';
+  }
+}
+// Review a break (Admin/HR): set remarks + mark reviewed.
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest && e.target.closest('[data-br-review]');
+  if (!btn) return;
+  const remarks = window.prompt('Reviewer remarks (optional) — saving marks this break REVIEWED:', '');
+  if (remarks === null) return;
+  try {
+    await api('/reports/breaks/' + Number(btn.dataset.brReview) + '/review', { method: 'PUT', body: JSON.stringify({ review_status: 'REVIEWED', reviewer_remarks: remarks || null }) });
+    toast('Break reviewed'); loadBreakReport();
+  } catch (err) { alert(err.message); }
+});
+
+// ---- Section 14: meeting report ----
+const MR_STATUS_TAG = { SCHEDULED: 't-warn', IN_PROGRESS: 't-ok', COMPLETED: 't-off', CANCELLED: 't-danger' };
+async function loadMeetingReport() {
+  const qs = new URLSearchParams();
+  qs.set('from', $('#mr-from').value || today());
+  qs.set('to', $('#mr-to').value || today());
+  try {
+    const d = await api('/reports/meetings?' + qs.toString());
+    $('#mr-rows').innerHTML = (d.data || []).map((r) => '<tr>'
+      + '<td><span class="nm">' + esc(r.title) + '</span></td>'
+      + '<td>' + esc(r.date || '—') + '</td>'
+      + '<td><span class="tag ' + (MR_STATUS_TAG[r.status] || 't-off') + '">' + esc((r.status || '').replace('_', ' ')) + '</span></td>'
+      + '<td>' + (r.participants ?? 0) + '</td>'
+      + '<td>' + (r.attended ?? 0) + '</td>'
+      + '<td>' + brMin(r.scheduled_seconds) + '</td>'
+      + '<td>' + brMin(r.actual_seconds) + '</td></tr>').join('')
+      || '<tr><td colspan="7" class="mut">No meetings in this range.</td></tr>';
+  } catch (e) {
+    $('#mr-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="7" class="mut">' + esc(e.message) + '</td></tr>';
+  }
+}
 document.querySelectorAll('[data-export]').forEach((b) => b.addEventListener('click', () => {
   const kind = b.dataset.export;
   const qs = kind === 'productivity' ? '?date=' + today() : '?from=' + today() + '&to=' + today();
