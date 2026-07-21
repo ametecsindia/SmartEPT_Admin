@@ -130,6 +130,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('register-device', [DeviceController::class, 'register']);
         Route::get('policy', [PolicyController::class, 'agentBundle']);
         Route::post('heartbeat', [DeviceController::class, 'heartbeat']);
+        // Section 10: the agent's explicit sign-out (revokes this device's session).
+        Route::post('session-logout', [DeviceController::class, 'sessionLogout']);
         Route::post('consent', [ConsentController::class, 'store']);
         Route::get('consent/status', [ConsentController::class, 'status']);
         Route::get('today', [AgentStatusController::class, 'today']);
@@ -297,6 +299,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('devices/{device}/unbind', [DeviceController::class, 'unbind']);
         Route::post('devices/{device}/rebind', [DeviceController::class, 'rebind']);
         Route::put('devices/{device}/tracking-mode', [DeviceController::class, 'trackingMode']);
+        // Section 10: end an employee's agent session on a specific device.
+        Route::post('devices/{device}/force-logout', [DeviceController::class, 'forceLogout']);
     });
 
     // ---- Policy Engine ----

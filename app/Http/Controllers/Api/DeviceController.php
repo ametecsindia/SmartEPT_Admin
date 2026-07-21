@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\EmployeeDevice;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class DeviceController extends Controller
 {
@@ -66,56 +67,114 @@ class DeviceController extends Controller
 
         $isNewDevice = $existing === null;
 
-        if ($isNewDevice) {
-            $seat = app(\App\Services\LicenseClient::class)
-                ->activateDevice($data['device_uuid'], $data['computer_name'] ?? null);
+        // Section 10: server-enforced single active session per employee. Serialise
+        // concurrent logins for this employee with a short lock so two PCs racing to
+        // sign in cannot BOTH win, then deny if another PC already holds a live session.
+        $staleMinutes = (int) config('smartept.session_stale_minutes', 10);
+        $lock = Cache::lock('agent-login:emp:' . $employee->id, 10);
+        try {
+            $lock->block(5);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => ['code' => 'LOGIN_BUSY', 'message' => 'Another sign-in is in progress — please try again.']], 409);
+        }
 
-            if (! $seat['ok']) {
+        try {
+            $activeOther = EmployeeDevice::where('employee_id', $employee->id)
+                ->where('device_uuid', '!=', $data['device_uuid'])
+                ->where('session_status', 'ACTIVE')
+                ->whereNull('unbound_at')
+                ->where('last_heartbeat_at', '>=', now()->subMinutes($staleMinutes))
+                ->first();
+
+            if ($activeOther) {
+                $this->audit($request, 'LOGIN_DENIED_CONCURRENT', EmployeeDevice::class, $activeOther->id, [
+                    'attempted_device' => $data['device_uuid'],
+                    'active_device'     => $activeOther->device_uuid,
+                ]);
+
                 return response()->json([
                     'error' => [
-                        'code' => 'LICENSE_SEAT_BLOCKED',
-                        'reason' => $seat['reason'],
-                        'message' => $seat['reason'] === 'device_limit_reached'
-                            ? 'All licensed device seats are in use. Free a seat (offboard/unbind a device) or upgrade the licence.'
-                            : 'This device cannot be activated on the current licence (' . $seat['reason'] . ').',
+                        'code' => 'SINGLE_SESSION_ACTIVE',
+                        'message' => 'Your SmartEPT account is already active on another computer ('
+                            . ($activeOther->computer_name ?: 'another PC') . '). Please log out from the other computer or contact your administrator.',
                     ],
                 ], 409);
             }
+
+            if ($isNewDevice) {
+                $seat = app(\App\Services\LicenseClient::class)
+                    ->activateDevice($data['device_uuid'], $data['computer_name'] ?? null);
+
+                if (! $seat['ok']) {
+                    return response()->json([
+                        'error' => [
+                            'code' => 'LICENSE_SEAT_BLOCKED',
+                            'reason' => $seat['reason'],
+                            'message' => $seat['reason'] === 'device_limit_reached'
+                                ? 'All licensed device seats are in use. Free a seat (offboard/unbind a device) or upgrade the licence.'
+                                : 'This device cannot be activated on the current licence (' . $seat['reason'] . ').',
+                        ],
+                    ], 409);
+                }
+            }
+
+            $device = EmployeeDevice::updateOrCreate(
+                ['device_uuid' => $data['device_uuid']],
+                array_merge($data, [
+                    'company_id'      => $employee->company_id,
+                    'employee_id'     => $employee->id,
+                    'current_status'  => 'ONLINE',
+                    'agent_health'    => 'HEALTHY',
+                    'registered_at'   => now(),
+                    'last_heartbeat_at' => now(),
+                    'session_status'  => 'ACTIVE',
+                    'last_login_at'   => now(),
+                    'force_logout_at' => null,
+                ])
+            );
+
+            // Issue a device-scoped token (ability 'agent') on the employee's user account.
+            $user = $request->user();
+            $ttl = config('smartept.agent_token_ttl');
+            $token = $user->createToken(
+                'device:' . $data['device_uuid'],
+                ['agent'],
+                $ttl ? now()->addMinutes($ttl) : null
+            )->plainTextToken;
+
+            $device->forceFill(['device_token_hash' => hash('sha256', $token)])->save();
+
+            // Section 10: this device is now THE session — retire every OTHER of the
+            // employee's sessions (revoke their agent tokens so a resuming stale PC gets
+            // 401 → login), so exactly one PC is ever active.
+            $retired = EmployeeDevice::where('employee_id', $employee->id)
+                ->where('device_uuid', '!=', $data['device_uuid'])
+                ->where('session_status', 'ACTIVE')
+                ->get();
+            foreach ($retired as $o) {
+                $o->employee?->user?->tokens()->where('name', 'device:' . $o->device_uuid)->delete();
+                $o->update(['session_status' => 'LOGGED_OUT', 'current_status' => 'OFFLINE']);
+            }
+            if ($retired->isNotEmpty()) {
+                $this->audit($request, 'SESSION_TAKEOVER', EmployeeDevice::class, $device->id, [
+                    'retired' => $retired->pluck('device_uuid'),
+                ]);
+            }
+
+            $this->audit($request, 'REGISTER_DEVICE', EmployeeDevice::class, $device->id, ['device_uuid' => $device->device_uuid]);
+
+            return response()->json([
+                'device_token' => $token,
+                'device'       => $device,
+                'employee'     => [
+                    'id'   => $employee->id,
+                    'name' => $employee->fullName(),
+                    'code' => $employee->employee_code,
+                ],
+            ], 201);
+        } finally {
+            optional($lock)->release();
         }
-
-        $device = EmployeeDevice::updateOrCreate(
-            ['device_uuid' => $data['device_uuid']],
-            array_merge($data, [
-                'company_id'   => $employee->company_id,
-                'employee_id'  => $employee->id,
-                'current_status' => 'ONLINE',
-                'agent_health'   => 'HEALTHY',
-                'registered_at'  => now(),
-                'last_heartbeat_at' => now(),
-            ])
-        );
-
-        // Issue a device-scoped token (ability 'agent') on the employee's user account.
-        $user = $request->user();
-        $ttl = config('smartept.agent_token_ttl');
-        $token = $user->createToken(
-            'device:' . $data['device_uuid'],
-            ['agent'],
-            $ttl ? now()->addMinutes($ttl) : null
-        )->plainTextToken;
-
-        $device->forceFill(['device_token_hash' => hash('sha256', $token)])->save();
-        $this->audit($request, 'REGISTER_DEVICE', EmployeeDevice::class, $device->id, ['device_uuid' => $device->device_uuid]);
-
-        return response()->json([
-            'device_token' => $token,
-            'device'       => $device,
-            'employee'     => [
-                'id'   => $employee->id,
-                'name' => $employee->fullName(),
-                'code' => $employee->employee_code,
-            ],
-        ], 201);
     }
 
     /**
@@ -243,6 +302,49 @@ class DeviceController extends Controller
         ]);
 
         return response()->json(['data' => $device->fresh()]);
+    }
+
+    /**
+     * POST /api/devices/{device}/force-logout — Section 10: end this device's agent
+     * session now. Revokes its token (so the agent gets 401 on its next heartbeat and
+     * returns to the login screen) WITHOUT freeing the licence seat or blocking
+     * re-registration — the employee can sign in again on any PC.
+     */
+    public function forceLogout(Request $request, EmployeeDevice $device): JsonResponse
+    {
+        $device->employee?->user?->tokens()
+            ->where('name', 'device:' . $device->device_uuid)->delete();
+
+        $device->update([
+            'session_status'  => 'FORCE_LOGOUT',
+            'force_logout_at' => now(),
+            'current_status'  => 'OFFLINE',
+        ]);
+
+        $this->audit($request, 'FORCE_LOGOUT', EmployeeDevice::class, $device->id, [
+            'device_uuid' => $device->device_uuid,
+        ]);
+
+        return response()->json(['data' => $device->fresh()]);
+    }
+
+    /**
+     * POST /api/agent/session-logout — the agent's own explicit sign-out. Marks the
+     * session logged out and revokes the current token so another PC can take over
+     * immediately (no wait for the stale window).
+     */
+    public function sessionLogout(Request $request): JsonResponse
+    {
+        abort_unless($request->user()?->tokenCan('agent'), 403, 'Agent token required.');
+
+        $uuid = (string) $request->input('device_uuid');
+        $device = EmployeeDevice::where('device_uuid', $uuid)->first();
+        if ($device) {
+            $device->update(['session_status' => 'LOGGED_OUT', 'current_status' => 'OFFLINE']);
+        }
+        $request->user()->currentAccessToken()?->delete();
+
+        return response()->json(['ok' => true]);
     }
 
     /**

@@ -33,6 +33,11 @@ return [
     'offline_alert_minutes' => (int) env('SMARTEPT_OFFLINE_ALERT_MINUTES', 30),
     'violation_spike_threshold' => (int) env('SMARTEPT_VIOLATION_SPIKE_THRESHOLD', 20),
 
+    // Section 10 single-device login: minutes of heartbeat silence after which an
+    // agent session is considered STALE, so another PC may take over (a crashed /
+    // permanently-disconnected PC never blocks the employee forever).
+    'session_stale_minutes' => (int) env('SMARTEPT_SESSION_STALE_MINUTES', 10),
+
     // Policy resolution precedence (most specific first).
     'policy_precedence' => ['DEVICE', 'EMPLOYEE', 'TEAM', 'DEPARTMENT', 'BRANCH', 'COMPANY'],
 

@@ -3032,6 +3032,14 @@ async function saveAgentLock(clear) {
     loadAgentLock();
   } catch (e) { m.textContent = e.message; m.style.color = '#DC2626'; }
 }
+// Section 10: a small session pill next to the activity status. "Signed in" only when
+// the login session is ACTIVE and a heartbeat has landed within the stale window.
+function devSessionTag(v) {
+  if (!v.session_status || v.session_status === 'LOGGED_OUT') return '';
+  if (v.session_status === 'FORCE_LOGOUT') return ' <span class="tag t-danger">forced out</span>';
+  const recent = v.last_heartbeat_at && (Date.now() - new Date(v.last_heartbeat_at).getTime()) < 10 * 60 * 1000;
+  return recent ? ' <span class="tag t-ok">signed in</span>' : ' <span class="tag t-warn">stale</span>';
+}
 async function loadDevices() {
   loadAgentLock();
   $('#al-save').onclick = () => saveAgentLock(false);
@@ -3053,11 +3061,11 @@ async function loadDevices() {
         + '<td>' + esc(v.os_version || '—') + '</td><td>' + esc(h.app_version || v.app_version || '—') + '</td>'
         + '<td><span class="tag ' + hc + '">' + esc(h.agent_health || '—') + '</span></td>'
         + '<td><span class="tag ' + cc + '">' + esc(h.compliance_status || '—') + '</span></td>'
-        + '<td>' + (v.unbound_at ? '<span class="tag t-danger">UNBOUND</span>' : '<span class="tag ' + sc + '">' + esc(h.current_status || '—') + '</span>') + '</td>'
+        + '<td>' + (v.unbound_at ? '<span class="tag t-danger">UNBOUND</span>' : '<span class="tag ' + sc + '">' + esc(h.current_status || '—') + '</span>' + devSessionTag(v)) + '</td>'
         + '<td>' + (h.sync_pending_count || 0) + '</td><td>' + dt(h.last_heartbeat_at) + '</td>'
         + '<td>' + (v.unbound_at
             ? '<button class="btn" data-devact="rebind">Approve re-bind</button>'
-            : '<button class="btn danger" data-devact="unbind">Unbind</button>') + '</td></tr>';
+            : ((v.session_status === 'ACTIVE' ? '<button class="btn" data-devact="force-logout">Force logout</button> ' : '') + '<button class="btn danger" data-devact="unbind">Unbind</button>')) + '</td></tr>';
     }).join('') || '<tr><td colspan="10" class="mut">No devices registered. Devices appear when the SmartEPT desktop agent registers on an employee\'s PC.</td></tr>';
     attachTableFilter($('#dev-q'), '#dev-rows');
   } catch (e) {
@@ -3076,6 +3084,11 @@ $('#dev-rows').addEventListener('click', async (e) => {
   }
   if (btn.dataset.devact === 'rebind') {
     try { await api('/devices/' + id + '/rebind', { method: 'POST' }); DEV_CACHE = null; loadDevices(); }
+    catch (err) { alert(err.message); }
+  }
+  if (btn.dataset.devact === 'force-logout') {
+    if (!confirm('Force logout ' + tr.dataset.devname + '?\n\nThe agent on this PC returns to the sign-in screen at its next heartbeat. The employee can sign in again on any PC (the licence seat is kept).')) return;
+    try { await api('/devices/' + id + '/force-logout', { method: 'POST' }); DEV_CACHE = null; loadDevices(); }
     catch (err) { alert(err.message); }
   }
 });
