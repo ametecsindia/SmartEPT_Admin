@@ -42,6 +42,10 @@ class ScreenshotController extends Controller
             'window_title'   => ['nullable', 'string', 'max:512'],
             'website_domain' => ['nullable', 'string', 'max:255'],
             'trigger_reason' => ['nullable', 'in:INTERVAL,RANDOM,VIOLATION,BLOCKED_APP,BLOCKED_SITE'],
+            // QA Phase 5 (B10/B11): correlation id + resolved-policy provenance from the agent.
+            'client_event_uuid'          => ['nullable', 'string', 'max:64'],
+            'screenshot_policy_version'  => ['nullable', 'integer'],
+            'effective_interval_seconds' => ['nullable', 'integer'],
         ]);
 
         $bundle = $resolver->bundleForEmployee($employee);
@@ -58,6 +62,8 @@ class ScreenshotController extends Controller
             $shot['retention_days'] ?? null
         );
 
+        $trigger = $data['trigger_reason'] ?? 'INTERVAL';
+
         $log = EmployeeScreenshotLog::create([
             'company_id'          => $employee->company_id,
             'employee_id'         => $employee->id,
@@ -67,12 +73,53 @@ class ScreenshotController extends Controller
             'active_app'          => $data['active_app'] ?? null,
             'window_title'        => $data['window_title'] ?? null,
             'website_domain'      => $data['website_domain'] ?? null,
-            'trigger_reason'      => $data['trigger_reason'] ?? 'INTERVAL',
+            'trigger_reason'      => $trigger,
             'screenshot_policy_id' => $shot['id'] ?? null,
             'file_size_bytes'     => $file->size_bytes,
+            // QA Phase 5 (B10/B11): provenance + correlation.
+            'client_event_uuid'         => $data['client_event_uuid'] ?? null,
+            'screenshot_policy_version' => $data['screenshot_policy_version'] ?? ($shot['version'] ?? null),
+            'effective_interval_seconds' => $data['effective_interval_seconds'] ?? ($shot['interval_seconds'] ?? null),
         ]);
 
+        // QA Phase 5 (B10): a violation-triggered shot is linked to its compliance event
+        // (by the shared client_event_uuid, else the nearest recent event in the window),
+        // so the Violations screen shows ONLY that violation's evidence.
+        if (in_array($trigger, ['VIOLATION', 'BLOCKED_APP', 'BLOCKED_SITE'], true)) {
+            $this->linkScreenshotToViolation($employee, $log);
+        }
+
         return response()->json(['ok' => true, 'screenshot_id' => $log->id, 'storage_file_id' => $file->id], 201);
+    }
+
+    /**
+     * QA Phase 5 (B10): correlate a violation screenshot with its compliance event.
+     * Preferred match is the shared client_event_uuid the agent stamps on both posts;
+     * failing that, the nearest same-employee event within evidence_window_seconds.
+     * The two posts can arrive in either order, so the compliance-event handler links
+     * the other direction too. Best-effort — never fails the upload.
+     */
+    private function linkScreenshotToViolation(Employee $employee, EmployeeScreenshotLog $log): void
+    {
+        try {
+            $window = (int) (\App\Models\Company::find($employee->company_id)->evidence_window_seconds ?? 120);
+            $at = $log->captured_at ?? now();
+
+            $event = \App\Models\EmployeeComplianceEvent::withoutGlobalScopes()
+                ->where('company_id', $employee->company_id)
+                ->where('employee_id', $employee->id)
+                ->when($log->client_event_uuid, fn ($q) => $q->where('client_event_uuid', $log->client_event_uuid))
+                ->when(! $log->client_event_uuid, fn ($q) => $q
+                    ->whereBetween('started_at', [$at->clone()->subSeconds($window), $at->clone()->addSeconds($window)]))
+                ->latest('started_at')  // portable: newest matching event (usually the only one for a uuid)
+                ->first();
+
+            if ($event) {
+                $log->forceFill(['violation_id' => $event->id])->save();
+            }
+        } catch (\Throwable $e) {
+            // linkage is best-effort; the raw shot + event are still stored
+        }
     }
 
     /**

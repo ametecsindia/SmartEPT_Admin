@@ -247,6 +247,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('meetings/{meeting}/cancel', [MeetingController::class, 'cancel'])->middleware('permission:meeting.cancel');
     Route::get('meetings/{meeting}/participation', [MeetingController::class, 'participation'])->middleware('permission:meeting.reports');
 
+    // ---- QA Phase 5 (B10): violation → evidence (only the screenshots for that violation) ----
+    Route::get('violations/{event}/evidence', [ComplianceController::class, 'evidence'])
+        ->middleware('permission:evidence.view');
+
     // ---- QA Phase 2 (A3): emergency biometric-gate override (admin, audited, never automatic) ----
     Route::post('agent-override/gate', [AgentOverrideController::class, 'gate'])
         ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,HR_ADMIN');

@@ -73,6 +73,17 @@ class PolicyResolver
         $trackingMode = $this->effectiveTrackingMode($employee, $device, $company);
         $this->applyTrackingMode($policies, $trackingMode);
 
+        // QA Phase 5 (B11/D5): surface the RESOLVED screenshot cadence explicitly so the
+        // agent schedules on the effective value (not a stale/default) and stamps every
+        // shot with the policy id + version it obeyed. This is where the "every minute
+        // instead of every N" bug is diagnosable — effective_interval_seconds is authoritative.
+        if (isset($policies['screenshot']) && is_array($policies['screenshot'])) {
+            $s = $policies['screenshot'];
+            $policies['screenshot']['policy_id'] = $s['id'] ?? null;
+            $policies['screenshot']['policy_version'] = (int) ($s['version'] ?? 1);
+            $policies['screenshot']['effective_interval_seconds'] = (int) ($s['interval_seconds'] ?? 600);
+        }
+
         return [
             'employee_id'     => $employee->id,
             'device_uuid'     => $device?->device_uuid,
