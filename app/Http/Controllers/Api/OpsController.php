@@ -25,9 +25,13 @@ use Illuminate\Support\Facades\Artisan;
 class OpsController extends Controller
 {
     /** GET /api/audit-logs — filterable, tenant-scoped viewer for the audit trail. */
+    /** QA Phase 6 (B13): hard cap so an over-wide range can't table-scan the log. */
+    public const AUDIT_MAX_RANGE_DAYS = 92;
+
     public function auditLogs(Request $request): JsonResponse
     {
         $user = $request->user();
+        [$from, $to] = $this->auditRange($request, $user);
 
         $logs = AuditLog::query()
             ->with('user:id,name,email')
@@ -39,12 +43,52 @@ class OpsController extends Controller
             }))
             ->when($request->action, fn ($q, $v) => $q->where('action', 'like', '%' . $v . '%'))
             ->when($request->user_id, fn ($q, $v) => $q->where('user_id', $v))
-            ->when($request->from, fn ($q, $v) => $q->whereDate('created_at', '>=', $v))
-            ->when($request->to, fn ($q, $v) => $q->whereDate('created_at', '<=', $v))
+            ->when($request->query('subject_type'), fn ($q, $v) => $q->where('subject_type', 'like', '%' . $v . '%'))
+            ->when($request->query('ip'), fn ($q, $v) => $q->where('ip', $v))
+            // QA Phase 6 (B13): honour the EXACT datetime bounds the caller sent — never
+            // silently collapse a set range to "the last hour" (that default lives only in
+            // the console when nothing is chosen). Bounds are in the org timezone.
+            ->when($from, fn ($q) => $q->where('created_at', '>=', $from))
+            ->when($to, fn ($q) => $q->where('created_at', '<=', $to))
             ->latest('id')
-            ->paginate((int) $request->integer('per_page', 50));
+            ->paginate((int) $request->integer('per_page', 50))
+            ->withQueryString();
 
         return response()->json($logs);
+    }
+
+    /**
+     * QA Phase 6 (B13): resolve [from, to] as org-timezone datetimes. A bare date
+     * (YYYY-MM-DD) spans the whole local day; a full datetime is honoured to the second.
+     * A range wider than AUDIT_MAX_RANGE_DAYS is clamped (from = to − cap) to bound the
+     * scan — never replaced with a one-hour default. Returns a Carbon|null pair.
+     */
+    private function auditRange(Request $request, $user): array
+    {
+        $tz = $user->company?->timezone ?: config('app.timezone', 'UTC');
+        $parse = function ($v, bool $isEnd) use ($tz) {
+            if (! $v) {
+                return null;
+            }
+            try {
+                $c = Carbon::parse($v, $tz);
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', trim((string) $v))) {
+                    return $isEnd ? $c->endOfDay() : $c->startOfDay();
+                }
+                return $c;
+            } catch (\Throwable $e) {
+                return null;
+            }
+        };
+
+        $from = $parse($request->query('from'), false);
+        $to   = $parse($request->query('to'), true);
+
+        if ($from && $to && $from->diffInDays($to) > self::AUDIT_MAX_RANGE_DAYS) {
+            $from = $to->clone()->subDays(self::AUDIT_MAX_RANGE_DAYS);
+        }
+
+        return [$from, $to];
     }
 
     /** GET /api/ops/storage-usage — screenshots/webcam bytes per company. */

@@ -1064,8 +1064,11 @@
       <div class="card"><h3>Audit trail <span class="hint">every admin action, export and screenshot view — accountable and searchable</span></h3>
         <div class="filters">
           <input id="au-action" placeholder="Action contains… e.g. DELETE, EXPORT, LOGIN" style="min-width:240px">
-          <input type="date" id="au-from"><input type="date" id="au-to">
+          <!-- QA Phase 6 (B13): exact date+time bounds, honoured to the second by the server. -->
+          <input type="datetime-local" id="au-from" title="From (date &amp; time)"><input type="datetime-local" id="au-to" title="To (date &amp; time)">
           <button class="btn" id="au-go">Search</button>
+          <button class="btn" id="au-export">Export CSV</button>
+          <span class="mut" id="au-msg"></span>
         </div>
         <table><thead><tr><th>When</th><th>User</th><th>Action</th><th>Subject</th><th>Details</th><th>IP</th></tr></thead>
         <tbody id="au-rows"></tbody></table>
@@ -4586,6 +4589,14 @@ $('#att-m-save').onclick = async () => {
   $('#att-m-err').textContent = '';
   const reason = $('#af-reason').value.trim();
   if (!reason) { $('#att-m-err').textContent = 'A reason is required — corrections feed payroll and are audited.'; return; }
+  // QA Phase 6 (B9): mirror the server rule — a manual check-out can't be after now,
+  // and never before check-in. The server (ManualAttendanceRequest) is authoritative.
+  if ($('#af-out').value && $('#af-in').value && new Date($('#af-out').value) < new Date($('#af-in').value)) {
+    $('#att-m-err').textContent = 'Check-out must be at or after check-in.'; return;
+  }
+  if ($('#af-out').value && new Date($('#af-out').value) > new Date()) {
+    $('#att-m-err').textContent = 'Check-out time cannot be later than the current time.'; return;
+  }
   const body = {
     status: $('#af-status').value,
     check_in_at: fromLocalDt($('#af-in').value),
@@ -4869,12 +4880,21 @@ async function previewPurge() {
 $('#rt-save').onclick = saveRetention;
 $('#rt-preview').onclick = previewPurge;
 
+// QA Phase 6 (B13): the current audit filters as URL params (datetime kept exact —
+// the server honours the range and never collapses it to "the last hour").
+function auditParams() {
+  const p = new URLSearchParams();
+  if ($('#au-action').value.trim()) p.set('action', $('#au-action').value.trim());
+  if ($('#au-from').value) p.set('from', $('#au-from').value.replace('T', ' '));
+  if ($('#au-to').value) p.set('to', $('#au-to').value.replace('T', ' '));
+  return p;
+}
 async function loadAudit() {
+  const f = $('#au-from').value, t = $('#au-to').value;
+  if (f && t && f > t) { $('#au-msg').textContent = 'From must be on or before To.'; $('#au-rows').innerHTML = ''; return; }
+  $('#au-msg').textContent = '';
   try {
-    const p = new URLSearchParams();
-    if ($('#au-action').value.trim()) p.set('action', $('#au-action').value.trim());
-    if ($('#au-from').value) p.set('from', $('#au-from').value);
-    if ($('#au-to').value) p.set('to', $('#au-to').value);
+    const p = auditParams();
     const d = await api('/audit-logs?' + p.toString());
     $('#au-rows').innerHTML = (d.data || []).map((r) => '<tr>'
       + '<td>' + dt(r.created_at) + '</td>'
@@ -4889,6 +4909,12 @@ async function loadAudit() {
   }
 }
 $('#au-go').onclick = loadAudit;
+// QA Phase 6 (B14): export the FULL filtered audit trail (respects the same filters).
+$('#au-export').onclick = () => {
+  const f = $('#au-from').value, t = $('#au-to').value;
+  if (f && t && f > t) { $('#au-msg').textContent = 'From must be on or before To.'; return; }
+  downloadCsv('/export/audit-logs?' + auditParams().toString(), 'audit-logs.csv');
+};
 $('#ops-backup-now').onclick = async () => {
   $('#ops-backup-msg').textContent = 'Backing up…';
   try {

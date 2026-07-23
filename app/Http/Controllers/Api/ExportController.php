@@ -3,13 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\EmployeeActivityEvent;
 use App\Models\EmployeeAttendanceLog;
 use App\Models\EmployeeBreakLog;
 use App\Models\EmployeeComplianceEvent;
 use App\Models\EmployeeDailySummary;
 use App\Models\Employee;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -102,6 +105,113 @@ class ExportController extends Controller
                 $this->hmFromSeconds($r->active_seconds), $this->hmFromSeconds($r->idle_seconds), $this->hmFromSeconds($r->break_seconds),
                 $this->hmFromMinutes($r->late_minutes), $r->violation_count, $r->productivity_score, $r->compliance_score,
             ]));
+    }
+
+    /**
+     * GET /api/export/audit-logs — B14: the FULL filtered audit trail as CSV (not just
+     * the current page). Respects every viewer filter (from/to/action/user/subject/ip),
+     * streams via chunkById so a large range never buffers in memory, neutralises CSV
+     * formula-injection, redacts secret-looking values, and is itself audit-logged.
+     */
+    public function auditLogs(Request $request): StreamedResponse
+    {
+        $user = $request->user();
+        $tz = $user->company?->timezone ?: config('app.timezone', 'UTC');
+        [$from, $to] = $this->auditBounds($request, $tz);
+
+        // Audit WHO exported WHAT (filters), before streaming.
+        $this->audit($request, 'EXPORT', AuditLog::class, null, [
+            'filters' => $request->only(['from', 'to', 'action', 'user_id', 'subject_type', 'ip']),
+        ]);
+
+        $query = AuditLog::query()->with('user:id,name,email')
+            ->when($user->company_id, fn ($q) => $q->where(fn ($qq) => $qq
+                ->where('company_id', $user->company_id)
+                ->orWhereIn('user_id', User::where('company_id', $user->company_id)->pluck('id'))))
+            ->when($request->action, fn ($q, $v) => $q->where('action', 'like', '%' . $v . '%'))
+            ->when($request->user_id, fn ($q, $v) => $q->where('user_id', $v))
+            ->when($request->query('subject_type'), fn ($q, $v) => $q->where('subject_type', 'like', '%' . $v . '%'))
+            ->when($request->query('ip'), fn ($q, $v) => $q->where('ip', $v))
+            ->when($from, fn ($q) => $q->where('created_at', '>=', $from))
+            ->when($to, fn ($q) => $q->where('created_at', '<=', $to));
+
+        $header = ['Time', 'Timezone', 'Action', 'Actor', 'Actor Email', 'Subject Type', 'Subject Id', 'IP', 'Details'];
+
+        return response()->streamDownload(function () use ($query, $tz, $header) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, $header);
+            $query->chunkById(1000, function ($rows) use ($out, $tz) {
+                foreach ($rows as $r) {
+                    fputcsv($out, array_map([$this, 'csvSafe'], [
+                        optional($r->created_at)->toDateTimeString(),
+                        $tz,
+                        $r->action,
+                        $r->user?->name,
+                        $r->user?->email,
+                        $r->subject_type,
+                        $r->subject_id,
+                        $r->ip,
+                        $this->redactChanges($r->changes),
+                    ]));
+                }
+            });
+            fclose($out);
+        }, 'audit-logs.csv', ['Content-Type' => 'text/csv']);
+    }
+
+    /** B13/B14: parse from/to as org-tz datetimes; a bare date spans the whole local day. */
+    private function auditBounds(Request $request, string $tz): array
+    {
+        $parse = function ($v, bool $isEnd) use ($tz) {
+            if (! $v) {
+                return null;
+            }
+            try {
+                $c = Carbon::parse($v, $tz);
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', trim((string) $v))) {
+                    return $isEnd ? $c->endOfDay() : $c->startOfDay();
+                }
+                return $c;
+            } catch (\Throwable $e) {
+                return null;
+            }
+        };
+
+        return [$parse($request->query('from'), false), $parse($request->query('to'), true)];
+    }
+
+    /** B14: neutralise a leading = + - @ TAB CR so a cell can't run as a spreadsheet formula. */
+    private function csvSafe($v): string
+    {
+        if ($v === null) {
+            return '';
+        }
+        $s = (string) $v;
+        if ($s !== '' && preg_match('/^[=+\-@\t\r]/', $s)) {
+            $s = "'" . $s;
+        }
+        return $s;
+    }
+
+    /** B14: never leak secrets — blank out values for sensitive-looking keys in the changes blob. */
+    private function redactChanges($changes): string
+    {
+        if (empty($changes)) {
+            return '';
+        }
+        $redact = function ($v) use (&$redact) {
+            if (is_array($v)) {
+                $out = [];
+                foreach ($v as $k => $val) {
+                    $out[$k] = preg_match('/pass|token|secret|hash|api[_-]?key|password/i', (string) $k)
+                        ? '***' : $redact($val);
+                }
+                return $out;
+            }
+            return $v;
+        };
+
+        return (string) json_encode($redact($changes));
     }
 
     /** R4 item 6: durations in reports as hh:mm, not raw minutes/decimal hours. */

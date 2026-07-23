@@ -212,6 +212,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('export/daily-summary', [ExportController::class, 'dailySummary']);
         Route::get('export/attendance-register', [MonthlyReportController::class, 'attendanceRegister']);
     });
+    // ---- QA Phase 6 (B14): audit-log export — its OWN permission (audit.export) ----
+    Route::get('export/audit-logs', [ExportController::class, 'auditLogs'])
+        ->middleware('permission:audit.export');
 
     // ---- Biometric integration (M6) ----
     Route::prefix('integrations/biometric')->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,HR_ADMIN')->group(function () {

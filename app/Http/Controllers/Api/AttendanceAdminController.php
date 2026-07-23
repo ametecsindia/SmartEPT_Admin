@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ManualAttendanceRequest;
 use App\Models\EmployeeAttendanceLog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -51,14 +51,11 @@ class AttendanceAdminController extends Controller
     }
 
     /** PUT /api/attendance/{attendance} — regularize an existing day. */
-    public function update(Request $request, EmployeeAttendanceLog $attendance): JsonResponse
+    public function update(ManualAttendanceRequest $request, EmployeeAttendanceLog $attendance): JsonResponse
     {
-        $data = $request->validate([
-            'status'       => ['required', Rule::in(['PRESENT', 'ABSENT', 'HALF_DAY', 'ON_LEAVE'])],
-            'check_in_at'  => ['nullable', 'date'],
-            'check_out_at' => ['nullable', 'date', 'after_or_equal:check_in_at'],
-            'reason'       => ['required', 'string', 'max:500'], // no silent payroll edits
-        ]);
+        // QA Phase 6 (B9): validation (incl. no future check-out) lives in the shared
+        // ManualAttendanceRequest so PUT and POST enforce the same payroll-safe rules.
+        $data = $request->validated();
 
         $before = $attendance->only(['status', 'source', 'check_in_at', 'check_out_at']);
 
@@ -78,22 +75,12 @@ class AttendanceAdminController extends Controller
     }
 
     /** POST /api/attendance — add a missed day (e.g. leave never recorded). */
-    public function store(Request $request): JsonResponse
+    public function store(ManualAttendanceRequest $request): JsonResponse
     {
         $companyId = $request->user()->company_id;
 
-        $data = $request->validate([
-            'employee_id' => [
-                'required',
-                // Tenant-scoped: an HR admin must not create rows for another company's employees.
-                Rule::exists('employees', 'id')->where(fn ($q) => $q->where('company_id', $companyId)),
-            ],
-            'work_date'    => ['required', 'date'],
-            'status'       => ['required', Rule::in(['PRESENT', 'ABSENT', 'HALF_DAY', 'ON_LEAVE'])],
-            'check_in_at'  => ['nullable', 'date'],
-            'check_out_at' => ['nullable', 'date', 'after_or_equal:check_in_at'],
-            'reason'       => ['required', 'string', 'max:500'],
-        ]);
+        // QA Phase 6 (B9): shared rules (tenant-scoped employee, no future check-out, etc.).
+        $data = $request->validated();
 
         // One attendance verdict per employee per day, regardless of source — a second
         // row would double-count in payroll.
