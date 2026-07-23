@@ -1443,6 +1443,18 @@
   </div>
 </div>
 
+<!-- VIOLATION EVIDENCE (QA Phase 5 · B10) — only this violation's linked screenshots -->
+<div class="ovl" id="ev-ovl">
+  <div class="modal" style="width:760px">
+    <div class="mhead">
+      <div class="mt"><b>Violation evidence</b><span>Only the screenshots captured for this violation</span></div>
+      <button class="x" data-close="ev-ovl" aria-label="Close">✕</button>
+    </div>
+    <div class="mbody" id="ev-body"></div>
+    <div class="mfoot"><button class="btn" data-close="ev-ovl">Close</button></div>
+  </div>
+</div>
+
 <!-- EMPLOYEE DRAWER -->
 <div class="drawer-backdrop" id="drawer-backdrop"></div>
 <div class="drawer" id="drawer">
@@ -2491,7 +2503,7 @@ async function loadViolations() {
       const sc = { LOW: 't-info', MEDIUM: 't-warn', HIGH: 't-danger', CRITICAL: 't-danger' }[v.severity] || 't-off';
       const date = v.started_at ? String(v.started_at).slice(0, 10) : today();
       const evidence = v.screenshot_captured
-        ? '<a data-ev-emp="' + (v.employee?.id ?? '') + '" data-ev-name="' + esc(fullName(v.employee)) + '" data-ev-date="' + esc(date) + '" data-ev-time="' + esc(String(v.started_at || '')) + '" data-ev-detected="' + esc(String(v.detected_value || '')) + '" style="cursor:pointer;font-weight:600">View evidence</a>'
+        ? '<a data-ev-id="' + v.id + '" style="cursor:pointer;font-weight:600">View evidence</a>'
         : '<span class="mut">—</span>';
       return '<tr><td>' + dt(v.started_at) + '</td><td><span class="nm">' + esc(fullName(v.employee) || '—') + '</span></td>'
         + '<td>' + esc(v.event_category) + '</td><td>' + esc(String(v.event_type || '').replace(/_/g, ' ')) + '</td>'
@@ -2502,17 +2514,52 @@ async function loadViolations() {
     $('#viol-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="8" class="mut">' + esc(e.message) + '</td></tr>';
   }
 }
-$('#viol-rows').addEventListener('click', async (e) => {
-  const a = e.target.closest('[data-ev-emp]');
-  if (!a || !a.dataset.evEmp) return;
-  window._EV_TIME = a.dataset.evTime || null; // highlight the exact capture
-  window._EV_DETECTED = a.dataset.evDetected || null; // the offending app/site, for a robust match
-  show('screenshots');
-  await initScreenshots();
-  $('#ss-emp').value = a.dataset.evEmp;
-  $('#ss-date').value = a.dataset.evDate;
-  loadScreenshots();
+$('#viol-rows').addEventListener('click', (e) => {
+  const a = e.target.closest('[data-ev-id]');
+  if (!a || !a.dataset.evId) return;
+  openViolationEvidence(a.dataset.evId);
 });
+
+// QA Phase 5 (B10): a DEDICATED evidence modal showing ONLY this violation's linked
+// screenshots (resolved server-side, tenant-safe) — not the full-day screenshot wall.
+// Images are fetched with the bearer token via apiBlob (the file route is protected).
+let EV_URLS = [];
+async function openViolationEvidence(id) {
+  const ovl = $('#ev-ovl'); const body = $('#ev-body');
+  EV_URLS.forEach((u) => { try { URL.revokeObjectURL(u); } catch {} }); EV_URLS = [];
+  ovl.classList.add('open');
+  body.innerHTML = '<div class="mut">Loading evidence…</div>';
+  try {
+    const d = (await api('/violations/' + id + '/evidence')).data;
+    const v = d.violation || {};
+    const head = '<div style="margin-bottom:12px;font-size:12.5px;line-height:1.6">'
+      + '<b>' + esc(String(v.event_type || '').replace(/_/g, ' ')) + '</b>'
+      + ' <span class="tag t-danger">' + esc(v.severity || '') + '</span><br>'
+      + '<span class="mut">' + esc((v.employee && v.employee.name) || '—')
+      + (v.detected_value ? (' · ' + esc(v.detected_value)) : '')
+      + ' · ' + dt(v.occurred_at) + '</span></div>';
+    if (!d.available) {
+      body.innerHTML = head + '<div class="never" style="border-left-color:var(--warn);background:var(--warn-w)">'
+        + '<b style="color:var(--warn)">' + (d.reason === 'EXPIRED' ? 'Evidence no longer available' : 'No screenshot for this violation') + '</b>'
+        + esc(d.message || '') + '</div>';
+      return;
+    }
+    const shots = d.evidence || [];
+    body.innerHTML = head + '<div class="shots">' + shots.map((s) =>
+      '<div class="shotcard"><div class="img" id="ev-img-' + s.id + '">loading…</div>'
+      + '<div class="m">' + dt(s.captured_at) + (s.active_app ? (' · ' + esc(s.active_app)) : '') + '</div></div>').join('') + '</div>';
+    shots.forEach(async (s) => {
+      const slot = document.getElementById('ev-img-' + s.id);
+      try {
+        const blob = await apiBlob('/screenshots/' + s.id + '/file');
+        const url = URL.createObjectURL(blob); EV_URLS.push(url);
+        if (slot) slot.innerHTML = '<img src="' + url + '" alt="Evidence">';
+      } catch (err) { if (slot) slot.textContent = err.status === 403 ? 'no access' : 'file missing'; }
+    });
+  } catch (e) {
+    body.innerHTML = isDenied(e) ? deniedCard() : '<div class="mut">' + esc(e.message) + '</div>';
+  }
+}
 
 // ---- 5. employees ----
 let EMP_EDIT_ID = null, EMP_DEV_COUNTS = null, EMP_SEARCH_TIMER = null;
@@ -4879,7 +4926,7 @@ $('#btn-help').onclick = () => {
 $$('[data-close]').forEach((b) => b.addEventListener('click', () => $('#' + b.dataset.close).classList.remove('open')));
 // pwd-ovl (forced change) and cred-ovl (one-time password) deliberately have no
 // click-outside close — one is mandatory, the other must not vanish on a stray click.
-['help-ovl', 'emp-ovl', 'user-ovl', 'att-ovl'].forEach((id) => {
+['help-ovl', 'emp-ovl', 'user-ovl', 'att-ovl', 'ev-ovl'].forEach((id) => {
   const el = document.getElementById(id);
   el.addEventListener('click', (e) => { if (e.target === el) el.classList.remove('open'); });
 });
