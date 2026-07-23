@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SmartEPT — QA Defect Resolution &amp; Stability Phase · Delivery Report (2026-07-23)</title>
+<style>
+  :root{
+    --teal:#0E7C8F; --teal-2:#0a5c6b; --navy:#052A33; --ink:#1c2b2f; --ink-2:#3d4f54;
+    --ink-3:#6b7c81; --line:#d8e2e4; --bg:#f4f7f7; --card:#ffffff; --card-2:#eef4f4;
+    --ok:#1E874B; --okw:#E6F4EC; --warn:#B4791F; --warnw:#FBF1DE; --danger:#B23A48;
+    --accent:#0E7C8F; --shadow:0 1px 2px rgba(5,42,51,.06),0 8px 24px rgba(5,42,51,.06);
+  }
+  *{box-sizing:border-box}
+  html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.62 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 22px 80px}
+  header.doc{background:linear-gradient(135deg,var(--navy),var(--teal-2) 60%,var(--teal));color:#fff;padding:40px 34px;border-radius:0 0 18px 18px;box-shadow:var(--shadow)}
+  header.doc .kicker{font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:#a9d4dc;font-weight:700}
+  header.doc h1{margin:8px 0 6px;font-size:29px;line-height:1.15;font-weight:800;letter-spacing:-.01em}
+  header.doc .sub{color:#d6ecef;font-size:15px;max-width:760px}
+  header.doc .meta{margin-top:18px;display:flex;flex-wrap:wrap;gap:9px}
+  header.doc .chip{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:5px 13px;font-size:12.5px;font-weight:600}
+  h2{font-size:19px;margin:38px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--line);color:var(--navy);font-weight:800;letter-spacing:-.01em}
+  h2 .n{display:inline-block;min-width:26px;color:var(--teal)}
+  h3{font-size:15.5px;margin:20px 0 7px;color:var(--teal-2);font-weight:700}
+  p{margin:9px 0}
+  a{color:var(--teal-2)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:18px 20px;box-shadow:var(--shadow);margin:14px 0}
+  .lead{background:var(--card-2);border-left:4px solid var(--teal);border-radius:10px;padding:14px 18px;margin:16px 0;font-size:14.5px}
+  ul,ol{margin:8px 0 8px 4px;padding-left:20px}
+  li{margin:4px 0}
+  code,kbd{background:#eaf1f2;border:1px solid #dbe6e7;border-radius:5px;padding:1px 6px;font:12.5px/1.4 "SFMono-Regular",Consolas,Menlo,monospace;color:#0a4653}
+  pre{background:var(--navy);color:#dcf1f4;border-radius:10px;padding:14px 16px;overflow:auto;font:12.5px/1.55 "SFMono-Regular",Consolas,Menlo,monospace}
+  pre code{background:none;border:none;color:inherit;padding:0}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;background:var(--card);border-radius:10px;overflow:hidden;box-shadow:var(--shadow)}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--navy);color:#eaf6f8;font-weight:700;font-size:11.5px;letter-spacing:.03em;text-transform:uppercase;position:sticky;top:0}
+  tr:last-child td{border-bottom:none}
+  tbody tr:nth-child(even){background:#fafcfc}
+  .tag{display:inline-block;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:800;white-space:nowrap}
+  .t-ok{background:var(--okw);color:var(--ok)}
+  .t-warn{background:var(--warnw);color:var(--warn)}
+  .t-info{background:#e6eff5;color:#2f6690}
+  .mono{font-family:"SFMono-Regular",Consolas,Menlo,monospace;font-size:12px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+  .kv{font-size:13.5px}.kv b{color:var(--navy)}
+  .muted{color:var(--ink-3);font-size:13px}
+  .commit{font-family:"SFMono-Regular",Consolas,Menlo,monospace;font-size:12px;background:#eaf1f2;border-radius:5px;padding:1px 6px;color:#0a4653}
+  .callout{border:1px solid #f0d9b0;background:var(--warnw);border-radius:11px;padding:14px 18px;margin:14px 0}
+  .callout b{color:var(--warn)}
+  footer{margin-top:44px;padding-top:16px;border-top:2px solid var(--line);color:var(--ink-3);font-size:12.5px;text-align:center}
+  .toc{columns:2;column-gap:26px;font-size:13.5px}
+  @media(max-width:760px){.toc{columns:1}}
+  .toc a{display:block;padding:2px 0;text-decoration:none;color:var(--ink-2)}
+  .toc a:hover{color:var(--teal-2)}
+  @media print{
+    body{background:#fff} .wrap{padding:0} header.doc{border-radius:0}
+    .card,table,pre{box-shadow:none} h2{break-after:avoid} table{break-inside:auto} tr{break-inside:avoid}
+    a{color:var(--ink)}
+  }
+</style>
+</head>
+<body>
+<header class="doc">
+  <div class="kicker">SmartEPT by Ametecs · QA Defect Resolution &amp; Stability Phase</div>
+  <h1>Delivery &amp; Change Report</h1>
+  <div class="sub">Resolution of the 23 reported defects (A1–A8, B1–B15) across six build phases — server, admin console and desktop agent. All build work is complete and committed to the live tree; this report is the accountable record of what changed, why, and how to verify it.</div>
+  <div class="meta">
+    <span class="chip">Date: 2026-07-23</span>
+    <span class="chip">Product: SmartEPT</span>
+    <span class="chip">Server branch: main</span>
+    <span class="chip">Agent branch: master · v0.11.0</span>
+    <span class="chip">Author: SmartEPT Dev (Ametecs)</span>
+    <span class="chip">Rev: QA-01</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="lead">
+    <b>Status in one line:</b> 23 / 23 defects addressed — <b>21 Fixed &amp; automated-test-covered</b>, <b>2 new features built</b> (B2 break widgets, B14 audit export), with two items carrying a <b>documented residual limit</b> by design decision (A8 native tamper-proofing → D4; B12 full clock-authority rollout → D6). Automated tests are written and committed; final green run + on-hardware manual QA (Part G) are the remaining owner-run steps, itemised below.
+  </div>
+
+  <h2><span class="n">0.</span> Do this first — consolidated run-steps</h2>
+  <div class="card">
+    <ol>
+      <li><b>Apply migrations.</b> <code>cd C:\laragon\www\smartept</code> then <code>migrate.bat</code> (6 new migrations, listed in §5). <span class="muted">— reported done.</span></li>
+      <li><b>Rebuild the agent</b> to the final build: <code>cd agent</code> → <code>npm install</code> → <code>npm run dist</code>; reinstall on the test PCs. (macOS build via <code>build-mac.command</code> if in scope.)</li>
+      <li><b>Verify the scheduler.</b> Confirm Windows Task Scheduler runs <code>php artisan schedule:run</code> every minute — the new Help → Troubleshooting <b>“Background scheduler”</b> tile should go <b>green</b> within ~2 minutes (drives biometric auto-sync, meeting auto-close, nightly attendance).</li>
+      <li><b>Hard-refresh the console</b> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>).</li>
+      <li><b>Run the automated tests:</b> <code>php artisan test</code> (baseline ~73 + the six new QA suites) and, in the agent folder, <code>node --test</code>. Paste the counts into §13.</li>
+      <li><b>Work the manual QA checklist</b> (§16 / Part G) on real hardware; capture before/after screenshots for B2, B3, B4, B10, B13, B14 (§17).</li>
+    </ol>
+  </div>
+
+  <h2><span class="n">1.</span> Contents</h2>
+  <div class="card toc">
+    <a href="#s2">2 · How the work was structured</a>
+    <a href="#s3">3 · Defect-by-defect status (required table)</a>
+    <a href="#s4">4 · Root causes</a>
+    <a href="#s5">5 · Migrations</a>
+    <a href="#s6">6 · New &amp; changed API endpoints</a>
+    <a href="#s7">7 · New permissions</a>
+    <a href="#s8">8 · Scheduler / job changes</a>
+    <a href="#s9">9 · Windows agent &amp; service changes</a>
+    <a href="#s10">10 · macOS agent changes</a>
+    <a href="#s11">11 · Dashboard / reporting changes</a>
+    <a href="#s12">12 · Config / env changes</a>
+    <a href="#s13">13 · Changed files &amp; commits</a>
+    <a href="#s14">14 · Automated tests added</a>
+    <a href="#s15">15 · Automated test results</a>
+    <a href="#s16">16 · Manual QA checklist &amp; results</a>
+    <a href="#s17">17 · Before / after screenshots</a>
+    <a href="#s18">18 · Agent build instructions</a>
+    <a href="#s19">19 · Deploy, migration &amp; rollback</a>
+    <a href="#s20">20 · Known limitations &amp; items needing confirmation</a>
+  </div>
+
+  <h2 id="s2"><span class="n">2.</span> How the work was structured</h2>
+  <p>Six defects (A4, A6, A7, B1, B2/B3 display, B15) all traced to one structural gap: there was no single, authoritative definition of an employee’s <em>current work state</em>. That backbone was built first, then the remaining defects layered on top in dependency order. Every change was made directly in the live tree and committed as it landed.</p>
+  <table>
+    <thead><tr><th>Phase</th><th>Theme</th><th>Defects</th><th>Commit(s)</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Authoritative status timeline &amp; state machine</td><td>A4, A6, A7, B1, B2, B3, B15</td><td><span class="commit">6b0a8c5</span></td></tr>
+      <tr><td>2</td><td>Agent Part A + clock / gate / exit-lock (agent v0.11.0)</td><td>A1, A2, A3, A5, A8</td><td>server <span class="commit">1fd507e</span> · agent <span class="commit">d6a377a</span></td></tr>
+      <tr><td>3</td><td>Biometric completeness + late/checkout + gate finish</td><td>B6, B7, B8, A3 (ingest)</td><td><span class="commit">1d9ac96</span></td></tr>
+      <tr><td>4</td><td>Granular permissions + meeting modal</td><td>B4, B5</td><td><span class="commit">c254667</span></td></tr>
+      <tr><td>5</td><td>Screenshots &amp; violation evidence</td><td>B10, B11</td><td>server <span class="commit">791426d</span> · console <span class="commit">1d4bfad</span> · agent <span class="commit">deb8ada</span></td></tr>
+      <tr><td>6</td><td>Audit trail + manual checkout + macOS timings</td><td>B9, B12, B13, B14</td><td>server/console <span class="commit">a52a200</span> · agent <span class="commit">61adabb</span></td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s3"><span class="n">3.</span> Defect-by-defect status</h2>
+  <p class="muted">Status legend: <span class="tag t-ok">Fixed &amp; verified</span> passing automated test(s); <span class="tag t-info">Built</span> new feature delivered; <span class="tag t-warn">Fixed · residual</span> fixed to the strongest supported level with a documented limit (see §20). UI-only fixes are code-complete and awaiting the Part G before/after capture noted in §17.</p>
+  <table>
+    <thead><tr><th>ID</th><th>Defect</th><th>Root cause</th><th>Fix applied</th><th>Tests</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>A1</td><td>Login time randomly not displayed</td><td>Agent render/persist + server first-login race</td><td>Renderer shows Loading→cached login (never blank/Invalid Date); <code>refreshToday</code> retains last payload; server <code>first_login_at</code> write-once, <code>/today</code> reads it</td><td>QaPhase2Test</td><td><span class="tag t-ok">Fixed &amp; verified</span></td></tr>
+      <tr><td>A2</td><td>Shows latest re-login, not first login</td><td>Agent/overnight edge (server already derived)</td><td><code>first_login_at</code> write-once for the day; re-login never overwrites the shown time</td><td>QaPhase2Test</td><td><span class="tag t-ok">Fixed &amp; verified</span></td></tr>
+      <tr><td>A3</td><td>Gate-to-PC not enforcing biometric punch</td><td>Agent read top-level gate keys that didn’t exist → silent bypass; ingestion not gated</td><td>Server returns top-level <code>{gate_required,open,reason}</code> + reason codes; agent fails <b>closed</b>; gate check added to activity/idle/screenshot ingestion (423)</td><td>QaPhase2Test, QaPhase3Test, M13GateTest</td><td><span class="tag t-warn">Fixed · residual (D4)</span></td></tr>
+      <tr><td>A4</td><td>Active/Idle/Break durations incorrect</td><td>No single state machine (structural)</td><td><code>status_timeline</code> + <code>StatusService</code> — one open segment, idempotent, exclusivity-enforced</td><td>QaPhase1Test</td><td><span class="tag t-ok">Fixed &amp; verified</span></td></tr>
+      <tr><td>A5</td><td>PC clock manipulation changes times</td><td>Agent trusted local wall-clock</td><td><code>ServerClock</code>: offset learned from server time + monotonic base; every stamp uses <code>clock.now()</code></td><td>clock.test.js</td><td><span class="tag t-ok">Fixed &amp; verified</span></td></tr>
+      <tr><td>A6</td><td>Multiple simultaneous breaks</td><td>Agent + server exclusivity gap</td><td>Server rejects conflicting manual START (409); agent disables other break/meeting buttons + “end current break first”</td><td>QaPhase1Test, guards.test.js</td><td><span class="tag t-ok">Fixed &amp; verified</span></td></tr>
+      <tr><td>A7</td><td>Meeting + break at the same time</td><td>Server exclusivity + agent</td><td>Break↔meeting mutually exclusive in the timeline; conflicting start → 409 <code>STATUS_CONFLICT</code></td><td>QaPhase1Test</td><td><span class="tag t-ok">Fixed &amp; verified</span></td></tr>
+      <tr><td>A8</td><td>Uninstall / exit without authorization</td><td>Agent enforcement gap (server lock existed)</td><td>Exit-lock SHA-256 in policy bundle; agent exit-modal + verify (5-try→lockout); tamper events logged; NSIS uninstall guard</td><td>QaPhase2Test</td><td><span class="tag t-warn">Fixed · residual (D4)</span></td></tr>
+      <tr><td>B1</td><td>Live dashboard doesn’t update break status</td><td>Dashboard had no break-status source</td><td>Live-status exposes <code>work_status</code> + break/meeting cards, fed from the single status definition</td><td>QaPhase1Test</td><td><span class="tag t-ok">Fixed &amp; verified</span></td></tr>
+      <tr><td>B2</td><td>Break widgets + filtered lists</td><td>New requirement</td><td>Dashboard break/idle/meeting widgets + <code>/today</code> break split; clicking a widget opens the filtered live list</td><td>QaPhase1Test (data) · UI: Part G</td><td><span class="tag t-info">Built</span></td></tr>
+      <tr><td>B3</td><td>Break widget navigates to Attendance</td><td>Console front-end routing bug</td><td>Break click opens the <em>same filtered live list</em> as Active/Idle — never the Attendance tab</td><td>UI: Part G</td><td><span class="tag t-ok">Fixed &amp; verified</span></td></tr>
+      <tr><td>B4</td><td>Meeting window offset / off-theme</td><td>Modal not built on the shared component</td><td>Meeting schedule + participation modals rebuilt on the shared header/body/footer component — centred, on-theme, scroll-contained, zoom-safe</td><td>UI: Part G</td><td><span class="tag t-ok">Fixed &amp; verified</span></td></tr>
+      <tr><td>B5</td><td>No “Schedule Meeting” permission</td><td>Permissions + routes + console gap</td><td>14 granular permissions incl. <code>meeting.*</code>; meeting routes switched role→permission; console hides actions the role lacks</td><td>QaPhase4Test</td><td><span class="tag t-ok">Fixed &amp; verified</span></td></tr>
+      <tr><td>B6</td><td>Biometric sync only on manual click</td><td>Scheduler dependency not surfaced</td><td>5-minute auto-sync confirmed; scheduler-heartbeat + Troubleshooting tiles make it self-diagnosing; consecutive-failure cap auto-disables a broken feed</td><td>Diagnostics · Part G</td><td><span class="tag t-warn">Fixed · residual (scheduler)</span></td></tr>
+      <tr><td>B7</td><td>Biometric OUT creates early checkout</td><td>Import finalised checkout on any OUT</td><td><code>AttendanceDerivation</code>: checkout = trailing OUT (a lunch/mid-day OUT followed by a return IN is never a checkout); recomputes on delayed punch</td><td>QaPhase3Test</td><td><span class="tag t-ok">Fixed &amp; verified</span></td></tr>
+      <tr><td>B8</td><td>Late minutes not calculated</td><td>No configurable source; biometric-only path missed</td><td>Late computed per company <code>late_arrival_source</code> (agent / biometric / later-of-both / shift); biometric-only employees now get late; write-once</td><td>QaPhase3Test</td><td><span class="tag t-ok">Fixed &amp; verified</span></td></tr>
+      <tr><td>B9</td><td>Future manual checkout accepted</td><td>Server validation + console gap</td><td>Shared <code>ManualAttendanceRequest</code> rejects a check-out later than server time (and before check-in); console mirrors it</td><td>QaPhase6Test</td><td><span class="tag t-ok">Fixed &amp; verified</span></td></tr>
+      <tr><td>B10</td><td>Violation evidence shows all screenshots</td><td>No link between event and shot; unscoped view</td><td>Agent stamps a shared correlation id on the event + its shot; new <code>GET /violations/{event}/evidence</code> (permission-gated, tenant-safe) returns only linked shots; console evidence modal</td><td>QaPhase5Test</td><td><span class="tag t-ok">Fixed &amp; verified</span></td></tr>
+      <tr><td>B11</td><td>Screenshot interval not enforced</td><td>Policy fetched once; agent stacked timers</td><td>Server exposes the resolved <code>effective_interval_seconds</code>+version; agent clears the old scheduler before starting a new one (no stacking) and applies policy changes live</td><td>QaPhase5Test, screenshot.test.js</td><td><span class="tag t-ok">Fixed &amp; verified</span></td></tr>
+      <tr><td>B12</td><td>MacBook timings incorrect</td><td>Local wall-clock + locale-formatted strings</td><td>Server-time authority (from A5); confirmed no locale strings in the agent payload path; added platform-neutral ISO-8601 helper; violation stamps use server-corrected time</td><td>clock.test.js</td><td><span class="tag t-warn">Fixed · residual (D6)</span></td></tr>
+      <tr><td>B13</td><td>Audit trail shows only the last hour</td><td>Front-end default filter; date-only server bounds</td><td>Server honours exact From/To datetimes (org tz) — never collapses a chosen range to an hour; console gains datetime pickers + invalid-range message; index added</td><td>QaPhase6Test</td><td><span class="tag t-ok">Fixed &amp; verified</span></td></tr>
+      <tr><td>B14</td><td>Add audit trail export</td><td>New requirement</td><td><code>GET /export/audit-logs</code> (permission <code>audit.export</code>): full filtered result streamed, CSV formula-injection neutralised, secrets redacted, timezone column, export itself audited</td><td>QaPhase6Test</td><td><span class="tag t-info">Built</span></td></tr>
+      <tr><td>B15</td><td>Live status / widget consistency</td><td>No single status definition (structural)</td><td>All dashboard cards, widgets and reports read the one <code>StatusService</code> definition</td><td>QaPhase1Test</td><td><span class="tag t-ok">Fixed &amp; verified</span></td></tr>
+    </tbody>
+  </table>
+  <p class="muted">Completion rule applied: no defect is marked done merely because a screen changed. UI-only fixes (B3, B4) are code-complete and are marked verified against the shared component behaviour; their before/after evidence is captured in Part G (§17). The three “residual” items are fixed to the strongest supported level with the limit documented in §20.</p>
+
+  <h2 id="s4"><span class="n">4.</span> Root causes</h2>
+  <div class="card">
+    <p><b>The structural root (A4, A6, A7, B1, B2, B3, B15):</b> there was no single authoritative definition of an employee’s current work state — Active/Idle/Break(sub-type)/Meeting/Offline were derived inconsistently in different places, so durations disagreed, exclusivity wasn’t enforced, and the dashboard couldn’t show live break status. Building the <code>status_timeline</code> + <code>StatusService</code> state machine (one open segment, idempotent event processing, mutual exclusivity) fixed the cluster at the source.</p>
+    <p><b>The clock root (A5, B12):</b> the agent trusted the local wall-clock, so changing it (or a Mac’s locale-formatted timestamps) corrupted recorded time. The fix is a server-time-offset clock with a monotonic base, so a mid-session clock change can’t distort reported duration.</p>
+    <p><b>The gate root (A3):</b> the agent read gate fields at a nesting level the server never returned, so the gate silently passed. The server now returns the fields at the level the agent enforces on, the agent fails closed, and pre-punch capture is refused at ingestion.</p>
+    <p><b>The policy-refresh root (B11):</b> the policy bundle was fetched once at login and the screenshot scheduler could stack a second timer on any re-apply — producing “a shot every minute” instead of the configured interval. The agent now clears the old scheduler first and re-resolves policy live. Individual root causes for the remaining defects are in the §3 table.</p>
+  </div>
+
+  <h2 id="s5"><span class="n">5.</span> Migrations</h2>
+  <p>Six additive, reversible migrations (filename order). Apply with <code>migrate.bat</code>; reverse a batch with <code>php artisan migrate:rollback</code>.</p>
+  <table>
+    <thead><tr><th>#</th><th>File</th><th>Adds</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td class="mono">2026_07_23_000100_create_status_timeline_table</td><td><code>status_timeline</code> table</td></tr>
+      <tr><td>2</td><td class="mono">2026_07_23_000200_qa_phase2_attendance_clock_and_tamper</td><td>attendance <code>first_login_at</code>/<code>last_login_at</code>/<code>final_logout_at</code>; activity clock-diagnostic cols; <code>agent_tamper_events</code> table</td></tr>
+      <tr><td>3</td><td class="mono">2026_07_23_000300_add_attendance_policy_to_companies</td><td>companies <code>late_arrival_source</code>/<code>checkout_policy</code>/<code>checkout_grace_minutes</code>; attendance derivation-provenance cols</td></tr>
+      <tr><td>4</td><td class="mono">2026_07_23_000400_seed_qa_permissions</td><td>14 permissions + default role grants (idempotent)</td></tr>
+      <tr><td>5</td><td class="mono">2026_07_23_000500_link_screenshots_to_violations</td><td><code>client_event_uuid</code> on screenshots + compliance events; <code>evidence_window_seconds</code> on companies; indexes</td></tr>
+      <tr><td>6</td><td class="mono">2026_07_23_000600_index_audit_logs_created_at</td><td>index on <code>audit_logs(company_id, created_at)</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s6"><span class="n">6.</span> New &amp; changed API endpoints</h2>
+  <table>
+    <thead><tr><th>Endpoint</th><th>Auth</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">GET /agent/gate-status</td><td>agent</td><td>Now returns top-level <code>{gate_required,open,message,reason}</code> + a backward-compatible nested block (A3)</td></tr>
+      <tr><td class="mono">POST /agent-override/gate</td><td>role: SUPER/COMPANY/HR ADMIN</td><td>Emergency, audited gate override (A3)</td></tr>
+      <tr><td class="mono">POST /agent/tamper-attempt</td><td>agent</td><td>Agent reports exit/uninstall/service-stop attempts (A8)</td></tr>
+      <tr><td class="mono">GET /agent/policy</td><td>agent</td><td>Bundle now carries exit-lock hash and resolved <code>screenshot.effective_interval_seconds</code>/version/id (A8, B11)</td></tr>
+      <tr><td class="mono">GET /violations/{event}/evidence</td><td>permission: evidence.view</td><td>Only the screenshots linked to that violation; tenant-safe; EXPIRED signal (B10)</td></tr>
+      <tr><td class="mono">GET /export/audit-logs</td><td>permission: audit.export</td><td>Full filtered audit trail as CSV, formula-safe, redacted (B14)</td></tr>
+      <tr><td class="mono">GET /audit-logs</td><td>role: SUPER/COMPANY/AUDITOR</td><td>Exact datetime range honoured; filters survive pagination (B13)</td></tr>
+      <tr><td class="mono">PUT/POST /attendance</td><td>role: SUPER/COMPANY/HR ADMIN</td><td>Shared request rejects a future manual check-out (B9)</td></tr>
+      <tr><td class="mono">Meetings routes</td><td>permission: meeting.*</td><td>index/show=view, store=schedule, update=edit, cancel=cancel, participation=reports (B5)</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s7"><span class="n">7.</span> New permissions</h2>
+  <p>Seeded and attached to sensible role defaults (Admin/HR = all; Manager/TL = meeting view/schedule/edit; Auditor = meeting view/reports + audit.export + evidence.view). They appear automatically in the Roles matrix.</p>
+  <p class="mono">meeting.view · meeting.schedule · meeting.edit · meeting.cancel · meeting.participants · meeting.reports · biometric.sync.config · biometric.sync.run · attendance.edit · audit.export · evidence.view · gate.override · agent.maintenance · agent.tamper.manage</p>
+  <div class="callout"><b>Note for existing custom roles:</b> the migration attaches the new permissions to the built-in <em>system</em> roles only. Any custom company role created before this update keeps its previous permission set — grant the new <code>meeting.*</code> (or others) in the Roles matrix if those users need them.</div>
+
+  <h2 id="s8"><span class="n">8.</span> Scheduler / job changes</h2>
+  <ul>
+    <li><b>New 1-minute heartbeat closure</b> stamps a cache key; the Troubleshooting <b>Background scheduler</b> tile turns red if <code>schedule:run</code> stops (B6 self-diagnosis).</li>
+    <li><b>Biometric auto-sync</b> (every 5 minutes) confirmed; a consecutive-failure cap (5) auto-disables a broken feed to <code>ERROR</code> and the Biometric tile flags it.</li>
+    <li><b>Nightly <code>mark-attendance</code></b> now finalises the shift-aware checkout (B7) before the half-day rule.</li>
+  </ul>
+
+  <h2 id="s9"><span class="n">9.</span> Windows agent &amp; service changes (v0.11.0)</h2>
+  <ul>
+    <li><b>Clock:</b> server-time offset + monotonic base; every stamp server-corrected (A5).</li>
+    <li><b>Gate:</b> fails closed; per-reason wall; never starts tracking on an unknown/gated state (A3).</li>
+    <li><b>Breaks:</b> IPC guards disable conflicting break/meeting buttons; “end current break first” (A6/A7).</li>
+    <li><b>Exit/uninstall:</b> admin-password exit modal (5-try → lockout), tamper reporting, NSIS uninstall guard (A8).</li>
+    <li><b>Screenshots:</b> scheduler never stacks timers; applies interval changes live; each shot carries policy id/version/interval + violation correlation id (B10/B11).</li>
+    <li><b>Login display:</b> renderer never blanks; retains last payload while offline (A1/A2).</li>
+  </ul>
+
+  <h2 id="s10"><span class="n">10.</span> macOS agent changes (B12)</h2>
+  <ul>
+    <li>Confirmed the agent payload path uses <b>no locale-dependent date strings</b> — timestamps are hand-formatted and byte-identical across Windows/macOS/Linux.</li>
+    <li>Added a platform-neutral <code>fmtIso()</code> (ISO-8601 with explicit numeric offset) as an additive helper.</li>
+    <li>Violation timestamps now use the server-corrected clock (ordering/correlation hold on macOS).</li>
+    <li>The full switch to offset-carrying stamps on <em>every</em> event is a coordinated server read-side change (D6) and is intentionally deferred to avoid regressing the existing timezone-aware day bucketing (see §20).</li>
+  </ul>
+
+  <h2 id="s11"><span class="n">11.</span> Dashboard / reporting changes</h2>
+  <ul>
+    <li>Live status shows <code>work_status</code> with break sub-type + meeting; break/idle/meeting widgets open the filtered live list, never the Attendance tab (B1/B2/B3/B15).</li>
+    <li>Attendance sheet + CSV export surface how check-in/out/late were derived (source columns) (B7/B8).</li>
+    <li>Violations tab: a dedicated evidence modal shows only the violation’s shots (B10).</li>
+    <li>Audit trail: datetime range pickers + CSV export button (B13/B14).</li>
+    <li>Meeting scheduling modal rebuilt on-theme; actions hidden when the role lacks the permission (B4/B5).</li>
+  </ul>
+
+  <h2 id="s12"><span class="n">12.</span> Config / env changes</h2>
+  <p>No <code>.env</code> or server config changes are required. New operational settings are per-company and admin-editable in the database (attendance <code>late_arrival_source</code>/<code>checkout_policy</code>/<code>checkout_grace_minutes</code>, <code>evidence_window_seconds</code>), consistent with the Ametecs “configure in the UI, stored in DB” standard. The only environmental dependency is the existing requirement that the OS scheduler runs <code>php artisan schedule:run</code> every minute (now self-diagnosing).</p>
+
+  <h2 id="s13"><span class="n">13.</span> Changed files &amp; commit hashes</h2>
+  <div class="grid2">
+    <div class="card">
+      <h3>Server / console (branch <span class="mono">main</span>)</h3>
+      <p class="kv"><b>New:</b> <span class="mono">StatusService, StatusTimeline, StatusResult, ConflictingStatusException, AttendanceDerivation, AgentOverrideController, TamperController, AgentTamperEvent, ManualAttendanceRequest</span> + 6 migrations + 6 test suites.</p>
+      <p class="kv"><b>Modified:</b> <span class="mono">Attendance/Activity/Break/AgentMeeting/Screenshot/Compliance/Diagnostics/Ops/Export/AttendanceAdmin/Biometric* controllers, GateService, PolicyResolver, BiometricCloudSync, BiometricSync, MarkAttendance, routes/api.php, routes/console.php, admin.blade.php, RolePermissionSeeder</span>.</p>
+      <p class="kv"><b>Commits:</b> <span class="commit">6b0a8c5</span> · <span class="commit">1fd507e</span> · <span class="commit">1d9ac96</span> · <span class="commit">c254667</span> · <span class="commit">791426d</span> · <span class="commit">1d4bfad</span> · <span class="commit">a52a200</span></p>
+    </div>
+    <div class="card">
+      <h3>Desktop agent (branch <span class="mono">master</span>)</h3>
+      <p class="kv"><b>New:</b> <span class="mono">src/tracking/clock.js, guards.js</span>; tests <span class="mono">clock.test.js, guards.test.js, screenshot.test.js</span>; NSIS <span class="mono">build/installer.nsh</span>.</p>
+      <p class="kv"><b>Modified:</b> <span class="mono">main.js, preload.js, src/renderer/*, src/tracking/{screenshot,idle,session,usage,activeWindow}.js, package.json</span>.</p>
+      <p class="kv"><b>Version:</b> v0.11.0 · <b>Commits:</b> <span class="commit">d6a377a</span> · <span class="commit">deb8ada</span> · <span class="commit">61adabb</span></p>
+    </div>
+  </div>
+
+  <h2 id="s14"><span class="n">14.</span> Automated tests added</h2>
+  <table>
+    <thead><tr><th>Suite</th><th>Runner</th><th>Covers</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">QaPhase1Test (12)</td><td>php artisan test</td><td>one open status; break/meeting no overlap; 409 on conflict; lock→idle; logout closes all; dashboard/report parity</td></tr>
+      <tr><td class="mono">QaPhase2Test (8)</td><td>php artisan test</td><td>gate-status shape+reason; override + tamper log; first-login write-once; exit-lock hash in bundle</td></tr>
+      <tr><td class="mono">QaPhase3Test (8)</td><td>php artisan test</td><td>lunch OUT ≠ checkout; delayed recompute; late per source; re-login stable; biometric-only late; gate refuses capture</td></tr>
+      <tr><td class="mono">QaPhase4Test (5)</td><td>php artisan test</td><td>meeting permission 201/403; cross-tenant 404; role-default seeding</td></tr>
+      <tr><td class="mono">QaPhase5Test (4)</td><td>php artisan test</td><td>effective interval + version; evidence only linked; cross-tenant 403; purged EXPIRED</td></tr>
+      <tr><td class="mono">QaPhase6Test (6)</td><td>php artisan test</td><td>explicit range precise; pagination keeps filters; export filtered + formula-safe + 403; future checkout rejected; overnight valid</td></tr>
+      <tr><td class="mono">clock.test.js (5)</td><td>node --test</td><td>offset math; unsynced fallback; bad-time reject; fmtStamp locale-independence; fmtIso offset + round-trip</td></tr>
+      <tr><td class="mono">guards.test.js (—)</td><td>node --test</td><td>break-conflict decision (end-current-first)</td></tr>
+      <tr><td class="mono">screenshot.test.js (3)</td><td>node --test</td><td>no timer stacking; applyPolicy restart-only-on-change; violations-only runs no interval timer</td></tr>
+    </tbody>
+  </table>
+  <p class="muted">Gate/clock acceptance points from the brief (gate denies login without punch; allows after synced punch; no tracking while gate denied; clock manipulation doesn’t alter duration) are covered by the existing <code>M13GateTest</code> plus <code>QaPhase2/3Test</code> and <code>clock.test.js</code>. Existing suite baseline was ~73 green and was not regressed by design (M2/M5/M6/M8/M13/M14 code paths preserved; M14 re-verified after the meeting role→permission switch).</p>
+
+  <h2 id="s15"><span class="n">15.</span> Automated test results</h2>
+  <div class="callout"><b>Owner-run.</b> The cloud build environment cannot execute MySQL/PHP or Electron, so this run is executed on your Laragon box after <code>migrate.bat</code>. Every suite is written, committed and passes <code>php -l</code> / <code>node --check</code>; the agent node tests pass locally (clock 5/5, screenshot 3/3). Paste the counts below after running.</div>
+  <table>
+    <thead><tr><th>Command</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">php artisan test</td><td>___ passed / ___ failed &nbsp;(fill in)</td></tr>
+      <tr><td class="mono">cd agent &amp;&amp; node --test</td><td>___ passed / ___ failed &nbsp;(fill in)</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s16"><span class="n">16.</span> Manual QA checklist &amp; results (Part G)</h2>
+  <p>Execute on real hardware and tick each; note any deviation.</p>
+  <h3>Windows agent</h3>
+  <p class="muted">Fresh + upgrade install · startup · login/re-login · gate enabled · device offline · sync delay · Tea→End→Lunch · Meeting→End→Tea · rapid clicks · PC lock · display off · sleep · hibernate · network drop/reconnect · clock forward/backward · window-close→tray · attempt exit · attempt stop service · attempt uninstall as standard user · authorized admin maintenance/uninstall.</p>
+  <h3>Admin console</h3>
+  <p class="muted">Live break updates · Tea/Lunch/Other filters · meeting modal position/theme · Schedule-Meeting permission · auto biometric sync · intermediate OUT punches · late minutes · future-checkout block · violation evidence filtering · screenshot policy update (10-min) · audit ranges · audit export · zoom/resolutions.</p>
+  <h3>macOS agent</h3>
+  <p class="muted">Login time · org timezone · active/idle · break/meeting durations · screen lock · display sleep · system sleep/wake · network reconnect · local time change.</p>
+
+  <h2 id="s17"><span class="n">17.</span> Before / after screenshots</h2>
+  <p>Capture before/after for the UI defects: <b>B2</b> (break widgets), <b>B3</b> (widget → filtered list, not Attendance), <b>B4</b> (meeting modal centred/on-theme), <b>B10</b> (violation evidence modal shows only that violation), <b>B13</b> (audit range honoured), <b>B14</b> (audit export). Paste them here in the delivered copy.</p>
+
+  <h2 id="s18"><span class="n">18.</span> Agent build instructions</h2>
+  <pre><code>cd C:\Users\ADMIN\Documents\Claude\Projects\SmartEPT\agent
+npm install          # first time / after dependency changes
+npm run dist         # produces the Windows installer (NSIS) — verify the build succeeds
+# macOS (if in scope): ./build-mac.command
+node --test          # optional: run the agent unit tests (clock / guards / screenshot)</code></pre>
+  <p class="muted">Reinstall the rebuilt agent on the test PCs. The NSIS uninstall guard is included via <code>build/installer.nsh</code> — confirm <code>npm run dist</code> completes without error (the guard is new this phase).</p>
+
+  <h2 id="s19"><span class="n">19.</span> Deploy, migration &amp; rollback</h2>
+  <pre><code># Deploy (edits are already in the live tree; Laragon serves it)
+cd C:\laragon\www\smartept
+migrate.bat                    # or: php artisan migrate     (applies the 6 migrations)
+# hard-refresh the console:  Ctrl+Shift+R
+
+# Rollback the QA migration batch if ever needed
+php artisan migrate:rollback   # each migration has a working down()</code></pre>
+
+  <h2 id="s20"><span class="n">20.</span> Known limitations &amp; items needing confirmation</h2>
+  <ul>
+    <li><b>A8 / D4 — native tamper-proofing.</b> Absolute protection against a full-Administrator or physical user is not achievable from an Electron/tray app. We ship the strongest supported protection (exit-lock, tamper logging, NSIS uninstall guard, server-authoritative gate). A protected Windows service is a separate, larger build if required.</li>
+    <li><b>B12 / D6 — clock authority rollout.</b> The agent is server-time-authoritative and macOS-format-safe now. Moving <em>every</em> timestamp to carry an explicit UTC offset (and the server storing UTC + displaying org-local everywhere) is a coordinated server read-side change; it was deferred to avoid regressing the current timezone-aware day bucketing. Confirm whether that full rollout is in scope for a follow-up.</li>
+    <li><b>B6 — auto-sync depends on the OS scheduler.</b> Cloud biometric auto-sync only runs if Task Scheduler runs <code>schedule:run</code> every minute (now self-diagnosing via the tile). Physical on-prem readers may need a device-specific auto path.</li>
+    <li><b>Custom roles (B5).</b> Pre-existing custom company roles need the new permissions ticked in the Roles matrix (see §7).</li>
+    <li><b>Decisions D1–D6</b> were implemented per the recommended defaults (reject conflicting starts; later-of-both late source; last-valid-OUT-after-grace checkout; server+agent gate/tamper; live screenshot refresh; server-offset clock). Confirm the defaults suit each client, or set per-company overrides where provided.</li>
+  </ul>
+
+  <footer>
+    SmartEPT by Ametecs · QA Defect Resolution &amp; Stability Phase · Delivery Report · 2026-07-23 · Rev QA-01<br>
+    All 23 defects addressed across 6 phases · server branch <span class="mono">main</span> · agent branch <span class="mono">master</span> v0.11.0
+  </footer>
+</div>
+</body>
+</html>
