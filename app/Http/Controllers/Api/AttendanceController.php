@@ -138,6 +138,13 @@ class AttendanceController extends Controller
             $updates['first_activity_at'] = $at;
             $updates['late_minutes'] = $this->lateMinutes($employee, $at);
         }
+        // QA Phase 2 (A2): first_login_at is WRITE-ONCE for the day; last_login_at always
+        // tracks the most recent login/unlock. /today reads first_login_at so the shown
+        // login time is stable across re-logins.
+        if (! $attendance->first_login_at) {
+            $updates['first_login_at'] = $at;
+        }
+        $updates['last_login_at'] = $at;
         $attendance->update($updates);
     }
 
@@ -154,11 +161,17 @@ class AttendanceController extends Controller
             ]);
         }
 
-        $attendance->update([
+        $updates = [
             'check_out_at' => $at,
             'last_activity_at' => $at,
             'early_logout_minutes' => $this->earlyLogoutMinutes($employee, $at),
-        ]);
+        ];
+        // QA Phase 2 (A2): a real LOGOUT closes the working day; a LOCK is temporary and
+        // must NOT stamp the final logout.
+        if ($reason === 'LOGOUT') {
+            $updates['final_logout_at'] = $at;
+        }
+        $attendance->update($updates);
     }
 
     private function lateMinutes($employee, Carbon $at): int

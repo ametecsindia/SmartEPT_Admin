@@ -215,9 +215,12 @@ class DeviceController extends Controller
         // Biometric Gate: piggyback the live gate state on every heartbeat so the
         // agent syncs continuously (Ejaz's rule — no hourly button, heartbeat-style).
         $gate = null;
+        $gateStatus = null; // QA Phase 2 (A3): the {gate_required, open, reason} the agent enforces on
 
         if ($device->employee) {
-            $gate = app(\App\Services\GateService::class)->stateFor($device->employee);
+            $svc = app(\App\Services\GateService::class);
+            $gate = $svc->stateFor($device->employee);           // backward-compatible nested block
+            $gateStatus = $svc->statusFor($device->employee);    // gate_required, open, message, reason
         }
 
         // Section 2: piggyback the currently-joinable meeting (participant + in window +
@@ -243,7 +246,8 @@ class DeviceController extends Controller
             'ok' => true,
             'server_time' => now()->toIso8601String(),
             'clock_skew_seconds' => $skew,
-            'gate' => $gate,
+            'gate' => $gate,                 // nested {enabled,state,arrived,...} (unchanged)
+            'gate_status' => $gateStatus,    // QA Phase 2 (A3): {gate_required, open, message, reason}
             'meeting' => $meeting,
         ]);
     }

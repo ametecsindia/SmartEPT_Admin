@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\BiometricDevice;
+use App\Models\BiometricEmployeeMapping;
 use App\Models\BiometricLog;
 use App\Models\Company;
 use App\Models\Employee;
@@ -102,13 +103,52 @@ class GateService
     public function statusFor(Employee $employee): array
     {
         $s = $this->stateFor($employee);
+        $open = ! $s['enabled'] || $s['state'] === 'IN';
 
         return [
             'gate_required' => $s['enabled'],
-            'open' => ! $s['enabled'] || $s['state'] === 'IN',
+            'open' => $open,
             'punched_in_at' => $s['last_punch_at'] ? Carbon::parse($s['last_punch_at'])->toIso8601String() : null,
             'message' => $s['message'],
+            // QA Phase 2 (A3): a distinct machine-readable reason the agent shows on the
+            // gate wall, so a stuck gate is self-diagnosable instead of a mystery.
+            'reason' => $open ? null : $this->closedReason($employee, $s),
         ];
+    }
+
+    /**
+     * Why the gate is closed right now (only called when open == false). Codes:
+     * EMPLOYEE_INACTIVE, NO_MAPPING, NO_PUNCH (no IN punch yet today), PUNCHED_OUT
+     * (mid-day soft-lock), CONFIG_ERROR. AWAITING_SYNC / DEVICE_OFFLINE / WRONG_ORG
+     * are reserved for when they become detectable at this layer.
+     */
+    private function closedReason(Employee $employee, array $state): string
+    {
+        try {
+            if (($employee->employment_status ?? 'ACTIVE') !== 'ACTIVE') {
+                return 'EMPLOYEE_INACTIVE';
+            }
+
+            // Punched in earlier but currently OUT → mid-day soft lock.
+            if (! empty($state['arrived'])) {
+                return 'PUNCHED_OUT';
+            }
+
+            // No punch yet today. If a physical reader is registered but this employee
+            // has no biometric mapping, the door can never lift their gate → flag it.
+            $hasDevice = BiometricDevice::withoutGlobalScopes()
+                ->where('company_id', $employee->company_id)->where('status', 'ACTIVE')->exists();
+            $mapped = BiometricEmployeeMapping::withoutGlobalScopes()
+                ->where('company_id', $employee->company_id)->where('employee_id', $employee->id)->exists();
+
+            if ($hasDevice && ! $mapped) {
+                return 'NO_MAPPING';
+            }
+
+            return 'NO_PUNCH';
+        } catch (\Throwable $e) {
+            return 'CONFIG_ERROR';
+        }
     }
 
     /** True when the agent is ALLOWED to run a work session right now. */

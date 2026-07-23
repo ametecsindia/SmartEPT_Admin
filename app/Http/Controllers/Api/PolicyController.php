@@ -160,6 +160,16 @@ class PolicyController extends Controller
                 'OTHER'  => (int) ($company->break_limit_other_min ?? 10) * 60,
                 'CUSTOM' => (int) ($company->break_limit_other_min ?? 10) * 60,
             ];
+
+            // QA Phase 2 (A8): exit/uninstall lock. The agent receives ONLY a SHA-256 of
+            // the admin password so it can verify a typed one locally (offline too); the
+            // plaintext never leaves the server.
+            $bundle['agent'] = [
+                'exit_lock_enabled'    => (bool) ($company->agent_exit_lock_enabled ?? false),
+                'exit_password_sha256' => filled($company->agent_exit_password)
+                    ? hash('sha256', (string) $company->agent_exit_password)
+                    : null,
+            ];
         }
 
         return response()->json($bundle);

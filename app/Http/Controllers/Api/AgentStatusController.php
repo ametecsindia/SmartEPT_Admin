@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\EmployeeActivityEvent;
+use App\Models\EmployeeAttendanceLog;
 use App\Models\EmployeeBreakLog;
 use App\Models\EmployeeIdleLog;
 use App\Models\EmployeeLoginSession;
@@ -25,8 +26,30 @@ class AgentStatusController extends Controller
     public function gateStatus(Request $request): JsonResponse
     {
         $employee = $this->agentEmployee($request);
+        $gate = app(\App\Services\GateService::class);
 
-        return response()->json(['gate' => app(\App\Services\GateService::class)->stateFor($employee)]);
+        try {
+            // QA Phase 2 (A3): return BOTH shapes. The nested `gate` block keeps the
+            // existing console/heartbeat consumers working; the TOP-LEVEL
+            // {gate_required, open, message, reason} is what the agent actually reads
+            // in ensureGateThenBegin (it was reading top-level keys that never existed —
+            // the gate silently never blocked). Now they exist and are correct.
+            $status = $gate->statusFor($employee);      // gate_required, open, message, reason
+            $status['gate'] = $gate->stateFor($employee); // backward-compatible nested block
+
+            return response()->json($status);
+        } catch (\Throwable $e) {
+            // Fail CLOSED for the USP: if we cannot compute the gate, tell the agent it
+            // is required and not open, with a diagnosable reason.
+            return response()->json([
+                'gate_required' => true,
+                'open' => false,
+                'message' => 'Gate status is temporarily unavailable — please wait.',
+                'reason' => 'SERVER_ERROR',
+                'gate' => ['enabled' => true, 'state' => 'OUT', 'arrived' => false, 'last_punch_at' => null,
+                    'message' => 'Gate status is temporarily unavailable — please wait.'],
+            ], 200);
+        }
     }
 
     /**
@@ -59,8 +82,14 @@ class AgentStatusController extends Controller
         $breakSeconds = (int) EmployeeBreakLog::where('employee_id', $employee->id)
             ->whereDate('start_at', $today)->sum('duration_seconds');
 
-        $firstLogin = EmployeeLoginSession::where('employee_id', $employee->id)
-            ->whereDate('login_at', $today)->min('login_at');
+        // QA Phase 2 (A1/A2): the shown login time must never be blank right after a
+        // login. Prefer the write-once first_login_at, then the earliest login session,
+        // then the attendance check-in — so a materialisation race can't render "—".
+        $attendance = EmployeeAttendanceLog::where('employee_id', $employee->id)
+            ->whereDate('work_date', $today)->first();
+        $firstLogin = $attendance?->first_login_at
+            ?? EmployeeLoginSession::where('employee_id', $employee->id)->whereDate('login_at', $today)->min('login_at')
+            ?? $attendance?->check_in_at;
 
         // Timeline-additive split + meeting time (the parts the legacy sums never carried).
         $totals = app(StatusService::class)->dayTotals($employee->id, $today);

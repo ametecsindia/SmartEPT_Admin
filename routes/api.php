@@ -24,6 +24,8 @@ use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\LicenseController;
 use App\Http\Controllers\Api\MeetingController;
 use App\Http\Controllers\Api\AgentMeetingController;
+use App\Http\Controllers\Api\AgentOverrideController;
+use App\Http\Controllers\Api\TamperController;
 use App\Http\Controllers\Api\BreakReportController;
 use App\Http\Controllers\Api\OpsController;
 use App\Http\Controllers\Api\StorageConfigController;
@@ -137,6 +139,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('consent/status', [ConsentController::class, 'status']);
         Route::get('today', [AgentStatusController::class, 'today']);
         Route::post('sync-batch', [SyncController::class, 'batch']);
+        // QA Phase 2 (A8): the agent reports exit/uninstall/service-stop tamper attempts.
+        // Outside the consent wall — a tamper attempt must be recordable regardless.
+        Route::post('tamper-attempt', [TamperController::class, 'report']);
         // Biometric Gate v1.1: PRE-consent by design — the wall shows before work
         // starts, and it exposes only the caller's own punch state.
         Route::get('gate-status', [AgentStatusController::class, 'gateStatus']);
@@ -241,6 +246,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('meetings/{meeting}/cancel', [MeetingController::class, 'cancel']);
         Route::get('meetings/{meeting}/participation', [MeetingController::class, 'participation']);
     });
+
+    // ---- QA Phase 2 (A3): emergency biometric-gate override (admin, audited, never automatic) ----
+    Route::post('agent-override/gate', [AgentOverrideController::class, 'gate'])
+        ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,HR_ADMIN');
 
     // ---- Companies (tenant provisioning + profile) ----
     Route::get('companies', [CompanyController::class, 'index'])
