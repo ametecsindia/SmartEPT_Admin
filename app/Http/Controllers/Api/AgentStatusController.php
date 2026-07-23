@@ -7,6 +7,7 @@ use App\Models\EmployeeActivityEvent;
 use App\Models\EmployeeBreakLog;
 use App\Models\EmployeeIdleLog;
 use App\Models\EmployeeLoginSession;
+use App\Services\StatusService;
 use App\Support\ResolvesAgentContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,7 +32,15 @@ class AgentStatusController extends Controller
     /**
      * GET /api/agent/today
      * Server-side truth for the employee's visible dashboard: today's active / idle /
-     * break totals and login time. The agent renders these so the numbers can't drift.
+     * break / meeting totals and login time. The agent renders these so the numbers
+     * can't drift.
+     *
+     * QA Phase 1: active / idle / break stay on the per-event legacy sums (which carry the
+     * agent's precise reported durations and must not regress), while the authoritative
+     * status_timeline ADDITIVELY contributes what those sums never carried — meeting time
+     * (productive, reported separately) and the Tea/Lunch/Other break split — so the agent
+     * can show them and they agree with the live console. Full read-switch of active/idle
+     * onto the timeline waits until the agent emits server-time segments (D6, later phase).
      */
     public function today(Request $request): JsonResponse
     {
@@ -53,14 +62,21 @@ class AgentStatusController extends Controller
         $firstLogin = EmployeeLoginSession::where('employee_id', $employee->id)
             ->whereDate('login_at', $today)->min('login_at');
 
+        // Timeline-additive split + meeting time (the parts the legacy sums never carried).
+        $totals = app(StatusService::class)->dayTotals($employee->id, $today);
+
         return response()->json([
-            'employee'       => ['id' => $employee->id, 'name' => $employee->fullName()],
-            'date'           => $today,
-            'logged_in_at'   => $firstLogin,
-            'active_seconds' => $activeSeconds,
-            'idle_seconds'   => $idleSeconds,
-            'break_seconds'  => $breakSeconds,
-            'server_time'    => now()->toIso8601String(),
+            'employee'            => ['id' => $employee->id, 'name' => $employee->fullName()],
+            'date'                => $today,
+            'logged_in_at'        => $firstLogin,
+            'active_seconds'      => $activeSeconds,
+            'idle_seconds'        => $idleSeconds,
+            'break_seconds'       => $breakSeconds,
+            'break_tea_seconds'   => $totals['break_tea'],
+            'break_lunch_seconds' => $totals['break_lunch'],
+            'break_other_seconds' => $totals['break_other'],
+            'meeting_seconds'     => $totals['meeting'],
+            'server_time'         => now()->toIso8601String(),
         ]);
     }
 }

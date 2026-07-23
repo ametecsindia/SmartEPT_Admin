@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\EmployeeBreakLog;
+use App\Services\ConflictingStatusException;
+use App\Services\StatusService;
 use App\Support\ResolvesAgentContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class BreakController extends Controller
 {
@@ -52,6 +55,31 @@ class BreakController extends Controller
             $same = $open->firstWhere('break_type', $type);
             if ($same) {
                 return response()->json(['ok' => true, 'break_id' => $same->id, 'deduped' => true], 200);
+            }
+
+            // QA Phase 1 (D1): the status timeline is the exclusivity authority. A MANUAL
+            // break while a DIFFERENT break/meeting is open is REJECTED (409) — nothing is
+            // written until the employee ends the current one. Non-manual sources
+            // (AUTO_IDLE / BIOMETRIC) may still switch. Do this BEFORE any legacy write so
+            // a rejected click leaves no partial state.
+            $manual = ($data['source'] ?? 'MANUAL') === 'MANUAL';
+            $timelineState = match ($type) {
+                'TEA'   => 'TEA_BREAK',
+                'LUNCH' => 'LUNCH_BREAK',
+                default => 'OTHER_BREAK',
+            };
+            try {
+                app(StatusService::class)->transition($employee, $timelineState, $at, [
+                    'device_uuid' => $data['device_uuid'],
+                    'manual'      => $manual,
+                    'source'      => $manual ? 'AGENT' : 'BIOMETRIC',
+                ]);
+            } catch (ConflictingStatusException $c) {
+                return response()->json(['error' => [
+                    'code'    => 'STATUS_CONFLICT',
+                    'message' => 'End your current break or meeting first.',
+                    'active'  => $c->activePayload(),
+                ]], 409);
             }
 
             // Switching break types: close whatever is open first (one break at a time).
@@ -111,6 +139,18 @@ class BreakController extends Controller
                 $o->update($update);
                 $closed++;
             });
+
+        // QA Phase 1 (dual-write): ending a break returns the employee to ACTIVE in the
+        // timeline — but only if they were actually on a break, so a stray END never ends
+        // an open meeting.
+        try {
+            $status = app(StatusService::class);
+            if (in_array($status->currentState($employee), StatusService::BREAK_STATES, true)) {
+                $status->resumeActive($employee, $at, ['device_uuid' => $data['device_uuid']]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('StatusService mirror failed on break END', ['e' => $e->getMessage()]);
+        }
 
         return response()->json([
             'ok'      => true,

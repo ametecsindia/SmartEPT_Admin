@@ -2093,27 +2093,42 @@ async function initDashOrgFilter() {
   DASH_ORG_READY = true;
 }
 let DASH_EMP = [];      // last live-status employees payload (EPT-23 drill-down)
-let DASH_FILTER = null; // active KPI filter: null | 'all' | 'ONLINE' | 'IDLE' | 'AWAY' | 'OFFLINE'
-const KPI_STATUS = { ONLINE: 't-ok', IDLE: 't-idle', AWAY: 't-warn', OFFLINE: 't-off' };
+let DASH_FILTER = null; // active KPI filter: null | 'all' | work_status | 'BREAK'
+// QA Phase 1 (B2/B3/B15): the live board is driven by the authoritative status_timeline
+// work_status, so each employee sits in exactly one category and a break widget opens the
+// SAME filtered list as Active/Idle (never the Attendance tab).
+const WORK_TAG = { ACTIVE: 't-ok', IDLE: 't-idle', TEA_BREAK: 't-info', LUNCH_BREAK: 't-info', OTHER_BREAK: 't-info', MEETING: 't-warn', OFFLINE: 't-off' };
+const WORK_LABEL = { ACTIVE: 'Active', IDLE: 'Idle', TEA_BREAK: 'Tea break', LUNCH_BREAK: 'Lunch', OTHER_BREAK: 'Other break', MEETING: 'Meeting', OFFLINE: 'Offline', BREAK: 'On break' };
+const WORK_KCLS = { ACTIVE: 'k-ok', IDLE: 'k-idle', BREAK: 'k-break', TEA_BREAK: 'k-break', LUNCH_BREAK: 'k-break', OTHER_BREAK: 'k-break', MEETING: 'k-away', OFFLINE: 'k-off' };
+const isBreakWS = (s) => s === 'TEA_BREAK' || s === 'LUNCH_BREAK' || s === 'OTHER_BREAK';
 function renderLiveRows() {
   const f = DASH_FILTER;
-  const active = f && f !== 'all' && KPI_STATUS[f];
-  const list = active ? DASH_EMP.filter((e) => e.status === f) : DASH_EMP;
-  if (active) {
-    const cc = { ONLINE: 'k-ok', IDLE: 'k-idle', AWAY: 'k-away', OFFLINE: 'k-off' }[f] || 'k-total';
-    const lbl = { ONLINE: 'Active now', IDLE: 'Idle', AWAY: 'Away', OFFLINE: 'Offline' }[f] || f;
+  const filtering = !!(f && f !== 'all');
+  const list = !filtering ? DASH_EMP
+    : (f === 'BREAK' ? DASH_EMP.filter((e) => isBreakWS(e.work_status))
+      : DASH_EMP.filter((e) => e.work_status === f));
+  if (filtering) {
+    const cc = WORK_KCLS[f] || 'k-total';
+    const lbl = WORK_LABEL[f] || f;
     $('#live-filter').innerHTML = '<span class="fchip ' + cc + '">' + esc(lbl) + ' · ' + list.length
       + ' <span class="x" id="clr-filter" title="Clear filter">✕</span></span>';
   } else {
     $('#live-filter').innerHTML = '';
   }
   $('#live-rows').innerHTML = list.map((e) => {
-    const cls = KPI_STATUS[e.status] || 't-off';
+    const ws = e.work_status || 'OFFLINE';
+    const cls = WORK_TAG[ws] || 't-off';
+    const lbl = WORK_LABEL[ws] || ws;
+    // Break / meeting rows carry their start time + running elapsed (B2/B3).
+    const onBreak = isBreakWS(ws) || ws === 'MEETING';
+    const extra = (onBreak && e.break_started_at)
+      ? ' <span class="mut" style="font-size:11px">since ' + t(e.break_started_at) + ' · ' + secH(e.elapsed) + '</span>'
+      : '';
     return '<tr class="clk" data-id="' + e.employee_id + '" data-name="' + esc(e.name) + '">'
       + '<td><span class="nm">' + esc(e.name) + '</span></td><td>' + esc(e.team || '—') + '</td>'
-      + '<td><span class="tag ' + cls + '">' + esc(e.status) + '</span></td>'
+      + '<td><span class="tag ' + cls + '">' + esc(lbl) + '</span>' + extra + '</td>'
       + '<td>' + secH(e.active_seconds) + '</td><td>' + secH(e.idle_seconds) + '</td><td>' + t(e.last_seen) + '</td></tr>';
-  }).join('') || '<tr><td colspan="6" class="mut">' + (active ? 'No employees match this filter right now.' : 'No employees online yet.') + '</td></tr>';
+  }).join('') || '<tr><td colspan="6" class="mut">' + (filtering ? 'No employees match this filter right now.' : 'No employees online yet.') + '</td></tr>';
 }
 async function loadDashboard() {
   try {
@@ -2122,11 +2137,14 @@ async function loadDashboard() {
     DASH_EMP = d.employees || [];
     const KPI = [
       ['Employees', c.total_employees, 'k-total', 'all'],
-      ['Active now', c.active_now, 'k-ok', 'ONLINE'],
-      ['Idle', c.idle_now, 'k-idle', 'IDLE'],
-      ['Away', c.away_now, 'k-away', 'AWAY'],
-      ['Offline', c.offline, 'k-off', 'OFFLINE'],
-      ['On break', c.on_break, 'k-break', 'view:attendance'],
+      ['Active', c.active, 'k-ok', 'ACTIVE'],
+      ['Idle', c.idle, 'k-idle', 'IDLE'],
+      ['On break', c.break_total, 'k-break', 'BREAK'],
+      ['· Tea', c.break_tea, 'k-break', 'TEA_BREAK'],
+      ['· Lunch', c.break_lunch, 'k-break', 'LUNCH_BREAK'],
+      ['· Other', c.break_other, 'k-break', 'OTHER_BREAK'],
+      ['In meeting', c.meeting, 'k-away', 'MEETING'],
+      ['Offline', c.offline_count, 'k-off', 'OFFLINE'],
       ['Violations today', c.violations_today, 'k-viol', 'view:violations'],
       ['Screenshots', c.screenshots_today, 'k-shot', 'view:screenshots'],
     ];
@@ -2139,7 +2157,7 @@ async function loadDashboard() {
         + '<div class="kside"><div class="l">' + esc(l) + '</div></div>'
         + '<div class="kmain"><span class="go">' + go + '</span><div class="v">' + (v ?? 0) + '</div></div></div>';
     }).join('');
-    const wf = [['Active', c.active_now, '#16A34A'], ['Idle', c.idle_now, '#D97706'], ['On break', c.on_break, '#EA580C'], ['Offline', c.offline, '#94A3B8']];
+    const wf = [['Active', c.active, '#16A34A'], ['Idle', c.idle, '#D97706'], ['On break', c.break_total, '#EA580C'], ['Meeting', c.meeting, '#B45309'], ['Offline', c.offline_count, '#94A3B8']];
     const wfTotal = c.total_employees || wf.reduce((a, [, v]) => a + (v || 0), 0);
     $('#wf-donut').innerHTML = svgDonut(wf.map(([label, value, color]) => ({ label, value: value || 0, color })), wfTotal);
     $('#wf-leg').innerHTML = wf.map(([l, v, col]) => '<div class="r"><span class="dot" style="background:' + col + '"></span><span class="nm">' + l + '</span><span class="ct">' + (v || 0) + '</span><span class="pc">' + (wfTotal ? Math.round((v || 0) / wfTotal * 100) : 0) + '%</span></div>').join('');

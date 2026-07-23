@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\EmployeeMeetingSession;
 use App\Models\Meeting;
 use App\Models\MeetingParticipant;
+use App\Services\ConflictingStatusException;
+use App\Services\StatusService;
 use App\Support\ResolvesAgentContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Section 2 (agent side) — an employee putting themselves into "Meeting" status.
@@ -58,6 +61,24 @@ class AgentMeetingController extends Controller
                 return response()->json(['ok' => true, 'session_id' => $open->id, 'deduped' => true]);
             }
 
+            // QA Phase 1 (D1): entering MEETING while a break is open is REJECTED (409) —
+            // the timeline is the single exclusivity authority. Done before the legacy
+            // session row is written so a rejected join leaves no partial state.
+            try {
+                app(StatusService::class)->transition($employee, 'MEETING', $now, [
+                    'device_uuid' => $data['device_uuid'],
+                    'manual'      => true,
+                    'source'      => 'AGENT',
+                    'meeting_id'  => $meeting->id,
+                ]);
+            } catch (ConflictingStatusException $c) {
+                return response()->json(['error' => [
+                    'code'    => 'STATUS_CONFLICT',
+                    'message' => 'End your current break before joining a meeting.',
+                    'active'  => $c->activePayload(),
+                ]], 409);
+            }
+
             $session = EmployeeMeetingSession::create([
                 'company_id'      => $employee->company_id,
                 'meeting_id'      => $meeting->id,
@@ -82,6 +103,17 @@ class AgentMeetingController extends Controller
                 ]);
                 $closed++;
             });
+
+        // QA Phase 1 (dual-write): leaving a meeting returns the employee to ACTIVE in the
+        // timeline (only when they were actually in a meeting, so it never ends a break).
+        try {
+            $status = app(StatusService::class);
+            if ($status->currentState($employee) === 'MEETING') {
+                $status->resumeActive($employee, $now, ['device_uuid' => $data['device_uuid']]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('StatusService mirror failed on meeting END', ['e' => $e->getMessage()]);
+        }
 
         return response()->json(['ok' => true, 'closed' => $closed]);
     }

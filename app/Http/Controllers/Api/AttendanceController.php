@@ -8,11 +8,13 @@ use App\Models\EmployeeDevice;
 use App\Models\EmployeeLoginSession;
 use App\Services\GateService;
 use App\Services\OutboundPusher;
+use App\Services\StatusService;
 use App\Services\WorkCalendar;
 use App\Support\ResolvesAgentContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class AttendanceController extends Controller
 {
@@ -73,6 +75,23 @@ class AttendanceController extends Controller
             'LOGIN', 'UNLOCK' => $this->handleLogin($employee, $data['device_uuid'], $at, $attendance, $request->ip()),
             'LOGOUT', 'LOCK'  => $this->handleLogout($employee, $at, $attendance, $data['event_type']),
         };
+
+        // QA Phase 1 (dual-write): mirror the session event into the authoritative
+        // status timeline. LOGIN opens ACTIVE; UNLOCK resumes work; LOCK forces IDLE
+        // (respecting an open manual break); LOGOUT closes the day. Wrapped so a
+        // timeline hiccup can never fail the primary attendance write.
+        try {
+            $status = app(StatusService::class);
+            $opts = ['device_uuid' => $data['device_uuid']];
+            match ($data['event_type']) {
+                'LOGIN'  => $status->transition($employee, 'ACTIVE', $at, $opts),
+                'UNLOCK' => $status->resumeActive($employee, $at, $opts),
+                'LOCK'   => $status->forceIdle($employee, $at, 'LOCK', $opts),
+                'LOGOUT' => $status->closeAll($employee, $at),
+            };
+        } catch (\Throwable $e) {
+            Log::warning('StatusService mirror failed on attendance event', ['e' => $e->getMessage()]);
+        }
 
         // R4 item 7: the live dashboard must flip THE INSTANT a session event lands —
         // never wait for the heartbeat window to expire.

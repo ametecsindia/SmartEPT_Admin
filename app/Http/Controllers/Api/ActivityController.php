@@ -7,10 +7,12 @@ use App\Models\EmployeeActivityEvent;
 use App\Models\EmployeeAttendanceLog;
 use App\Models\EmployeeDevice;
 use App\Models\EmployeeIdleLog;
+use App\Services\StatusService;
 use App\Support\ResolvesAgentContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class ActivityController extends Controller
 {
@@ -66,6 +68,27 @@ class ActivityController extends Controller
         }
 
         EmployeeActivityEvent::insert($rows);
+
+        // QA Phase 1 (dual-write): reflect ACTIVE/IDLE stretches in the status timeline.
+        // Consecutive same-type events collapse to one segment (StatusService also dedupes),
+        // and an open manual break/meeting is preserved — ambient activity never clobbers it.
+        try {
+            $status = app(StatusService::class);
+            $prevType = null;
+            foreach ($data['events'] as $e) {
+                if ($e['event_type'] === $prevType) {
+                    continue; // collapse repeats within the batch
+                }
+                $prevType = $e['event_type'];
+                $isIdle = $e['event_type'] === 'IDLE';
+                $status->transition($employee, $isIdle ? 'IDLE' : 'ACTIVE', Carbon::parse($e['started_at']), [
+                    'device_uuid' => $data['device_uuid'],
+                    'idle_source' => $isIdle ? 'INACTIVITY' : null,
+                ]);
+            }
+        } catch (\Throwable $ex) {
+            Log::warning('StatusService mirror failed on activity events', ['e' => $ex->getMessage()]);
+        }
 
         // Keep the day's attendance "last activity" fresh.
         if ($lastActivity) {

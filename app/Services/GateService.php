@@ -168,6 +168,11 @@ class GateService
             'start_at' => $at,
             'approval_status' => 'NOT_REQUIRED',
         ]);
+
+        // QA Phase 1 (dual-write): the door break is BIOMETRIC/auto, so it may switch the
+        // timeline (rule D1 only rejects MANUAL switches). Reflect it as an out-of-office
+        // OTHER_BREAK segment.
+        $this->mirrorDoorBreak($employeeId, $at);
     }
 
     /** IN punch → close the open door break (merge tiny ones, flag long ones). */
@@ -184,11 +189,13 @@ class GateService
         // Stepped out for under 2 minutes? Not a break — merge it away.
         if ($seconds < self::MERGE_UNDER_MINUTES * 60) {
             $open->delete();
+            $this->mirrorDoorReturn($employeeId, $at);
 
             return;
         }
 
         $open->update(['end_at' => $at, 'duration_seconds' => $seconds]);
+        $this->mirrorDoorReturn($employeeId, $at);
 
         $minutes = intdiv($seconds, 60);
 
@@ -219,6 +226,39 @@ class GateService
                 ->whereHas('role', fn ($q) => $q->whereIn('slug', ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR_ADMIN']))
                 ->get(['id', 'email', 'company_id'])
                 ->each(fn ($admin) => MailService::send($admin->email, 'SmartEPT: long out-of-office break — ' . ($employee?->fullName() ?? ''), $body, 'gate_long_break', $companyId));
+        }
+    }
+
+    /** QA Phase 1: reflect a door OUT punch as an out-of-office break in the timeline. */
+    private function mirrorDoorBreak(int $employeeId, Carbon $at): void
+    {
+        try {
+            $employee = Employee::withoutGlobalScopes()->find($employeeId);
+            if ($employee) {
+                app(StatusService::class)->transition($employee, 'OTHER_BREAK', $at, [
+                    'manual' => false,
+                    'source' => 'BIOMETRIC',
+                ]);
+            }
+        } catch (\Throwable $e) {
+            // The timeline mirror must never break punch processing.
+        }
+    }
+
+    /** QA Phase 1: a return IN punch ends the door break — back to ACTIVE. */
+    private function mirrorDoorReturn(int $employeeId, Carbon $at): void
+    {
+        try {
+            $employee = Employee::withoutGlobalScopes()->find($employeeId);
+            if (! $employee) {
+                return;
+            }
+            $status = app(StatusService::class);
+            if (in_array($status->currentState($employee), StatusService::BREAK_STATES, true)) {
+                $status->resumeActive($employee, $at, ['source' => 'BIOMETRIC']);
+            }
+        } catch (\Throwable $e) {
+            // never break punch processing
         }
     }
 
