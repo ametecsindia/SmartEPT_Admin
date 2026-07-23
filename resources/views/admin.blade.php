@@ -1390,32 +1390,39 @@
   </div>
 </div>
 
-<!-- MEETING SCHEDULE / EDIT (Section 2) -->
+<!-- MEETING SCHEDULE / EDIT (Section 2) — QA Phase 4 (B4): standard mhead/mbody/mfoot
+     modal so the header/footer never clip, the body (incl. participant list) scrolls
+     inside, and the window stays centred + on-theme at any zoom. -->
 <div class="ovl" id="mtg-ovl">
   <div class="modal" style="width:700px">
-    <h3 id="mtg-modal-title">Schedule meeting</h3>
-    <label>Title</label><input id="mtg-title" maxlength="200" placeholder="e.g. Sprint planning">
-    <label>Purpose / description</label><textarea id="mtg-purpose" rows="2" maxlength="2000" style="width:100%;background:var(--card-2);border:1.5px solid var(--border-2);border-radius:9px;padding:9px 11px;color:var(--ink);font-family:inherit;font-size:13px;resize:vertical"></textarea>
-    <div class="grid2">
-      <div><label>Scheduled start</label><input id="mtg-start" type="datetime-local"></div>
-      <div><label>Scheduled end</label><input id="mtg-end" type="datetime-local"></div>
+    <div class="mhead">
+      <div class="mt"><b id="mtg-modal-title">Schedule meeting</b><span>Section 2 · schedule &amp; track meeting participation</span></div>
+      <button class="x" data-close="mtg-ovl" aria-label="Close">✕</button>
     </div>
-    <label>Notes (optional)</label><textarea id="mtg-notes" rows="2" maxlength="2000" style="width:100%;background:var(--card-2);border:1.5px solid var(--border-2);border-radius:9px;padding:9px 11px;color:var(--ink);font-family:inherit;font-size:13px;resize:vertical"></textarea>
-    <label>Participants</label>
-    <div class="row" style="gap:8px;flex-wrap:wrap">
-      <select id="mtg-f-branch" style="flex:1;min-width:120px"></select>
-      <select id="mtg-f-dept" style="flex:1;min-width:120px"></select>
-      <select id="mtg-f-team" style="flex:1;min-width:120px"></select>
-      <input id="mtg-f-search" placeholder="Search name / code…" class="search" style="flex:2;min-width:140px">
+    <div class="mbody">
+      <label>Title</label><input id="mtg-title" maxlength="200" placeholder="e.g. Sprint planning">
+      <label>Purpose / description</label><textarea id="mtg-purpose" rows="2" maxlength="2000" style="width:100%;background:var(--card-2);border:1.5px solid var(--border-2);border-radius:9px;padding:9px 11px;color:var(--ink);font-family:inherit;font-size:13px;resize:vertical"></textarea>
+      <div class="grid2">
+        <div><label>Scheduled start</label><input id="mtg-start" type="datetime-local"></div>
+        <div><label>Scheduled end</label><input id="mtg-end" type="datetime-local"></div>
+      </div>
+      <label>Notes (optional)</label><textarea id="mtg-notes" rows="2" maxlength="2000" style="width:100%;background:var(--card-2);border:1.5px solid var(--border-2);border-radius:9px;padding:9px 11px;color:var(--ink);font-family:inherit;font-size:13px;resize:vertical"></textarea>
+      <label>Participants</label>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <select id="mtg-f-branch" style="flex:1;min-width:120px"></select>
+        <select id="mtg-f-dept" style="flex:1;min-width:120px"></select>
+        <select id="mtg-f-team" style="flex:1;min-width:120px"></select>
+        <input id="mtg-f-search" placeholder="Search name / code…" class="search" style="flex:2;min-width:140px">
+      </div>
+      <div class="row" style="justify-content:space-between;margin:8px 0 4px">
+        <span class="mut" id="mtg-part-count">0 selected</span>
+        <span style="font-size:12px"><a href="#" id="mtg-sel-all">Select shown</a> &nbsp;·&nbsp; <a href="#" id="mtg-sel-none">Clear all</a></span>
+      </div>
+      <div id="mtg-part-list" style="max-height:230px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:8px;background:var(--card-2)"></div>
+      <div class="err" id="mtg-err"></div>
     </div>
-    <div class="row" style="justify-content:space-between;margin:8px 0 4px">
-      <span class="mut" id="mtg-part-count">0 selected</span>
-      <span style="font-size:12px"><a href="#" id="mtg-sel-all">Select shown</a> &nbsp;·&nbsp; <a href="#" id="mtg-sel-none">Clear all</a></span>
-    </div>
-    <div id="mtg-part-list" style="max-height:230px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:8px;background:var(--card-2)"></div>
-    <div class="err" id="mtg-err"></div>
-    <div class="row" style="justify-content:flex-end;gap:8px;margin-top:14px">
-      <button class="btn" id="mtg-close-btn">Close</button>
+    <div class="mfoot">
+      <button class="btn" data-close="mtg-ovl" id="mtg-close-btn">Close</button>
       <button class="btn solid" id="mtg-save">Save meeting</button>
     </div>
   </div>
@@ -1424,10 +1431,15 @@
 <!-- MEETING PARTICIPATION (Section 2) -->
 <div class="ovl" id="mtg-part-ovl">
   <div class="modal" style="width:720px">
-    <h3 id="mtg-part-title">Participation</h3>
-    <table><thead><tr><th>Employee</th><th>Scheduled</th><th>Joined</th><th>Left</th><th>Time</th><th>Attendance</th></tr></thead>
-    <tbody id="mtg-part-rows"></tbody></table>
-    <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn" id="mtg-part-close">Close</button></div>
+    <div class="mhead">
+      <div class="mt"><b id="mtg-part-title">Participation</b><span>Scheduled vs actual attendance per participant</span></div>
+      <button class="x" data-close="mtg-part-ovl" aria-label="Close">✕</button>
+    </div>
+    <div class="mbody">
+      <table><thead><tr><th>Employee</th><th>Scheduled</th><th>Joined</th><th>Left</th><th>Time</th><th>Attendance</th></tr></thead>
+      <tbody id="mtg-part-rows"></tbody></table>
+    </div>
+    <div class="mfoot"><button class="btn" data-close="mtg-part-ovl" id="mtg-part-close">Close</button></div>
   </div>
 </div>
 
@@ -1740,6 +1752,14 @@ function applyAttendanceMode() {
   const nav = document.querySelector('.nav[data-view="biometric"]');
   if (nav) nav.style.display = off ? 'none' : '';
 }
+// QA Phase 4 (B5): does the current user hold a permission? Super/Company Admin
+// always do (they bypass every check server-side); everyone else is checked against
+// the permission list the /auth/me + login payload carry.
+function can(perm) {
+  if (!ME) return false;
+  if (ME.role === 'SUPER_ADMIN' || ME.role === 'COMPANY_ADMIN') return true;
+  return (ME.permissions || []).includes(perm);
+}
 // R4 item 5: the role's permission matrix decides which modules appear.
 function applyPermissionNav() {
   if (!ME || !ME.role) return;
@@ -1749,6 +1769,8 @@ function applyPermissionNav() {
     dashboard: 'dashboard.view', screenshots: 'screenshot.view', usage: 'activity.view',
     attendance: 'attendance.view', violations: 'dashboard.view', reports: 'export.data',
     policies: 'policy.view', ops: 'audit.view',
+    // QA Phase 4 (B5): the Meetings screen is gated on meeting.view.
+    meetings: 'meeting.view',
   };
   Object.entries(NAVP).forEach(([view, perm]) => {
     const el = document.querySelector('.nav[data-view="' + view + '"]');
@@ -3887,6 +3909,8 @@ function initMeetings() {
       updatePartCount();
     });
   }
+  // QA Phase 4 (B5): only offer "Schedule meeting" to a role that may actually create one.
+  const nb = $('#mtg-new'); if (nb) nb.style.display = can('meeting.schedule') ? '' : 'none';
   loadMeetings();
 }
 
@@ -3904,8 +3928,12 @@ async function loadMeetings() {
       + '<td>' + (m.start_at ? dt(m.start_at) : '—') + (m.end_at ? ' – ' + new Date(m.end_at.replace(' ', 'T')).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '') + '</td>'
       + '<td>' + (m.participant_count ?? 0) + '</td>'
       + '<td><span class="tag ' + (MTG_STATUS_TAG[m.status] || 't-off') + '">' + esc((m.status || '').replace('_', ' ')) + '</span></td>'
-      + '<td style="text-align:right;white-space:nowrap"><button class="btn" data-mtg-part="' + m.id + '">Participation</button> '
-      + ((m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS') ? '<button class="btn" data-mtg-edit="' + m.id + '">Edit</button> <button class="btn danger" data-mtg-cancel="' + m.id + '">Cancel</button>' : '')
+      + '<td style="text-align:right;white-space:nowrap">'
+      + (can('meeting.reports') ? '<button class="btn" data-mtg-part="' + m.id + '">Participation</button> ' : '')
+      + ((m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS')
+          ? ((can('meeting.edit') ? '<button class="btn" data-mtg-edit="' + m.id + '">Edit</button> ' : '')
+             + (can('meeting.cancel') ? '<button class="btn danger" data-mtg-cancel="' + m.id + '">Cancel</button>' : ''))
+          : '')
       + '</td></tr>').join('')
       || '<tr><td colspan="6" class="mut">No meetings yet. Press "Schedule meeting" to create one.</td></tr>';
   } catch (e) {
@@ -4854,6 +4882,22 @@ $$('[data-close]').forEach((b) => b.addEventListener('click', () => $('#' + b.da
 ['help-ovl', 'emp-ovl', 'user-ovl', 'att-ovl'].forEach((id) => {
   const el = document.getElementById(id);
   el.addEventListener('click', (e) => { if (e.target === el) el.classList.remove('open'); });
+});
+// QA Phase 4 (B4): Esc closes the top-most open modal (except the mandatory forced-password
+// and one-time-credentials dialogs), matching the existing backdrop-click behaviour.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const open = [...document.querySelectorAll('.ovl.open')].filter((o) => !['pwd-ovl', 'cred-ovl'].includes(o.id));
+  if (open.length) open[open.length - 1].classList.remove('open');
+});
+// QA Phase 4 (B4): lock background scroll whenever a meeting modal is open, via any close
+// path (button, backdrop, Esc, save) — a MutationObserver keeps the body lock in sync.
+['mtg-ovl', 'mtg-part-ovl'].forEach((id) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  new MutationObserver(() => {
+    document.body.classList.toggle('drawer-lock', !!document.querySelector('#mtg-ovl.open, #mtg-part-ovl.open'));
+  }).observe(el, { attributes: true, attributeFilter: ['class'] });
 });
 </script>
 @endverbatim

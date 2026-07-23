@@ -237,15 +237,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('reports/biometric-mismatch', [BiometricController::class, 'mismatch'])
         ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,HR_ADMIN,MANAGER,AUDITOR');
 
-    // ---- Meetings (Section 2) — HR / Admin / Manager / TL schedule + manage ----
-    Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,HR_ADMIN,MANAGER,TEAM_LEADER')->group(function () {
-        Route::get('meetings', [MeetingController::class, 'index']);
-        Route::post('meetings', [MeetingController::class, 'store']);
-        Route::get('meetings/{meeting}', [MeetingController::class, 'show']);
-        Route::put('meetings/{meeting}', [MeetingController::class, 'update']);
-        Route::post('meetings/{meeting}/cancel', [MeetingController::class, 'cancel']);
-        Route::get('meetings/{meeting}/participation', [MeetingController::class, 'participation']);
-    });
+    // ---- Meetings (Section 2) — QA Phase 4 (B5): granular permission gate ----
+    // Tenant isolation still comes from the Meeting model's company scope (route-model
+    // binding 404s a cross-tenant id); the permission decides WHICH action a role may take.
+    Route::get('meetings', [MeetingController::class, 'index'])->middleware('permission:meeting.view');
+    Route::post('meetings', [MeetingController::class, 'store'])->middleware('permission:meeting.schedule');
+    Route::get('meetings/{meeting}', [MeetingController::class, 'show'])->middleware('permission:meeting.view');
+    Route::put('meetings/{meeting}', [MeetingController::class, 'update'])->middleware('permission:meeting.edit');
+    Route::post('meetings/{meeting}/cancel', [MeetingController::class, 'cancel'])->middleware('permission:meeting.cancel');
+    Route::get('meetings/{meeting}/participation', [MeetingController::class, 'participation'])->middleware('permission:meeting.reports');
 
     // ---- QA Phase 2 (A3): emergency biometric-gate override (admin, audited, never automatic) ----
     Route::post('agent-override/gate', [AgentOverrideController::class, 'gate'])
