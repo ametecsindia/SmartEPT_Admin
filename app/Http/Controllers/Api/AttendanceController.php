@@ -135,8 +135,25 @@ class AttendanceController extends Controller
         $updates = ['last_activity_at' => $at];
         if (! $attendance->check_in_at) {
             $updates['check_in_at'] = $at;
+            $updates['check_in_source'] = 'AGENT';
             $updates['first_activity_at'] = $at;
-            $updates['late_minutes'] = $this->lateMinutes($employee, $at);
+
+            // QA Phase 3 (B8/D2): the late formula lives in AttendanceDerivation so agent
+            // login, biometric-only and nightly recompute all agree. late is set only on
+            // the FIRST check-in of the day (write-once — re-login never moves it).
+            $bioInRaw = \App\Models\BiometricLog::withoutGlobalScopes()
+                ->where('employee_id', $employee->id)
+                ->where('punch_type', 'IN')
+                ->whereDate('punched_at', $at->toDateString())
+                ->min('punched_at');
+            $bioIn = $bioInRaw ? Carbon::parse($bioInRaw) : null;
+
+            $late = app(\App\Services\AttendanceDerivation::class)
+                ->lateFor($employee, $at->toDateString(), $at, $bioIn, $at);
+            $updates['late_minutes'] = $late['minutes'] ?? 0;
+            if ($late) {
+                $updates['arrival_source_used'] = $late['used'];
+            }
         }
         // QA Phase 2 (A2): first_login_at is WRITE-ONCE for the day; last_login_at always
         // tracks the most recent login/unlock. /today reads first_login_at so the shown

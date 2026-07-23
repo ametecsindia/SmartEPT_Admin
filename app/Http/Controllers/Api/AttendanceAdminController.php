@@ -39,6 +39,11 @@ class AttendanceAdminController extends Controller
             'check_out_at'         => $r->check_out_at?->toDateTimeString(),
             'late_minutes'         => $r->late_minutes,
             'early_logout_minutes' => $r->early_logout_minutes,
+            // QA Phase 3 (B7/B8): how each value was derived (audit — raw stays raw).
+            'check_in_source'      => $r->check_in_source,
+            'check_out_source'     => $r->check_out_source,
+            'arrival_source_used'  => $r->arrival_source_used,
+            'derivation_note'      => $r->derivation_note,
             'notes'                => $r->notes,
         ]);
 

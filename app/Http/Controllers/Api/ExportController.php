@@ -30,11 +30,13 @@ class ExportController extends Controller
             ->whereBetween('work_date', [$from, $to])->orderBy('work_date')->get();
 
         return $this->stream('attendance.csv',
-            ['Employee Code', 'Name', 'Date', 'Source', 'Check In', 'Check Out', 'Late (hh:mm)', 'Early Logout (hh:mm)', 'Status'],
+            ['Employee Code', 'Name', 'Date', 'Source', 'Check In', 'Check In Via', 'Check Out', 'Check Out Via',
+                'Late (hh:mm)', 'Arrival Source', 'Early Logout (hh:mm)', 'Status'],
             $rows->map(fn ($r) => [
                 $r->employee?->employee_code, $r->employee?->fullName(), $r->work_date?->toDateString(),
-                $r->source, $r->check_in_at, $r->check_out_at,
-                $this->hmFromMinutes($r->late_minutes), $this->hmFromMinutes($r->early_logout_minutes), $r->status,
+                $r->source, $r->check_in_at, $r->check_in_source, $r->check_out_at, $r->check_out_source,
+                $this->hmFromMinutes($r->late_minutes), $r->arrival_source_used,
+                $this->hmFromMinutes($r->early_logout_minutes), $r->status,
             ]));
     }
 

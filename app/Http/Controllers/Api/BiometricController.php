@@ -284,8 +284,48 @@ class BiometricController extends Controller
             // (auto-break on mid-day OUT, close/merge/flag on return IN). Punches are
             // processed in time order so out→in pairs resolve correctly.
             self::processGatePunches($companyId, $rows);
+
+            // QA Phase 3 (B7/B8): re-derive shift-aware checkout + configurable late from
+            // the full raw set, so a mid-day door OUT never becomes an early checkout and
+            // biometric-only employees still get late set.
+            self::deriveAttendance($companyId, $rows);
         }
         return count($rows);
+    }
+
+    /**
+     * QA Phase 3 fan-out: recompute the derived attendance summary for every
+     * (employee, day) touched by this batch of punches. Public static so every
+     * ingest path (push API, CSV import, cloud sync) derives identically. Wrapped
+     * per employee/day so one bad row can never fail punch ingestion.
+     */
+    public static function deriveAttendance(int $companyId, array $rows): void
+    {
+        $service = app(\App\Services\AttendanceDerivation::class);
+
+        $pairs = [];
+        foreach ($rows as $r) {
+            if (($r['employee_id'] ?? null) === null) {
+                continue; // unmapped punches derive after map-employee backfill
+            }
+            $date = $r['punched_at'] instanceof \Illuminate\Support\Carbon
+                ? $r['punched_at']->toDateString()
+                : \Illuminate\Support\Carbon::parse($r['punched_at'])->toDateString();
+            $pairs[$r['employee_id'] . '|' . $date] = ['employee_id' => (int) $r['employee_id'], 'date' => $date];
+        }
+
+        foreach ($pairs as $p) {
+            try {
+                $employee = \App\Models\Employee::withoutGlobalScopes()->find($p['employee_id']);
+                if ($employee) {
+                    $service->deriveDay($employee, $p['date']);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('AttendanceDerivation failed', [
+                    'employee_id' => $p['employee_id'], 'date' => $p['date'], 'e' => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     /**
@@ -350,6 +390,12 @@ class BiometricController extends Controller
                     'check_in_at'  => $firstIn,
                     'check_out_at' => $lastOut,
                 ]);
+                continue;
+            }
+
+            // QA Phase 3: an approved MANUAL verdict (HR regularization / leave) is never
+            // overwritten by raw punches — payroll edits stand until HR reconciles them.
+            if ($attendance->source === 'MANUAL') {
                 continue;
             }
 

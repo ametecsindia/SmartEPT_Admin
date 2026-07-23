@@ -30,6 +30,9 @@ class ScreenshotController extends Controller
     public function upload(Request $request, PolicyResolver $resolver, StorageService $storage): JsonResponse
     {
         $employee = $this->agentEmployee($request);
+        // QA Phase 3 (A3): no screenshot capture while the gate is closed (pre-punch /
+        // punched-out) — evidence can't be force-posted before verified arrival.
+        $this->assertGateOpen($employee);
 
         $data = $request->validate([
             'device_uuid'    => ['required', 'string'],

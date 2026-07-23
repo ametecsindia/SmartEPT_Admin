@@ -33,6 +33,8 @@ class DiagnosticsController extends Controller
             $this->checkDatabase(),
             $this->checkSanctumTable(),
             $this->checkMigrations(),
+            $this->checkScheduler(),
+            $this->checkBiometricSync($companyId),
             $this->checkEvidenceWritable(),
             $this->checkStoragePaused(),
             $this->checkOpcache(),
@@ -321,6 +323,100 @@ class DiagnosticsController extends Controller
                 "{$count} error(s) were logged in the last hour. Open the Log viewer below and use "
                 . '"Copy for developer" if you need help.',
                 'kb-500');
+    }
+
+    /**
+     * QA Phase 3 (B6): the background scheduler heartbeat. A 1-minute closure in
+     * routes/console.php stamps a cache key; if it goes stale the OS is not running
+     * `php artisan schedule:run`, so biometric auto-sync + nightly jobs have stopped.
+     */
+    private function checkScheduler(): array
+    {
+        try {
+            $beat = \Illuminate\Support\Facades\Cache::get('smartept:scheduler_heartbeat');
+        } catch (\Throwable $e) {
+            $beat = null;
+        }
+
+        if (! $beat) {
+            return $this->row('scheduler', 'Background scheduler', 'warn',
+                'The 1-minute background scheduler has not checked in yet. If this does not turn green '
+                . 'within a couple of minutes, Windows Task Scheduler (or cron) is not running '
+                . '"php artisan schedule:run" — biometric auto-sync, meeting auto-close and the nightly '
+                . 'attendance job will not run.',
+                'kb-scheduler');
+        }
+
+        try {
+            $age = (int) now()->diffInMinutes(\Illuminate\Support\Carbon::parse($beat), true);
+        } catch (\Throwable $e) {
+            $age = 999;
+        }
+
+        if ($age > 5) {
+            return $this->row('scheduler', 'Background scheduler', 'down',
+                "The background scheduler last ran {$age} minute(s) ago — it should run every minute. "
+                . 'Windows Task Scheduler is not running "php artisan schedule:run", so biometric '
+                . 'auto-sync and the nightly attendance job have stopped. Start the scheduled task, '
+                . 'then re-check.',
+                'kb-scheduler');
+        }
+
+        return $this->row('scheduler', 'Background scheduler', 'ok',
+            'The background scheduler ran within the last few minutes — automatic sync and nightly jobs are active.');
+    }
+
+    /**
+     * QA Phase 3 (B6): cloud biometric auto-sync coverage. Surfaces devices that
+     * have stopped syncing (stale) or were auto-disabled after repeated failures,
+     * so a silent feed outage is visible without reading logs.
+     */
+    private function checkBiometricSync(?int $companyId): array
+    {
+        try {
+            if (! Schema::hasTable('biometric_devices')) {
+                return $this->row('biometric_sync', 'Biometric auto-sync', 'ok',
+                    'No biometric devices are configured yet.');
+            }
+
+            $base = \App\Models\BiometricDevice::query()
+                ->when($companyId, fn ($q) => $q->where('company_id', $companyId));
+
+            $errored = (clone $base)->where('status', 'ERROR')->count();
+            $active  = (clone $base)->where('status', 'ACTIVE')->count();
+
+            if ($active === 0) {
+                return $errored > 0
+                    ? $this->row('biometric_sync', 'Biometric auto-sync', 'warn',
+                        "{$errored} biometric device(s) were switched OFF after repeated sync failures. "
+                        . 'Check the API credentials / endpoint in Biometric setup, then re-enable them.',
+                        'kb-biometric-sync')
+                    : $this->row('biometric_sync', 'Biometric auto-sync', 'ok',
+                        'No active cloud biometric devices — nothing to sync automatically.');
+            }
+
+            // Only INTERVAL/SCHEDULED (automatic) devices are expected to be fresh; a
+            // never-synced or >15-min-stale device signals the feed has stalled.
+            $stale = (clone $base)->where('status', 'ACTIVE')
+                ->where(fn ($q) => $q->whereNull('sync_mode')->orWhere('sync_mode', '!=', 'MANUAL'))
+                ->where(fn ($q) => $q->whereNull('last_sync_ok_at')->orWhere('last_sync_ok_at', '<', now()->subMinutes(15)))
+                ->count();
+
+            if ($stale > 0) {
+                return $this->row('biometric_sync', 'Biometric auto-sync', 'warn',
+                    "{$stale} of {$active} biometric device(s) have not completed an automatic sync in the "
+                    . 'last 15 minutes. If the scheduler is green above, check the device credentials / '
+                    . 'endpoint, or use "Sync now" on the Biometric screen.',
+                    'kb-biometric-sync');
+            }
+
+            return $this->row('biometric_sync', 'Biometric auto-sync', 'ok',
+                "{$active} biometric device(s) synced successfully within the last 15 minutes.");
+        } catch (\Throwable $e) {
+            return $this->row('biometric_sync', 'Biometric auto-sync', 'warn',
+                'Could not check biometric auto-sync status (the database may be unreachable).',
+                'kb-db');
+        }
     }
 
     // ---------------------------------------------------------------------

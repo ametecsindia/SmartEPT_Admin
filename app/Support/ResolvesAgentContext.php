@@ -4,6 +4,8 @@ namespace App\Support;
 
 use App\Models\Employee;
 use App\Models\EmployeeDevice;
+use App\Services\GateService;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 
 /**
@@ -13,6 +15,24 @@ use Illuminate\Http\Request;
  */
 trait ResolvesAgentContext
 {
+    /**
+     * QA Phase 3 (A3): refuse tracking ingestion while the biometric gate is closed
+     * (no door punch yet, or a mid-day soft-lock), so pre-punch / punched-out capture
+     * can't be force-posted. Returns 423 with the same GATE_CLOSED shape the agent
+     * already handles on attendance-event. No-op for non-gated companies.
+     */
+    protected function assertGateOpen(Employee $employee): void
+    {
+        if (! app(GateService::class)->isOpen($employee)) {
+            throw new HttpResponseException(response()->json([
+                'error' => [
+                    'code'    => 'GATE_CLOSED',
+                    'message' => 'No door punch received yet. Punch IN at the entrance to start your session.',
+                ],
+            ], 423));
+        }
+    }
+
     protected function agentEmployee(Request $request): Employee
     {
         abort_unless($request->user()?->tokenCan('agent'), 403, 'Agent token required.');

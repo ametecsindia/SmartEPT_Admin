@@ -150,10 +150,13 @@ class BiometricCloudSync
             }
         }
         if ($inserts || $corrections) {
-            BiometricController::mergeIntoAttendance($d->company_id, array_merge($inserts, $corrections));
+            $touched = array_merge($inserts, $corrections);
+            BiometricController::mergeIntoAttendance($d->company_id, $touched);
             // Biometric Gate v1.1: cloud-synced punches drive the gate/auto-break
             // engine exactly like pushed or imported ones.
-            BiometricController::processGatePunches($d->company_id, array_merge($inserts, $corrections));
+            BiometricController::processGatePunches($d->company_id, $touched);
+            // QA Phase 3 (B7/B8): shift-aware checkout + configurable late, same path.
+            BiometricController::deriveAttendance($d->company_id, $touched);
         }
 
         $codes = array_slice(array_keys($unmatchedCodes), 0, 15);

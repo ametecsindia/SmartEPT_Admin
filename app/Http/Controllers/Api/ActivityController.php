@@ -40,6 +40,9 @@ class ActivityController extends Controller
         ]);
 
         $this->agentDevice($request, $employee);
+        // QA Phase 3 (A3): no activity capture while the gate is closed (pre-punch /
+        // punched-out) — the work clock only ever runs on verified arrival.
+        $this->assertGateOpen($employee);
         $now = now();
         $rows = [];
         $lastActivity = null;
@@ -121,6 +124,7 @@ class ActivityController extends Controller
         ]);
 
         $this->agentDevice($request, $employee);
+        $this->assertGateOpen($employee); // QA Phase 3 (A3): no capture while gate closed
         $start = Carbon::parse($data['idle_start']);
         $end = isset($data['idle_end']) ? Carbon::parse($data['idle_end']) : null;
 

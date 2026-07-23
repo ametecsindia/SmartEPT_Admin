@@ -28,6 +28,9 @@ class BiometricSync extends Command
 
     protected $description = 'Pull punches from cloud biometric providers (eTimeOffice etc.) into attendance';
 
+    /** QA Phase 3 (B6): auto-disable a cloud device after this many straight failures. */
+    private const CONSECUTIVE_FAILURE_CAP = 5;
+
     public function handle(BiometricCloudSync $sync): int
     {
         $days = max(1, (int) $this->option('days'));
@@ -125,11 +128,28 @@ class BiometricSync extends Command
                     'unmapped'  => $r['unmapped'] ?? null,
                 ],
             ])->save();
+            // A good sync clears the failure streak (a device that self-recovers stays ACTIVE).
+            Cache::forget('biosync:fails:' . $d->id);
             $this->line(sprintf('device %d (%s): %s', $d->id, $d->provider ?: $d->name, $r['message']));
         } catch (\Throwable $e) {
             // sync() already stamped last_sync_at + an ERROR result; record the next try.
             $d->forceFill(['next_sync_at' => $this->nextRunAt($d)])->save();
-            $this->error(sprintf('device %d (%s): %s', $d->id, $d->provider ?: $d->name, $e->getMessage()));
+
+            // QA Phase 3 (B6): a permanent auth/config failure must not retry forever. After
+            // CONSECUTIVE_FAILURE_CAP straight failures, switch the device OFF (status ERROR)
+            // so it stops auto-syncing until an admin fixes it — the Troubleshooting biometric
+            // tile then flags it. Any later success (manual "Sync now") clears the streak.
+            $fails = (int) Cache::get('biosync:fails:' . $d->id, 0) + 1;
+            Cache::put('biosync:fails:' . $d->id, $fails, now()->addDay());
+            if ($fails >= self::CONSECUTIVE_FAILURE_CAP) {
+                $d->forceFill([
+                    'status'           => 'ERROR',
+                    'last_sync_result' => mb_substr(sprintf('Auto-sync disabled after %d consecutive failures — %s',
+                        $fails, $e->getMessage()), 0, 490),
+                ])->save();
+            }
+            $this->error(sprintf('device %d (%s): %s%s', $d->id, $d->provider ?: $d->name, $e->getMessage(),
+                $fails >= self::CONSECUTIVE_FAILURE_CAP ? ' [auto-sync disabled — fix + re-enable]' : " [failure {$fails}/" . self::CONSECUTIVE_FAILURE_CAP . ']'));
         } finally {
             optional($lock)->release();
         }

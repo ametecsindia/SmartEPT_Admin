@@ -33,7 +33,7 @@ class MarkAttendance extends Command
     /** company_id => min working seconds from the company AttendancePolicy (null = none assigned). */
     private array $minSecondsCache = [];
 
-    public function handle(WorkCalendar $calendar): int
+    public function handle(WorkCalendar $calendar, \App\Services\AttendanceDerivation $derivation): int
     {
         $date = $this->option('date') ?: now()->subDay()->toDateString();
         $this->info("Completing attendance for {$date}...");
@@ -43,7 +43,7 @@ class MarkAttendance extends Command
         $absent = 0;
         $halfDay = 0;
         Employee::withoutGlobalScopes()->where('employment_status', 'ACTIVE')
-            ->chunkById(200, function ($employees) use ($calendar, $date, &$absent, &$halfDay) {
+            ->chunkById(200, function ($employees) use ($calendar, $derivation, $date, &$absent, &$halfDay) {
                 foreach ($employees as $employee) {
                     // Weekly offs / holidays are never marked — no ABSENT (or HALF_DAY)
                     // rows for days the employee was not expected to work.
@@ -67,6 +67,19 @@ class MarkAttendance extends Command
                         ]);
                         $absent++;
                         continue;
+                    }
+
+                    // QA Phase 3 (B7): finalise the shift-aware checkout now the day is
+                    // fully closed — a trailing door OUT with no agent LOGOUT is the real
+                    // checkout. Never throws into the nightly run; never touches MANUAL.
+                    try {
+                        $derivation->deriveDay($employee, $date);
+                        $rows = EmployeeAttendanceLog::withoutGlobalScopes()
+                            ->where('employee_id', $employee->id)
+                            ->whereDate('work_date', $date)
+                            ->get();
+                    } catch (\Throwable $e) {
+                        // leave the raw rows in place if derivation fails
                     }
 
                     $halfDay += $this->applyHalfDayRule($employee, $date, $rows);

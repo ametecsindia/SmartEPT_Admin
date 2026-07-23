@@ -38,3 +38,11 @@ Schedule::command('smartept:biometric-sync')->everyFiveMinutes();
 // Section 2: advance meeting statuses + auto-close meeting sessions at the scheduled
 // end (so "Meeting" status ends on time even if the employee never presses End).
 Schedule::command('smartept:close-meetings')->everyMinute();
+
+// QA Phase 3 (B6): scheduler self-diagnosis. A 1-minute closure stamps a heartbeat
+// cache key; Help → Troubleshooting turns RED when it goes stale — the tell-tale that
+// Windows Task Scheduler / cron is NOT running `php artisan schedule:run`, which would
+// otherwise silently stop biometric auto-sync, meeting auto-close and nightly attendance.
+Schedule::call(function () {
+    \Illuminate\Support\Facades\Cache::put('smartept:scheduler_heartbeat', now()->toDateTimeString(), now()->addMinutes(30));
+})->everyMinute()->name('scheduler-heartbeat')->withoutOverlapping();
