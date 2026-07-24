@@ -577,6 +577,14 @@
         <table><thead><tr><th>Code</th><th>Name</th><th>Email</th><th>Department</th><th>Team</th><th>Shift</th><th>Status</th><th>Devices</th><th></th></tr></thead>
         <tbody id="emp-rows"></tbody></table>
       </div>
+      <div class="card" id="emp-archive-card">
+        <h3>Employee Archive
+          <span class="hint">complete backups of deleted employees — their code is freed for reuse</span>
+          <button class="btn" id="arch-reload" style="float:right">Refresh</button>
+        </h3>
+        <table><thead><tr><th>Archived ID (Code_Name_Date)</th><th>Employee</th><th>Archived on</th><th>Records</th><th>Backup</th></tr></thead>
+        <tbody id="arch-rows"></tbody></table>
+      </div>
     </div>
 
     <!-- 5b. USERS -->
@@ -2607,7 +2615,60 @@ async function loadEmployees() {
   } catch (e) {
     $('#emp-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="9" class="mut">' + esc(e.message) + '</td></tr>';
   }
+  loadArchives();
 }
+
+// Employee Archive (deleted-employee backups): Code_Name_Date label, record count, and a
+// Download button once the background ZIP is ready.
+function archBytes(n) {
+  if (!n) return '';
+  if (n >= 1048576) return (n / 1048576).toFixed(1) + ' MB';
+  if (n >= 1024) return (n / 1024).toFixed(0) + ' KB';
+  return n + ' B';
+}
+async function downloadArchive(id, label) {
+  try {
+    const blob = await apiBlob('/employees/archives/' + id + '/download');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (label || ('archive-' + id)) + '.zip';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } catch (e) { alert((e && e.message) || 'Could not download the backup.'); }
+}
+async function loadArchives() {
+  const tb = $('#arch-rows'); if (!tb) return;
+  try {
+    const d = await api('/employees/archives');
+    const rows = d.data || [];
+    tb.innerHTML = rows.map((a) => {
+      let backup;
+      if (a.file_status === 'READY') {
+        const sz = archBytes(a.file_size);
+        backup = '<button class="btn solid" data-arch-dl="' + a.id + '" data-arch-label="' + esc(a.label) + '">Download ZIP</button>'
+          + (a.media_files ? ' <span class="mut" style="font-size:11px">' + a.media_files + ' media' + (sz ? ' · ' + sz : '') + '</span>' : (sz ? ' <span class="mut" style="font-size:11px">' + sz + '</span>' : ''));
+      } else if (a.file_status === 'FAILED') {
+        backup = '<span class="tag t-danger" title="' + esc(a.error || '') + '">Failed</span>';
+      } else {
+        backup = '<span class="tag t-warn">Preparing…</span>';
+      }
+      return '<tr><td><span class="nm">' + esc(a.label) + '</span></td>'
+        + '<td>' + esc(a.name) + ' <span class="mut" style="font-size:11px">(' + esc(a.code) + ')</span></td>'
+        + '<td>' + esc(a.archived_at || '—') + (a.archived_by ? ' <span class="mut" style="font-size:11px">by ' + esc(a.archived_by) + '</span>' : '') + '</td>'
+        + '<td>' + (a.total_records || 0) + '</td>'
+        + '<td>' + backup + '</td></tr>';
+    }).join('') || '<tr><td colspan="5" class="mut">No archived employees yet.</td></tr>';
+  } catch (e) {
+    tb.innerHTML = isDenied(e) ? '<tr><td colspan="5" class="mut">Your role cannot view the archive.</td></tr>'
+      : '<tr><td colspan="5" class="mut">' + esc(e.message) + '</td></tr>';
+  }
+}
+document.addEventListener('click', (e) => {
+  const dl = e.target.closest && e.target.closest('[data-arch-dl]');
+  if (dl) { downloadArchive(Number(dl.dataset.archDl), dl.dataset.archLabel); return; }
+  const rb = e.target.closest && e.target.closest('#arch-reload');
+  if (rb) loadArchives();
+});
 $('#emp-q').addEventListener('input', () => {
   clearTimeout(EMP_SEARCH_TIMER);
   EMP_SEARCH_TIMER = setTimeout(loadEmployees, 300);
@@ -2630,10 +2691,11 @@ $('#emp-rows').addEventListener('click', async (e) => {
     return;
   }
   if (act && act.dataset.act === 'del') {
-    if (!confirm('Delete ' + tr.dataset.name + '? This removes the employee record (activity history is retained per policy).')) return;
+    if (!confirm('Delete ' + tr.dataset.name + '?\n\nA complete backup of this employee (attendance, breaks, screenshots, violations and more) is saved to the Employee Archive below, and their code is freed for reuse. The backup ZIP is prepared in the background within a minute.')) return;
     try {
-      await api('/employees/' + id, { method: 'DELETE' });
+      const r = await api('/employees/' + id, { method: 'DELETE' });
       EMP_CACHE = null; EMP_DEV_COUNTS = null;
+      toast((r && r.data && r.data.archive_label) ? ('Archived as ' + r.data.archive_label) : 'Employee archived');
       loadEmployees();
     } catch (err) { alert(err.message); }
     return;

@@ -7,12 +7,15 @@ use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Designation;
 use App\Models\Employee;
+use App\Models\EmployeeArchive;
 use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\EmployeeArchiver;
 use App\Services\MailService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -139,21 +142,102 @@ class EmployeeController extends Controller
         return response()->json(['data' => $employee->fresh()]);
     }
 
-    /** DELETE /api/employees/{employee} */
+    /**
+     * DELETE /api/employees/{employee}
+     *
+     * Archive-on-delete (Ejaz 24-Jul):
+     *  1. Snapshot the employee + a full count of their data into an EmployeeArchive row
+     *     labelled Code_Name_Date (the heavy ZIP with every record + the actual screenshot/
+     *     webcam files is built moments later by smartept:build-archives).
+     *  2. Free the employee_code so a new joiner can reuse it (the soft-deleted row would
+     *     otherwise keep the code locked).
+     *  3. Soft-delete the employee — the underlying data stays in place, safely backed up.
+     */
     public function destroy(Request $request, Employee $employee): JsonResponse
     {
-        // Employees are SOFT-deleted (history stays for reports/audit) — so free
-        // the employee code first, or it stays locked by the trashed row and the
-        // admin can never issue the same ID to a replacement (Ejaz, 16-Jul).
+        $archiver = app(EmployeeArchiver::class);
+
+        // Capture everything BEFORE we mutate the code.
         $freedCode = $employee->employee_code;
+        $name      = $employee->fullName();
+        $label     = $archiver->label($employee);
+        $counts    = $archiver->counts($employee->id);
+        $snapshot  = $archiver->snapshot($employee);
+
+        $archive = EmployeeArchive::create([
+            'company_id'             => $employee->company_id,
+            'employee_id'            => $employee->id,
+            'archive_label'          => $label,
+            'original_employee_code' => $freedCode,
+            'employee_name'          => $name !== '' ? $name : $freedCode,
+            'archived_by_user_id'    => $request->user()->id,
+            'archived_at'            => now(),
+            'snapshot'               => $snapshot,
+            'counts'                 => $counts,
+            'file_status'            => 'PENDING',
+        ]);
+
+        // Free the code, then soft-delete (history retained).
         $employee->forceFill([
             'employee_code' => $freedCode . '~del' . $employee->id . '~' . now()->format('ymdHis'),
         ])->save();
-
         $employee->delete();
-        $this->audit($request, 'DELETE', Employee::class, $employee->id, ['employee_code' => $freedCode]);
 
-        return response()->json(null, 204);
+        $this->audit($request, 'DELETE', Employee::class, $employee->id, [
+            'employee_code' => $freedCode,
+            'archive_id'    => $archive->id,
+            'archive_label' => $label,
+        ]);
+
+        return response()->json(['data' => [
+            'archive_id'    => $archive->id,
+            'archive_label' => $label,
+            'message'       => 'Employee archived; the code is free to reuse. The full backup is being prepared.',
+        ]]);
+    }
+
+    /** GET /api/employees/archives — list archived (deleted) employees + backup status. */
+    public function archives(Request $request): JsonResponse
+    {
+        $companyId = $request->user()->company_id;
+
+        $rows = EmployeeArchive::where('company_id', $companyId)
+            ->orderByDesc('archived_at')
+            ->limit(1000)
+            ->get()
+            ->map(fn ($a) => [
+                'id'            => $a->id,
+                'label'         => $a->archive_label,
+                'name'          => $a->employee_name,
+                'code'          => $a->original_employee_code,
+                'archived_at'   => $a->archived_at?->toDateTimeString(),
+                'archived_by'   => $a->archivedBy?->name,
+                'counts'        => $a->counts,
+                'total_records' => array_sum($a->counts ?? []),
+                'file_status'   => $a->file_status,
+                'file_size'     => $a->file_size,
+                'media_files'   => $a->media_files,
+                'error'         => $a->error,
+            ]);
+
+        return response()->json(['data' => $rows]);
+    }
+
+    /** GET /api/employees/archives/{archive}/download — stream the backup ZIP. */
+    public function downloadArchive(Request $request, EmployeeArchive $archive)
+    {
+        abort_unless($archive->company_id === $request->user()->company_id, 403, 'Outside your tenant.');
+        abort_unless($archive->file_status === 'READY' && $archive->storage_key, 404,
+            'The backup file is not ready yet — it is still being prepared.');
+
+        $disk = Storage::disk($archive->storage_driver ?: 'local');
+        abort_unless($disk->exists($archive->storage_key), 404, 'The backup file could not be found.');
+
+        $this->audit($request, 'EXPORT', EmployeeArchive::class, $archive->id, ['label' => $archive->archive_label]);
+
+        $safe = preg_replace('/[^A-Za-z0-9._-]+/', '_', $archive->archive_label);
+
+        return $disk->download($archive->storage_key, $safe . '.zip');
     }
 
     private function validated(Request $request, bool $creating, ?Employee $employee = null): array

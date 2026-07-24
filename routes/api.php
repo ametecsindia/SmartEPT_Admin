@@ -302,6 +302,12 @@ Route::middleware('auth:sanctum')->group(function () {
     // ---- Employees ----
     Route::get('employees', [EmployeeController::class, 'index'])
         ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,HR_ADMIN,MANAGER,TEAM_LEADER,AUDITOR');
+    // Employee Archive (deleted-employee backups) — MUST precede employees/{employee}
+    // so the literal "archives" segment is not captured as a route-model-bound employee.
+    Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,HR_ADMIN')->group(function () {
+        Route::get('employees/archives', [EmployeeController::class, 'archives']);
+        Route::get('employees/archives/{archive}/download', [EmployeeController::class, 'downloadArchive']);
+    });
     Route::get('employees/{employee}', [EmployeeController::class, 'show'])
         ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,HR_ADMIN,MANAGER,TEAM_LEADER,AUDITOR');
     Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,HR_ADMIN')->group(function () {
