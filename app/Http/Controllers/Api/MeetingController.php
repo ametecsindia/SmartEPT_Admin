@@ -41,6 +41,7 @@ class MeetingController extends Controller
                 'notes'             => $m->notes,
                 'created_by'        => $m->creator?->name,
                 'is_organizer'      => optional($request->user())->id === $m->created_by_user_id,
+                'reminder_minutes'  => $m->reminder_minutes,
                 'created_at'        => $m->created_at?->toDateTimeString(),
             ]);
 
@@ -61,6 +62,7 @@ class MeetingController extends Controller
             'end_at'          => $meeting->end_at?->toDateTimeString(),
             'status'          => $this->liveStatus($meeting),
             'notes'           => $meeting->notes,
+            'reminder_minutes'=> $meeting->reminder_minutes,
             'participant_ids' => $meeting->participants->pluck('employee_id'),
         ]]);
     }
@@ -78,6 +80,7 @@ class MeetingController extends Controller
             'end_at'             => $data['end_at'],
             'meeting_date'       => Carbon::parse($data['start_at'])->toDateString(),
             'notes'              => $data['notes'] ?? null,
+            'reminder_minutes'   => $data['reminder_minutes'] ?? null,
             'status'             => 'SCHEDULED',
             'created_by_user_id' => $request->user()->id,
         ]);
@@ -112,6 +115,7 @@ class MeetingController extends Controller
             'end_at'       => $data['end_at'],
             'meeting_date' => Carbon::parse($data['start_at'])->toDateString(),
             'notes'        => $data['notes'] ?? null,
+            'reminder_minutes' => $data['reminder_minutes'] ?? null,
         ]);
 
         $this->syncParticipants($meeting, $companyId, $data['participant_ids']);
@@ -249,6 +253,7 @@ class MeetingController extends Controller
             'start_at'          => ['required', 'date'],
             'end_at'            => ['required', 'date', 'after:start_at'],
             'notes'             => ['nullable', 'string', 'max:2000'],
+            'reminder_minutes'  => ['nullable', 'integer', 'min:0', 'max:1440'],
             'participant_ids'   => ['required', 'array', 'min:1', 'max:1000'],
             'participant_ids.*' => ['integer', Rule::exists('employees', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
         ]);

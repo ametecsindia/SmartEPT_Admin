@@ -242,6 +242,21 @@ class DeviceController extends Controller
             }
         }
 
+        // Admin #9: an APPROACHING meeting (reminder lead-time reached, not yet started)
+        // so the agent can pop a reminder with a Join button for members + organiser.
+        $meetingReminder = null;
+        if ($device->employee) {
+            $rm = \App\Models\Meeting::reminderDueFor($device->employee);
+            if ($rm) {
+                $meetingReminder = [
+                    'id'                => $rm->id,
+                    'title'             => $rm->title,
+                    'start_at'          => $rm->start_at->toIso8601String(),
+                    'starts_in_seconds' => max(0, (int) now()->diffInSeconds($rm->start_at, false)),
+                ];
+            }
+        }
+
         return response()->json([
             'ok' => true,
             'server_time' => now()->toIso8601String(),
@@ -249,6 +264,7 @@ class DeviceController extends Controller
             'gate' => $gate,                 // nested {enabled,state,arrived,...} (unchanged)
             'gate_status' => $gateStatus,    // QA Phase 2 (A3): {gate_required, open, message, reason}
             'meeting' => $meeting,
+            'meeting_reminder' => $meetingReminder, // Admin #9: approaching-meeting reminder
         ]);
     }
 

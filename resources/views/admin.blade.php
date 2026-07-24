@@ -1409,6 +1409,8 @@
         <div><label>Scheduled start</label><input id="mtg-start" type="datetime-local"></div>
         <div><label>Scheduled end</label><input id="mtg-end" type="datetime-local"></div>
       </div>
+      <label>Remind participants before (minutes) <span class="mut" style="font-weight:400">— a Join popup appears on each member\'s agent this many minutes before start. Blank = no reminder.</span></label>
+      <input id="mtg-reminder" type="number" min="0" max="1440" placeholder="e.g. 5" style="max-width:160px">
       <label>Notes (optional)</label><textarea id="mtg-notes" rows="2" maxlength="2000" style="width:100%;background:var(--card-2);border:1.5px solid var(--border-2);border-radius:9px;padding:9px 11px;color:var(--ink);font-family:inherit;font-size:13px;resize:vertical"></textarea>
       <label>Participants</label>
       <div class="row" style="gap:8px;flex-wrap:wrap">
@@ -4036,10 +4038,11 @@ async function openMeetingModal(id) {
       $('#mtg-start').value = mtgToLocalInput(m.start_at);
       $('#mtg-end').value = mtgToLocalInput(m.end_at);
       $('#mtg-notes').value = m.notes || '';
+      $('#mtg-reminder').value = (m.reminder_minutes ?? '') === null ? '' : (m.reminder_minutes ?? '');
       (m.participant_ids || []).forEach((x) => MTG_SEL.add(Number(x)));
     } catch (e) { $('#mtg-err').textContent = e.message; }
   } else {
-    $('#mtg-title').value = ''; $('#mtg-purpose').value = ''; $('#mtg-notes').value = '';
+    $('#mtg-title').value = ''; $('#mtg-purpose').value = ''; $('#mtg-notes').value = ''; $('#mtg-reminder').value = '';
     $('#mtg-start').value = ''; $('#mtg-end').value = '';
   }
   $('#mtg-f-search').value = '';
@@ -4076,6 +4079,7 @@ async function saveMeeting() {
     start_at: $('#mtg-start').value,
     end_at: $('#mtg-end').value,
     notes: $('#mtg-notes').value.trim() || null,
+    reminder_minutes: $('#mtg-reminder').value === '' ? null : Math.max(0, parseInt($('#mtg-reminder').value, 10) || 0),
     participant_ids: [...MTG_SEL],
   };
   if (!body.title) { $('#mtg-err').textContent = 'Title is required.'; return; }
