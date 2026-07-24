@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\ComplianceController;
 use App\Http\Controllers\Api\ConsentController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DeviceController;
+use App\Http\Controllers\Api\DbMaintenanceController;
 use App\Http\Controllers\Api\DiagnosticsController;
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\LicenseController;
@@ -118,6 +119,13 @@ Route::middleware('auth:sanctum')->group(function () {
         // (Ametecs troubleshooting-in-app standard — non-technical self-service.)
         Route::get('ops/diagnostics', [DiagnosticsController::class, 'checks']);
         Route::get('ops/logs', [DiagnosticsController::class, 'logs']);
+
+        // ---- Danger Zone: SUPER ADMIN-only data clearing, e-mail-OTP gated (24-Jul) ----
+        Route::middleware('role:SUPER_ADMIN')->group(function () {
+            Route::get('ops/db-clear/summary', [DbMaintenanceController::class, 'summary']);
+            Route::post('ops/db-clear/request-code', [DbMaintenanceController::class, 'requestCode']);
+            Route::post('ops/db-clear/execute', [DbMaintenanceController::class, 'execute']);
+        });
     });
 
     // ---- Licence (R2-1): admin view/set key + force revalidation ----

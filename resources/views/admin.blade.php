@@ -796,6 +796,18 @@
       <div class="card">
         <h3>Biometric Device Setup <span class="hint">connect a cloud attendance API — punches sync continuously (every 5 minutes) into Attendance, payroll and the Biometric Gate</span></h3>
         <table><thead><tr><th>Provider</th><th>API</th><th>Auto sync</th><th>Status</th><th>Last sync</th><th>Last result</th><th>Punches</th><th></th></tr></thead><tbody id="biodev-rows"></tbody></table>
+        <div id="bio-livesync" style="margin-top:14px;padding:12px 14px;border:1px solid var(--border-2);border-radius:10px;background:var(--card-2)">
+          <label style="margin:0">Live auto-sync <span class="hint">calls the API and syncs on a timer while this page is open — no scheduler needed</span></label>
+          <div class="row" style="align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <span class="mut" style="font-size:12px">Every</span>
+            <input id="bls-n" type="number" min="5" value="60" style="width:90px">
+            <select id="bls-unit" style="width:130px"><option value="sec">seconds</option><option value="min">minutes</option></select>
+            <button class="btn solid" id="bls-start">Start</button>
+            <button class="btn" id="bls-stop" style="display:none">Stop</button>
+            <span class="mut" id="bls-status" style="font-size:12px"></span>
+          </div>
+          <div class="mut" style="font-size:11.5px;margin-top:6px">Syncs every configured device on each tick. For unattended sync when this page is <b>closed</b>, set the device to <b>Automatic — every N minutes</b> below and make sure the background scheduler is green in Help &rarr; Troubleshooting.</div>
+        </div>
         <div style="margin-top:14px;max-width:560px">
           <label>Automatic sync <span class="hint">runs in the background via the scheduler — no need to open this tab and click Sync</span></label>
           <select id="bd-mode">
@@ -1080,6 +1092,22 @@
         </div>
         <table><thead><tr><th>When</th><th>User</th><th>Action</th><th>Subject</th><th>Details</th><th>IP</th></tr></thead>
         <tbody id="au-rows"></tbody></table>
+      </div>
+      <div class="card" id="dz-card" style="display:none;border:1.5px solid var(--danger)">
+        <h3 style="color:var(--danger)">&#9888; Danger Zone — Clear data <span class="hint">Super Admin only · a full database backup is taken automatically first</span></h3>
+        <p class="mut" style="font-size:12px;margin-top:0">Permanently deletes the selected operational data for your company. Employees, users, org structure, policies and the licence are never touched here. Protected by a one-time code e-mailed to you.</p>
+        <div id="dz-groups" style="margin:10px 0"><span class="mut">Loading…</span></div>
+        <div class="row" style="gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px">
+          <label class="fbool" style="padding:0"><input type="checkbox" id="dz-all"> Select all</label>
+          <button class="btn" id="dz-code">1) E-mail me a code</button>
+          <span class="mut" id="dz-code-msg" style="font-size:12px"></span>
+        </div>
+        <div class="row" style="gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px">
+          <input id="dz-otp" placeholder="6-digit code" style="width:140px" maxlength="6" autocomplete="off">
+          <input id="dz-confirm" placeholder="Type CLEAR" style="width:140px" autocomplete="off">
+          <button class="btn danger" id="dz-exec">2) Clear selected data</button>
+        </div>
+        <div class="mut" id="dz-result" style="margin-top:10px;font-size:12px"></div>
       </div>
     </div>
 
@@ -3860,6 +3888,56 @@ $('#bd-syncnow').onclick = async () => {
     loadBiometric();
   } catch (e) { $('#bd-msg').textContent = '✕ ' + e.message; }
 };
+
+// Live auto-sync (browser timer) — syncs every configured device every N sec/min while this
+// page is open, independent of the OS scheduler. The setting survives a refresh.
+let BLS_TIMER = null, BLS_RUNNING = false;
+function blsSaveCfg() { try { localStorage.setItem('ept_bio_livesync', JSON.stringify({ on: BLS_RUNNING, n: $('#bls-n').value, unit: $('#bls-unit').value })); } catch (e) { /* private mode */ } }
+function blsIntervalMs() {
+  const n = Math.max(5, parseInt($('#bls-n').value, 10) || 60);
+  return (($('#bls-unit').value === 'min') ? n * 60 : n) * 1000;
+}
+async function blsTick() {
+  const devs = (bdDevices || []).filter((d) => d && d.id);
+  const st = $('#bls-status'); if (!st) return;
+  if (!devs.length) { st.textContent = 'No devices to sync yet.'; return; }
+  st.textContent = 'Syncing ' + devs.length + ' device(s)…';
+  let ok = 0, fail = 0;
+  for (const d of devs) {
+    try { await api('/integrations/biometric/devices/' + d.id + '/sync', { method: 'POST' }); ok++; }
+    catch (e) { fail++; }
+  }
+  st.textContent = 'Last run ' + new Date().toLocaleTimeString() + ' — ' + ok + ' ok' + (fail ? ', ' + fail + ' failed' : '');
+  loadBioDevices(); loadBiometric();
+}
+function blsStart(silent) {
+  if (BLS_TIMER) clearInterval(BLS_TIMER);
+  BLS_RUNNING = true;
+  if ($('#bls-start')) $('#bls-start').style.display = 'none';
+  if ($('#bls-stop')) $('#bls-stop').style.display = '';
+  blsSaveCfg();
+  if (!silent) blsTick();
+  BLS_TIMER = setInterval(blsTick, blsIntervalMs());
+}
+function blsStop() {
+  BLS_RUNNING = false;
+  if (BLS_TIMER) { clearInterval(BLS_TIMER); BLS_TIMER = null; }
+  if ($('#bls-start')) $('#bls-start').style.display = '';
+  if ($('#bls-stop')) $('#bls-stop').style.display = 'none';
+  if ($('#bls-status')) $('#bls-status').textContent = 'Stopped.';
+  blsSaveCfg();
+}
+if ($('#bls-start')) $('#bls-start').onclick = () => blsStart(false);
+if ($('#bls-stop')) $('#bls-stop').onclick = blsStop;
+(function blsRestore() {
+  try {
+    const c = JSON.parse(localStorage.getItem('ept_bio_livesync') || 'null');
+    if (!c) return;
+    if (c.n && $('#bls-n')) $('#bls-n').value = c.n;
+    if (c.unit && $('#bls-unit')) $('#bls-unit').value = c.unit;
+    if (c.on) blsStart(true);
+  } catch (e) { /* ignore */ }
+})();
 $('#biodev-rows').addEventListener('click', async (ev) => {
   const eBtn = ev.target.closest('[data-bd-edit]');
   const dBtn = ev.target.closest('[data-bd-del]');
@@ -4835,7 +4913,49 @@ async function loadOps() {
       ? '<table>' + b.data.slice(0, 5).map((r) => '<tr><td>' + esc(r.name) + '</td><td>' + esc(r.human) + '</td></tr>').join('') + '</table>'
       : 'No backups yet — the first one runs tonight at 01:30, or click "Back up now".';
   } catch (e) { $('#ops-backups').textContent = e.message; }
+  // Danger Zone (Super Admin only) — clear operational data, email-OTP gated.
+  const dz = $('#dz-card');
+  if (dz) {
+    if (ME && ME.role === 'SUPER_ADMIN') { dz.style.display = ''; loadDzSummary(); }
+    else { dz.style.display = 'none'; }
+  }
 }
+
+async function loadDzSummary() {
+  const box = $('#dz-groups'); if (!box) return;
+  try {
+    const d = (await api('/ops/db-clear/summary')).data;
+    box.innerHTML = (d.groups || []).map((g) =>
+      '<label class="fbool" style="padding:4px 0;display:flex;gap:8px;align-items:center">'
+      + '<input type="checkbox" class="dz-g" value="' + g.key + '" style="width:auto;margin:0"> '
+      + esc(g.label) + ' <span class="mut" style="font-size:11px">(' + (g.count || 0) + ' records)</span></label>').join('')
+      || '<span class="mut">Nothing to clear.</span>';
+  } catch (e) { box.innerHTML = '<span class="mut">' + esc(e.message) + '</span>'; }
+}
+function dzCheckedGroups() { return [...document.querySelectorAll('.dz-g:checked')].map((c) => c.value); }
+if ($('#dz-all')) $('#dz-all').onchange = (e) => { document.querySelectorAll('.dz-g').forEach((c) => { c.checked = e.target.checked; }); };
+if ($('#dz-code')) $('#dz-code').onclick = async () => {
+  const m = $('#dz-code-msg'); m.textContent = 'Sending…';
+  try { const r = (await api('/ops/db-clear/request-code', { method: 'POST' })).data; m.textContent = r.note || ('Code sent to ' + (r.email_masked || 'your email')); }
+  catch (e) { m.textContent = '\u2715 ' + e.message; }
+};
+if ($('#dz-exec')) $('#dz-exec').onclick = async () => {
+  const groups = dzCheckedGroups();
+  const res = $('#dz-result');
+  if (!groups.length) { res.textContent = 'Select at least one data group.'; return; }
+  if (($('#dz-confirm').value || '').trim().toUpperCase() !== 'CLEAR') { res.textContent = 'Type CLEAR in the confirmation box.'; return; }
+  if (!confirm('Permanently clear the selected data (' + groups.length + ' group(s)) for your company?\n\nA full backup is taken first, but this cannot be undone from within the app.')) return;
+  res.textContent = 'Backing up and clearing…';
+  try {
+    const r = (await api('/ops/db-clear/execute', { method: 'POST', body: JSON.stringify({ code: ($('#dz-otp').value || '').trim(), confirm: ($('#dz-confirm').value || '').trim(), groups }) })).data;
+    res.innerHTML = '\u2713 Cleared ' + (r.total_rows || 0) + ' record(s)'
+      + (r.files_deleted ? ' and ' + r.files_deleted + ' file(s)' : '') + '. Backup: ' + esc(String(r.backup || 'done')).slice(0, 200);
+    $('#dz-otp').value = ''; $('#dz-confirm').value = '';
+    document.querySelectorAll('.dz-g').forEach((c) => { c.checked = false; });
+    if ($('#dz-all')) $('#dz-all').checked = false;
+    loadDzSummary();
+  } catch (e) { res.textContent = '\u2715 ' + e.message; }
+};
 async function loadStorageConfig() {
   try {
     const c = await api('/ops/storage-config');
