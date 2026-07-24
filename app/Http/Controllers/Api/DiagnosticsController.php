@@ -36,6 +36,7 @@ class DiagnosticsController extends Controller
             $this->checkScheduler(),
             $this->checkBiometricSync($companyId),
             $this->checkEvidenceWritable(),
+            $this->checkScreenshotEvidence($companyId),
             $this->checkStoragePaused(),
             $this->checkOpcache(),
             $this->checkAgentHeartbeats($companyId),
@@ -395,6 +396,19 @@ class DiagnosticsController extends Controller
                         'No active cloud biometric devices — nothing to sync automatically.');
             }
 
+            // Admin #1/2: the "I have to sync manually" case — every active device is set to
+            // MANUAL, so nothing is due for the scheduler and punches only import on "Sync now".
+            $autoActive = (clone $base)->where('status', 'ACTIVE')
+                ->where(fn ($q) => $q->whereNull('sync_mode')->orWhere('sync_mode', '!=', 'MANUAL'))
+                ->count();
+            if ($autoActive === 0) {
+                return $this->row('biometric_sync', 'Biometric auto-sync', 'warn',
+                    "All {$active} active biometric device(s) are set to MANUAL sync, so punches only import "
+                    . 'when you press "Sync now". To pull them automatically, open Biometric setup and set each '
+                    . 'device to Interval (e.g. every 5 min) or Scheduled.',
+                    'kb-biometric-sync');
+            }
+
             // Only INTERVAL/SCHEDULED (automatic) devices are expected to be fresh; a
             // never-synced or >15-min-stale device signals the feed has stalled.
             $stale = (clone $base)->where('status', 'ACTIVE')
@@ -415,6 +429,52 @@ class DiagnosticsController extends Controller
         } catch (\Throwable $e) {
             return $this->row('biometric_sync', 'Biometric auto-sync', 'warn',
                 'Could not check biometric auto-sync status (the database may be unreachable).',
+                'kb-db');
+        }
+    }
+
+    /**
+     * Admin #8: screenshots recorded but with NO stored image file (null storage_file_id).
+     * This is exactly what makes some violations show "evidence no longer available" — the
+     * agent captured a shot but the image never landed in storage (a storage/upload problem
+     * on some PCs), as opposed to genuine retention purging.
+     */
+    private function checkScreenshotEvidence(?int $companyId): array
+    {
+        try {
+            if (! Schema::hasTable('employee_screenshot_logs')) {
+                return $this->row('screenshot_evidence', 'Screenshot evidence', 'ok',
+                    'No screenshots have been recorded yet.');
+            }
+
+            $base = DB::table('employee_screenshot_logs')
+                ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+                ->where('captured_at', '>=', now()->subDays(7));
+
+            $total = (clone $base)->count();
+            if ($total === 0) {
+                return $this->row('screenshot_evidence', 'Screenshot evidence', 'ok',
+                    'No screenshots were recorded in the last 7 days.');
+            }
+
+            $missing = (clone $base)->whereNull('storage_file_id')->count();
+            if ($missing > 0) {
+                $pct = (int) round($missing * 100 / max(1, $total));
+
+                return $this->row('screenshot_evidence', 'Screenshot evidence', 'warn',
+                    "{$missing} of {$total} screenshots from the last 7 days ({$pct}%) have NO stored image "
+                    . 'file. The agent captured them but the image was not saved — usually a storage or upload '
+                    . 'problem on some PCs (evidence folder full / not writable, or cloud-storage credentials). '
+                    . 'This is why some violations show "evidence no longer available". Check the Evidence '
+                    . 'storage folder result above and your cloud-storage settings.',
+                    'kb-storage');
+            }
+
+            return $this->row('screenshot_evidence', 'Screenshot evidence', 'ok',
+                "All {$total} screenshots from the last 7 days have their image stored.");
+        } catch (\Throwable $e) {
+            return $this->row('screenshot_evidence', 'Screenshot evidence', 'warn',
+                'Could not check screenshot evidence (the database may be unreachable).',
                 'kb-db');
         }
     }
