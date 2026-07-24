@@ -2176,22 +2176,23 @@ async function loadDashboard() {
       ['Employees', c.total_employees, 'k-total', 'all'],
       ['Active', c.active, 'k-ok', 'ACTIVE'],
       ['Idle', c.idle, 'k-idle', 'IDLE'],
-      ['On break', c.break_total, 'k-break', 'BREAK'],
-      ['· Tea', c.break_tea, 'k-break', 'TEA_BREAK'],
-      ['· Lunch', c.break_lunch, 'k-break', 'LUNCH_BREAK'],
-      ['· Other', c.break_other, 'k-break', 'OTHER_BREAK'],
+      ['On break', c.break_total, 'k-break', 'BREAK', 'Tea ' + (c.break_tea || 0) + ' · Lunch ' + (c.break_lunch || 0) + ' · Other ' + (c.break_other || 0)],
       ['In meeting', c.meeting, 'k-away', 'MEETING'],
       ['Offline', c.offline_count, 'k-off', 'OFFLINE'],
       ['Violations today', c.violations_today, 'k-viol', 'view:violations'],
       ['Screenshots', c.screenshots_today, 'k-shot', 'view:screenshots'],
     ];
-    $('#kpis').innerHTML = KPI.map(([l, v, cls, act]) => {
+    $('#kpis').innerHTML = KPI.map(([l, v, cls, act, sub]) => {
       const isView = act.indexOf('view:') === 0;
       const sel = (!isView && DASH_FILTER === act) ? ' sel' : '';
       const go = isView ? 'Open →' : (act === 'all' ? 'View all →' : 'Filter →');
+      // Admin #5: the break categories now live INSIDE the single "On break" box
+      // (overall count on the right, Tea/Lunch/Other breakdown underneath the label)
+      // instead of separate boxes for each type.
+      const subLine = sub ? '<div class="l" style="font-size:11px;font-weight:500;opacity:.75;margin-top:2px">' + esc(sub) + '</div>' : '';
       return '<div class="kpi drill ' + cls + sel + '" data-act="' + act + '" title="'
         + esc(l) + ' — click to ' + (isView ? 'open that screen' : 'filter the list below') + '">'
-        + '<div class="kside"><div class="l">' + esc(l) + '</div></div>'
+        + '<div class="kside"><div class="l">' + esc(l) + '</div>' + subLine + '</div>'
         + '<div class="kmain"><span class="go">' + go + '</span><div class="v">' + (v ?? 0) + '</div></div></div>';
     }).join('');
     const wf = [['Active', c.active, '#16A34A'], ['Idle', c.idle, '#D97706'], ['On break', c.break_total, '#EA580C'], ['Meeting', c.meeting, '#B45309'], ['Offline', c.offline_count, '#94A3B8']];
