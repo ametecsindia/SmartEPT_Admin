@@ -1095,7 +1095,11 @@
       </div>
       <div class="card" id="dz-card" style="display:none;border:1.5px solid var(--danger)">
         <h3 style="color:var(--danger)">&#9888; Danger Zone — Clear data <span class="hint">Super Admin only · a full database backup is taken automatically first</span></h3>
-        <p class="mut" style="font-size:12px;margin-top:0">Permanently deletes the selected operational data for your company. Employees, users, org structure, policies and the licence are never touched here. Protected by a one-time code e-mailed to you.</p>
+        <p class="mut" style="font-size:12px;margin-top:0">Permanently deletes the selected operational data. Employees, users, org structure, policies and the licence are never touched here. Protected by a one-time code e-mailed to you.</p>
+        <div id="dz-company-wrap" style="display:none;margin:8px 0">
+          <label>Company to clear</label>
+          <select id="dz-company" style="max-width:340px"></select>
+        </div>
         <div id="dz-groups" style="margin:10px 0"><span class="mut">Loading…</span></div>
         <div class="row" style="gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px">
           <label class="fbool" style="padding:0"><input type="checkbox" id="dz-all"> Select all</label>
@@ -4923,8 +4927,24 @@ async function loadOps() {
 
 async function loadDzSummary() {
   const box = $('#dz-groups'); if (!box) return;
+  const sel = $('#dz-company');
+  const cid = sel ? sel.value : '';
   try {
-    const d = (await api('/ops/db-clear/summary')).data;
+    const d = (await api('/ops/db-clear/summary' + (cid ? ('?company_id=' + encodeURIComponent(cid)) : ''))).data;
+    const wrap = $('#dz-company-wrap');
+    if (d.needs_company && sel && wrap) {
+      wrap.style.display = '';
+      if (!sel.dataset.filled) {
+        sel.innerHTML = '<option value="">— choose a company —</option>'
+          + (d.companies || []).map((c) => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
+        sel.dataset.filled = '1';
+      }
+      if (!sel.dataset.wired) { sel.onchange = loadDzSummary; sel.dataset.wired = '1'; }
+    } else if (wrap) { wrap.style.display = 'none'; }
+    if (d.needs_company && !cid) {
+      box.innerHTML = '<span class="mut">Choose a company above to see what can be cleared.</span>';
+      return;
+    }
     box.innerHTML = (d.groups || []).map((g) =>
       '<label class="fbool" style="padding:4px 0;display:flex;gap:8px;align-items:center">'
       + '<input type="checkbox" class="dz-g" value="' + g.key + '" style="width:auto;margin:0"> '
@@ -4947,7 +4967,7 @@ if ($('#dz-exec')) $('#dz-exec').onclick = async () => {
   if (!confirm('Permanently clear the selected data (' + groups.length + ' group(s)) for your company?\n\nA full backup is taken first, but this cannot be undone from within the app.')) return;
   res.textContent = 'Backing up and clearing…';
   try {
-    const r = (await api('/ops/db-clear/execute', { method: 'POST', body: JSON.stringify({ code: ($('#dz-otp').value || '').trim(), confirm: ($('#dz-confirm').value || '').trim(), groups }) })).data;
+    const r = (await api('/ops/db-clear/execute', { method: 'POST', body: JSON.stringify({ code: ($('#dz-otp').value || '').trim(), confirm: ($('#dz-confirm').value || '').trim(), groups, company_id: ($('#dz-company') ? ($('#dz-company').value || null) : null) }) })).data;
     res.innerHTML = '\u2713 Cleared ' + (r.total_rows || 0) + ' record(s)'
       + (r.files_deleted ? ' and ' + r.files_deleted + ' file(s)' : '') + '. Backup: ' + esc(String(r.backup || 'done')).slice(0, 200);
     $('#dz-otp').value = ''; $('#dz-confirm').value = '';

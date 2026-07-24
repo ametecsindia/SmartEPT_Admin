@@ -46,28 +46,49 @@ class DbMaintenanceController extends Controller
     /** GET /api/ops/db-clear/summary — the clearable groups + how many rows each holds now. */
     public function summary(Request $request): JsonResponse
     {
-        $companyId = $request->user()->company_id;
+        $user = $request->user();
+        $needsCompany = ! $user->company_id;                       // super admin has no company
+        $target = $user->company_id ?: ((int) $request->integer('company_id') ?: null);
+
         $out = [];
         foreach ($this->groups() as $key => $g) {
             $count = 0;
-            foreach ($g['tables'] as $t) {
-                $count += $this->countTable($t, $companyId);
+            if ($target) {
+                foreach ($g['tables'] as $t) {
+                    $count += $this->countTable($t, $target);
+                }
             }
             $out[] = ['key' => $key, 'label' => $g['label'], 'tables' => $g['tables'], 'count' => $count];
         }
 
         return response()->json(['data' => [
-            'groups'      => $out,
-            'company_id'  => $companyId,
-            'email_masked' => $this->mask($request->user()->email),
+            'groups'        => $out,
+            'company_id'    => $target,
+            'needs_company' => $needsCompany,
+            'companies'     => $needsCompany ? $this->companyList() : null,
+            'email_masked'  => $this->mask($user->email),
         ]]);
+    }
+
+    /** Companies a super admin may target (id + name). */
+    private function companyList(): array
+    {
+        try {
+            if (! Schema::hasTable('companies')) {
+                return [];
+            }
+
+            return DB::table('companies')->select('id', 'name')->orderBy('name')->get()
+                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])->all();
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 
     /** POST /api/ops/db-clear/request-code — e-mail the super admin a one-time code. */
     public function requestCode(Request $request): JsonResponse
     {
         $user = $request->user();
-        abort_unless($user->company_id, 422, 'Your account has no company context to clear.');
 
         $code = (string) random_int(100000, 999999);
         Cache::put($this->otpKey($user->id), [
@@ -100,14 +121,22 @@ class DbMaintenanceController extends Controller
     public function execute(Request $request): JsonResponse
     {
         $user = $request->user();
-        abort_unless($user->company_id, 422, 'Your account has no company context to clear.');
 
         $data = $request->validate([
-            'code'     => ['required', 'string'],
-            'confirm'  => ['required', 'string'],
-            'groups'   => ['required', 'array', 'min:1'],
-            'groups.*' => ['string'],
+            'code'       => ['required', 'string'],
+            'confirm'    => ['required', 'string'],
+            'groups'     => ['required', 'array', 'min:1'],
+            'groups.*'   => ['string'],
+            'company_id' => ['nullable', 'integer'],
         ]);
+
+        // A company-scoped admin can only clear their OWN company; a super admin (no company
+        // of their own) must name the company to clear.
+        $companyId = $user->company_id ?: (int) ($data['company_id'] ?? 0);
+        abort_unless($companyId, 422, 'Choose which company to clear.');
+        if (! $user->company_id) {
+            abort_unless(DB::table('companies')->where('id', $companyId)->exists(), 422, 'That company does not exist.');
+        }
 
         abort_unless(strtoupper(trim($data['confirm'])) === 'CLEAR', 422,
             'Type CLEAR in the confirmation box to proceed.');
@@ -127,7 +156,6 @@ class DbMaintenanceController extends Controller
         }
         Cache::forget($key); // single use
 
-        $companyId = $user->company_id;
         $registry  = $this->groups();
         $selected  = array_values(array_intersect(array_keys($registry), $data['groups']));
         abort_if(empty($selected), 422, 'None of the selected groups are valid.');
@@ -161,6 +189,7 @@ class DbMaintenanceController extends Controller
         }
 
         $this->audit($request, 'DB_CLEAR_EXECUTED', \App\Models\User::class, $user->id, [
+            'company_id'    => $companyId,
             'groups'        => $selected,
             'cleared'       => $cleared,
             'files_deleted' => $filesDeleted,
