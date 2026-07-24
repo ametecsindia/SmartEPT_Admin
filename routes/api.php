@@ -248,6 +248,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('meetings/{meeting}', [MeetingController::class, 'show'])->middleware('permission:meeting.view');
     Route::put('meetings/{meeting}', [MeetingController::class, 'update'])->middleware('permission:meeting.edit');
     Route::post('meetings/{meeting}/cancel', [MeetingController::class, 'cancel'])->middleware('permission:meeting.cancel');
+    Route::post('meetings/{meeting}/end', [MeetingController::class, 'end'])->middleware('permission:meeting.cancel'); // organiser-only enforced in controller (Admin #9)
     Route::get('meetings/{meeting}/participation', [MeetingController::class, 'participation'])->middleware('permission:meeting.reports');
 
     // ---- QA Phase 5 (B10): violation → evidence (only the screenshots for that violation) ----

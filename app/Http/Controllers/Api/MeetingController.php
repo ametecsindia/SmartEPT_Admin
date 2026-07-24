@@ -40,6 +40,7 @@ class MeetingController extends Controller
                 'participant_count' => $m->participants_count,
                 'notes'             => $m->notes,
                 'created_by'        => $m->creator?->name,
+                'is_organizer'      => optional($request->user())->id === $m->created_by_user_id,
                 'created_at'        => $m->created_at?->toDateTimeString(),
             ]);
 
@@ -131,6 +132,43 @@ class MeetingController extends Controller
         $this->audit($request, 'CANCEL', Meeting::class, $meeting->id, ['title' => $meeting->title]);
 
         return response()->json(['data' => ['id' => $meeting->id, 'status' => 'CANCELLED']]);
+    }
+
+    /**
+     * POST /api/meetings/{meeting}/end — the ORGANISER ends the meeting NOW, for everyone.
+     * (Admin #9) Only the creator/organiser may end it — not other participants or admins.
+     * Ending closes the window immediately: the agents' Meeting button disappears on the
+     * next heartbeat, open sessions are closed, and the live-board "In Meeting" clears at
+     * once (the status-timeline MEETING segment is closed here, not only at the old end).
+     */
+    public function end(Request $request, Meeting $meeting): JsonResponse
+    {
+        abort_unless($meeting->created_by_user_id === $request->user()->id, 403,
+            'Only the meeting organiser can end this meeting.');
+        abort_if(in_array($meeting->status, ['CANCELLED', 'COMPLETED'], true), 422,
+            'This meeting is already over.');
+
+        $now = now();
+        $meeting->update([
+            'end_at' => ($meeting->end_at && $meeting->end_at->lessThan($now)) ? $meeting->end_at : $now,
+            'status' => 'COMPLETED',
+        ]);
+        $this->closeOpenSessions($meeting, $now);
+
+        \App\Models\StatusTimeline::withoutGlobalScopes()
+            ->whereNull('ended_at')->where('state', 'MEETING')->where('meeting_id', $meeting->id)
+            ->get()
+            ->each(function ($seg) use ($now) {
+                $end = $seg->started_at->greaterThan($now) ? $seg->started_at : $now;
+                $seg->forceFill([
+                    'ended_at'         => $end,
+                    'duration_seconds' => max(0, $end->getTimestamp() - $seg->started_at->getTimestamp()),
+                ])->save();
+            });
+
+        $this->audit($request, 'END', Meeting::class, $meeting->id, ['title' => $meeting->title]);
+
+        return response()->json(['data' => ['id' => $meeting->id, 'status' => 'COMPLETED']]);
     }
 
     /** GET /api/meetings/{meeting}/participation — scheduled vs actual per participant. */

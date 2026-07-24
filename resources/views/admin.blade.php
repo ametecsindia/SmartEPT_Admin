@@ -3983,6 +3983,7 @@ async function loadMeetings() {
       + (can('meeting.reports') ? '<button class="btn" data-mtg-part="' + m.id + '">Participation</button> ' : '')
       + ((m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS')
           ? ((can('meeting.edit') ? '<button class="btn" data-mtg-edit="' + m.id + '">Edit</button> ' : '')
+             + (m.is_organizer ? '<button class="btn danger" data-mtg-end="' + m.id + '">End now</button> ' : '')
              + (can('meeting.cancel') ? '<button class="btn danger" data-mtg-cancel="' + m.id + '">Cancel</button>' : ''))
           : '')
       + '</td></tr>').join('')
@@ -3996,8 +3997,15 @@ async function loadMeetings() {
 document.addEventListener('click', async (e) => {
   const ed = e.target.closest && e.target.closest('[data-mtg-edit]');
   const cn = e.target.closest && e.target.closest('[data-mtg-cancel]');
+  const en = e.target.closest && e.target.closest('[data-mtg-end]');
   const pt = e.target.closest && e.target.closest('[data-mtg-part]');
   if (ed) { openMeetingModal(Number(ed.dataset.mtgEdit)); }
+  else if (en) {
+    // Admin #9: organiser ends the meeting now -> it ends for ALL participants.
+    if (!window.confirm('End this meeting now for everyone? Participants leave the Meeting status immediately.')) return;
+    try { await api('/meetings/' + Number(en.dataset.mtgEnd) + '/end', { method: 'POST' }); toast('Meeting ended'); loadMeetings(); }
+    catch (err) { alert(err.message); }
+  }
   else if (cn) {
     if (!window.confirm('Cancel this meeting? Participants lose the Meeting option immediately.')) return;
     try { await api('/meetings/' + Number(cn.dataset.mtgCancel) + '/cancel', { method: 'POST' }); toast('Meeting cancelled'); loadMeetings(); }
