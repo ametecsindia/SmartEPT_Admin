@@ -83,6 +83,35 @@ class ProvisionController extends Controller
         ], 201);
     }
 
+    /**
+     * POST /api/provision/status  { external_tenant_id, status: ACTIVE|SUSPENDED }
+     * Central pushes a tenant's suspend/enable here (secret-signed) so the hosted console
+     * blocks or restores that company's people immediately.
+     */
+    public function setStatus(Request $request): JsonResponse
+    {
+        $secret = (string) config('services.provision.secret');
+        abort_if($secret === '', 503, 'Provisioning is not configured on this server.');
+        abort_unless(hash_equals($secret, (string) $request->header('X-Provision-Secret')), 401, 'Invalid provisioning secret.');
+
+        $data = $request->validate([
+            'external_tenant_id' => ['required', 'string', 'max:64'],
+            'status'             => ['required', 'in:ACTIVE,SUSPENDED'],
+        ]);
+
+        $company = Company::where('external_tenant_id', $data['external_tenant_id'])->first();
+        abort_unless($company, 404, 'Unknown tenant.');
+        $company->update(['status' => $data['status']]);
+
+        Log::info('Tenant status set from Central', [
+            'external_tenant_id' => $data['external_tenant_id'],
+            'company_id'         => $company->id,
+            'status'             => $data['status'],
+        ]);
+
+        return response()->json(['ok' => true, 'company_id' => $company->id, 'status' => $company->status]);
+    }
+
     /** A short, unique, human-ish company code. */
     private function uniqueCode(string $name, string $ext): string
     {

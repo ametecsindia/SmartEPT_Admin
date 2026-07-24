@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Named middleware used by SmartEPT routes.
         $middleware->alias([
             'role'       => \App\Http\Middleware\EnsureRole::class,
+            'company.active' => \App\Http\Middleware\EnsureCompanyActive::class,
             'permission' => \App\Http\Middleware\EnsurePermission::class,
             'consent'    => \App\Http\Middleware\EnsureConsent::class,
             'tracking-mode' => \App\Http\Middleware\EnforceTrackingMode::class,

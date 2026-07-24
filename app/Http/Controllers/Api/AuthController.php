@@ -33,6 +33,14 @@ class AuthController extends Controller
             ], 403);
         }
 
+        // Hard cut-off: a suspended tenant (set from Central) cannot sign in.
+        if ($user->company_id && optional($user->company)->status === 'SUSPENDED') {
+            return response()->json([
+                'error' => ['code' => 'COMPANY_SUSPENDED',
+                    'message' => 'Your organisation\'s access has been suspended. Please contact Ametecs.'],
+            ], 403);
+        }
+
         $user->forceFill(['last_login_at' => now()])->save();
         $this->audit($request, 'LOGIN', User::class, $user->id, null, $user);
 
