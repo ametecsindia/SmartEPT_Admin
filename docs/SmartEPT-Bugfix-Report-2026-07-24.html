@@ -1,0 +1,88 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SmartEPT — Bug-Fix Delivery Report · 24 Jul 2026</title>
+<style>
+:root{--teal:#0E7C8F;--teal-d:#0b6474;--ink:#0f172a;--body:#334155;--mut:#64748b;--bd:#e2e8f0;--bg:#f8fafc;--bg2:#f1f5f9;--ok:#15803d;--okb:#f0fdf4;--amb:#b45309;--ambb:#fffbeb;}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:var(--body);background:#fff;line-height:1.55;font-size:15px}
+.wrap{max-width:960px;margin:0 auto;padding:0 26px 60px}
+header{background:linear-gradient(135deg,var(--teal),var(--teal-d));color:#fff;padding:30px 26px;margin-bottom:24px}
+.hd{max-width:960px;margin:0 auto;display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap}
+.badge{display:inline-block;width:46px;height:46px;border-radius:11px;background:#fff;color:var(--teal);font-weight:800;font-size:19px;text-align:center;line-height:46px}
+h1{font-size:22px;margin:.15em 0 .1em;color:#fff}
+.sub{opacity:.92;font-size:13.5px}
+.meta{font-size:12.5px;opacity:.9;text-align:right}
+h2{color:var(--ink);font-size:18px;margin:32px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--bd)}
+h3{color:var(--ink);font-size:15px;margin:18px 0 6px}
+p{margin:.5em 0}.lead{font-size:15.5px;color:var(--ink)}
+code{background:var(--bg2);border:1px solid var(--bd);border-radius:5px;padding:1px 5px;font-family:Consolas,Menlo,monospace;font-size:12.5px;color:#0b3b45}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px}
+.t-ok{background:var(--okb);color:var(--ok);border:1px solid #bbf7d0}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+th,td{border:1px solid var(--bd);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--bg2);color:var(--ink);font-weight:700}
+ul{margin:.4em 0}li{margin:3px 0}
+.callout{background:var(--okb);border:1px solid #bbf7d0;border-left:5px solid var(--ok);border-radius:9px;padding:13px 16px;margin:14px 0}
+.callout.a{background:var(--ambb);border-color:#fde68a;border-left-color:var(--amb)}
+.grid{display:grid;grid-template-columns:130px 1fr;gap:4px 14px;margin:8px 0;font-size:13.5px}
+.grid .k{color:var(--mut);font-weight:600}
+.mono{font-family:Consolas,Menlo,monospace;font-size:12.5px}
+footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--bd);color:var(--mut);font-size:12px;text-align:center}
+@media print{header{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head>
+<body>
+<header><div class="hd">
+<div style="display:flex;gap:14px;align-items:center"><span class="badge">EPT</span>
+<div><h1>SmartEPT — Bug-Fix Delivery Report</h1><div class="sub">Admin &amp; Agent issue list of 24 July 2026 · all items addressed</div></div></div>
+<div class="meta">Ametecs India Pvt. Ltd.<br>24 Jul 2026 · rev 24b (final)<br>Prepared for: Ejaz Hussain</div>
+</div></header>
+<div class="wrap">
+
+<p class="lead">Every item on the 24-July Admin &amp; Agent list has been worked through — the six core time/status bugs plus all nine dashboard/agent items. The headline problem (Active time running double, totals not tallying, a 16-hour break on the board) came from <b>one</b> root cause, fixed at the source. This revision also covers the four follow-ups you asked me to continue with: the meeting reminder popup, password-protected uninstall, and self-service diagnostics for biometric sync and screenshot evidence.</p>
+
+<div class="callout"><b>The one root cause behind the time bugs.</b> The agent's sync engine (<code>sync.drain()</code>) had no re-entrancy guard. It is triggered from many places <i>and</i> a 15-second timer, and waits on the network for each event — so two runs overlapped, both read the <i>same</i> queued batch, and both sent it. The server stored every Active/Idle stretch <b>twice</b>. That is why Active climbed ~2× and Active+Idle+Break never added up. It was never a clock problem.</div>
+
+<h2>1 · Everything that changed</h2>
+<table>
+<tr><th style="width:52px">Ref</th><th>Reported issue</th><th>What was done</th><th style="width:64px">Status</th></tr>
+<tr><td>Agent 1,2,3,6</td><td>Active/Idle running double; totals don't tally</td><td>Re-entrancy mutex in the agent + idempotent insert on the server (de-dupe by employee+device+type+start)</td><td><span class="tag t-ok">Done</span></td></tr>
+<tr><td>Agent 5</td><td>Break counted inside Active time</td><td>Agent suspends the work-clock (and screenshots) during a break, resumes after</td><td><span class="tag t-ok">Done</span></td></tr>
+<tr><td>Agent 4</td><td>No password on exit / uninstall</td><td>Exit lock already exists (enable in Admin→Ops). New: tray <b>"Uninstall SmartEPT Agent…"</b> asks for the same admin password before removing</td><td><span class="tag t-ok">Done</span></td></tr>
+<tr><td>Admin 3,4</td><td>Active employee shows "Other break"; break shows 16h</td><td>Stale break/meeting now self-heals — on next login, on dashboard load, and via a 15-min job</td><td><span class="tag t-ok">Done</span></td></tr>
+<tr><td>Admin 5</td><td>Separate Lunch/Tea/Other boxes</td><td>One "On break" box with the breakdown inside it</td><td><span class="tag t-ok">Done</span></td></tr>
+<tr><td>Admin 6</td><td>Late minutes missing for some</td><td>Late captured on login even when a door punch created the row first</td><td><span class="tag t-ok">Done</span></td></tr>
+<tr><td>Admin 7</td><td>Shows "In Meeting" after it ended</td><td>Auto-close now also closes the status-timeline segment at the scheduled end</td><td><span class="tag t-ok">Done</span></td></tr>
+<tr><td>Admin 9</td><td>Organiser End (ends for all); reminder + Join popup</td><td>Organiser-only <b>"End now"</b> ends for everyone; organiser sets <b>"remind X min before"</b> and members get a popup + Join button. "Leave" already worked</td><td><span class="tag t-ok">Done</span></td></tr>
+<tr><td>Admin 1,2</td><td>Biometric auto-sync "needs manual"</td><td>Self-service check in Troubleshooting: flags all-Manual devices, stale/disabled devices, and whether the scheduler is actually firing</td><td><span class="tag t-ok">Done</span></td></tr>
+<tr><td>Admin 8</td><td>"Evidence no longer available" for some</td><td>New check counts screenshots captured but not stored (a storage/upload problem on some PCs) so the real cause is visible, not guessed</td><td><span class="tag t-ok">Done</span></td></tr>
+</table>
+
+<h2>2 · How it was verified (twice)</h2>
+<p>This cloud environment can't launch the live PHP app or the Electron agent, so verification was done where it catches real defects — syntax, unit tests, and a maths proof:</p>
+<ul>
+<li><b>Agent unit tests</b> — <code>node --test</code>: <b>14 pass</b> (including 2 new drain-mutex regression tests proving each queued event is sent exactly once under concurrent drains).</li>
+<li><b>Syntax</b> — every changed agent file passes <code>node --check</code>; every changed server file passes <code>php -l</code>; the dashboard script passes <code>node --check</code>.</li>
+<li><b>Tally proof</b> — the time maths, re-run in Python over a real 2-hour timeline, now gives Active 90m + Idle 10m + Break 20m = exactly <b>120m</b> (old logic gave 1.83×), with break excluded from active.</li>
+<li><b>Note:</b> the two new on-screen flows — the meeting reminder popup and the uninstall password modal — are UI, so they're syntax-checked here and should get a quick click-through on a test PC after the agent rebuild.</li>
+</ul>
+
+<h2>3 · What you need to do</h2>
+<div class="callout a">
+<ol style="margin:.2em 0">
+<li><b>Run the database migration</b> (<span class="mono">migrate.bat</span> or <span class="mono">php artisan migrate</span>) — one new column for the meeting reminder.</li>
+<li><b>Rebuild the agent</b> and reinstall on the test PCs: <span class="mono">cd agent &amp;&amp; npm install &amp;&amp; npm run dist</span>.</li>
+<li><b>Hard-refresh</b> the console (<b>Ctrl+Shift+R</b>) for the merged break box, End-now, the reminder field, and the new diagnostics.</li>
+<li><b>Restart PHP / clear OPcache</b> so the updated server code loads.</li>
+<li><b>Confirm the scheduler runs</b> — Task Scheduler should call <code>php artisan schedule:run</code> every minute (the "Background scheduler" tile in Help → Troubleshooting should be green). This is what drives biometric auto-sync, the stale-break closer, meeting auto-close and reminders.</li>
+<li>To password-protect the agent, enable the <b>exit lock</b> in Admin → Ops and set the password — that gates both Exit and the in-app Uninstall.</li>
+</ol></div>
+
+<h2>4 · Committed to the live trees</h2>
+<div class="grid">
+<span class="k">Product (main)</span><span><code>a8bf76f</code> activity idempotency + stale-break self-heal + In-Meeting close + late capture</span>
+<span class="k"></span><span><code>f18d79f</code> merge break boxes · <code>7fe2fa9</code> End-now · <code>925f7a4</code> meeting reminder · <code>705201d</code> diagnostics</span>
+<span class="k">Agent (master)</span><span><code>3daaf9f</code> drain mutex + break-suspend · <code>4468664</code> reminder popup · <code>6efc4da</code> password-gated uninstall</span>
+</div>
+<p style="font-size:13px;color:var(--mut)">All commits authored <span class="mono">SmartEPT Dev &lt;dev@ametecsindia.com&gt;</span>, made directly in the live trees per the deployment policy.</p>
+
+<footer>M/s. AMETECS INDIA PRIVATE LIMITED · GST 36AAHCT0971F1ZB · SmartEPT — Employee Productivity Tracking &amp; Intelligence · Generated 24 Jul 2026</footer>
+</div></body></html>

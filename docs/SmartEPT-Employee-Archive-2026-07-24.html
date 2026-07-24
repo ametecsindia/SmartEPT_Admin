@@ -1,0 +1,85 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SmartEPT — Employee Archive on Delete · 24 Jul 2026</title>
+<style>
+:root{--teal:#0E7C8F;--teal-d:#0b6474;--ink:#0f172a;--body:#334155;--mut:#64748b;--bd:#e2e8f0;--bg:#f8fafc;--bg2:#f1f5f9;--ok:#15803d;--okb:#f0fdf4;--amb:#b45309;--ambb:#fffbeb;}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:var(--body);background:#fff;line-height:1.55;font-size:15px}
+.wrap{max-width:940px;margin:0 auto;padding:0 26px 60px}
+header{background:linear-gradient(135deg,var(--teal),var(--teal-d));color:#fff;padding:30px 26px;margin-bottom:24px}
+.hd{max-width:940px;margin:0 auto;display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap}
+.badge{display:inline-block;width:46px;height:46px;border-radius:11px;background:#fff;color:var(--teal);font-weight:800;font-size:19px;text-align:center;line-height:46px}
+h1{font-size:22px;margin:.15em 0 .1em;color:#fff}.sub{opacity:.92;font-size:13.5px}
+.meta{font-size:12.5px;opacity:.9;text-align:right}
+h2{color:var(--ink);font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--bd)}
+p{margin:.5em 0}.lead{font-size:15.5px;color:var(--ink)}
+code{background:var(--bg2);border:1px solid var(--bd);border-radius:5px;padding:1px 5px;font-family:Consolas,Menlo,monospace;font-size:12.5px;color:#0b3b45}
+.step{display:grid;grid-template-columns:34px 1fr;gap:12px;margin:12px 0;align-items:start}
+.num{width:30px;height:30px;border-radius:50%;background:var(--teal);color:#fff;font-weight:700;text-align:center;line-height:30px;font-size:14px}
+.step b{color:var(--ink)}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+th,td{border:1px solid var(--bd);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--bg2);color:var(--ink);font-weight:700}
+.callout{background:var(--ambb);border:1px solid #fde68a;border-left:5px solid var(--amb);border-radius:9px;padding:13px 16px;margin:14px 0}
+.callout.g{background:var(--okb);border-color:#bbf7d0;border-left-color:var(--ok)}
+ul{margin:.4em 0}li{margin:3px 0}
+.mono{font-family:Consolas,Menlo,monospace;font-size:12.5px}
+.grid{display:grid;grid-template-columns:130px 1fr;gap:4px 14px;margin:8px 0;font-size:13.5px}
+.grid .k{color:var(--mut);font-weight:600}
+footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--bd);color:var(--mut);font-size:12px;text-align:center}
+@media print{header{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head>
+<body>
+<header><div class="hd">
+<div style="display:flex;gap:14px;align-items:center"><span class="badge">EPT</span>
+<div><h1>SmartEPT — Employee Archive on Delete</h1><div class="sub">Delete an employee → full backup kept, code freed for reuse</div></div></div>
+<div class="meta">Ametecs India Pvt. Ltd.<br>24 Jul 2026 · rev 1<br>Prepared for: Ejaz Hussain</div>
+</div></header>
+<div class="wrap">
+
+<p class="lead">Deleting an employee used to simply remove them from the active list. It now does three things automatically, so no history is ever lost and the employee code can be handed to a new joiner straight away.</p>
+
+<h2>1 · What happens when you delete an employee</h2>
+<div class="step"><div class="num">1</div><div><b>The record is archived under a clear label.</b> The deleted person is filed in a new <b>Employee Archive</b> as <span class="mono">EmployeeCode_Name_ArchiveDate</span> — for example <span class="mono">E-2001_Rahul-Sharma_2026-07-24</span> — so their identity stays traceable even after the code is reused.</div></div>
+<div class="step"><div class="num">2</div><div><b>A complete backup is taken.</b> Everything tied to that person — attendance, breaks, activity, screenshots, webcam photos, violations, meetings, biometric mappings (about twenty data types in all) — is packaged into a downloadable ZIP: a full record-by-record export <i>plus the actual screenshot and webcam image files</i>.</div></div>
+<div class="step"><div class="num">3</div><div><b>The Employee Code is released.</b> The code is freed the moment you delete, so you can issue the same code to a new joiner. The old person's data stays under their old record and never mixes with the new hire's.</div></div>
+
+<div class="callout g"><b>Where to find it.</b> A new <b>Employee Archive</b> panel sits just below the employee list in the Employee tab. Each archived person shows their label, a record count, who archived them and when, and a <b>Download ZIP</b> button. The backup is prepared in the background and shows <b>"Preparing…"</b> for up to a minute, then becomes a download.</div>
+
+<h2>2 · What's inside the backup ZIP</h2>
+<table>
+<tr><th>Item</th><th>Contents</th></tr>
+<tr><td><span class="mono">employee.json</span></td><td>The employee's profile and a record count for every data type.</td></tr>
+<tr><td><span class="mono">data/*.ndjson</span></td><td>The complete record-by-record export — one file per data type (attendance, breaks, activity, violations, meetings, and so on).</td></tr>
+<tr><td><span class="mono">screenshots/</span></td><td>The actual screenshot images captured for this person.</td></tr>
+<tr><td><span class="mono">webcam/</span></td><td>Webcam presence photos, if any were captured.</td></tr>
+<tr><td><span class="mono">README.txt</span></td><td>A plain-language guide to the folder.</td></tr>
+</table>
+<p style="font-size:13px;color:var(--mut)">The live data is left in place (nothing is destroyed) — the ZIP is a clean, retrievable copy. Backups are built one at a time and streamed in chunks, so even an employee with months of screenshots can't slow down the delete or overload the server.</p>
+
+<h2>3 · How it was built &amp; checked</h2>
+<ul>
+<li><b>Instant delete, background backup.</b> The heavy ZIP is built by a scheduled job (<code>smartept:build-archives</code>, every minute) rather than during the click — so deleting is always fast. No separate queue worker is needed, just the scheduler.</li>
+<li><b>Safe by design.</b> Every data table is read defensively, so a missing or renamed table can never turn a delete into an error — the backup is always best-effort complete.</li>
+<li><b>Verified here:</b> all server code is PHP lint-clean and the dashboard JavaScript passes its syntax check. The one part to click-test on your live console is the Archive panel + download, since that UI can only be syntax-checked from my side.</li>
+</ul>
+
+<h2>4 · To switch it on</h2>
+<div class="callout">
+<ol style="margin:.2em 0">
+<li><b>Run the migration</b> — <span class="mono">migrate.bat</span> (adds the <code>employee_archives</code> table).</li>
+<li><b>Confirm the scheduler is running</b> — the "Background scheduler" tile in Help → Troubleshooting should be green. That's what builds the ZIPs; without it, archives stay on "Preparing…". You can also run <span class="mono">php artisan smartept:build-archives</span> once by hand.</li>
+<li><b>Check PHP's zip extension is on</b> (Laragon ships with it). If it's off, an archive row says so clearly instead of failing silently.</li>
+<li><b>Restart PHP / hard-refresh</b> the console.</li>
+</ol>
+<p style="margin:.3em 0 0">Backups are saved under <span class="mono">storage/app/archives/</span> — make sure your storage backup covers that folder.</p>
+</div>
+
+<h2>5 · Committed to the live tree</h2>
+<div class="grid">
+<span class="k">Product (main)</span><span><code>e76694a</code> — archive-on-delete: table + model + service, background ZIP builder, Archive panel, list/download endpoints</span>
+<span class="k">Migration</span><span><code>001000_create_employee_archives_table</code></span>
+</div>
+<p style="font-size:13px;color:var(--mut)">Committed directly in the live tree per the deployment policy.</p>
+
+<footer>M/s. AMETECS INDIA PRIVATE LIMITED · GST 36AAHCT0971F1ZB · SmartEPT — Employee Productivity Tracking &amp; Intelligence · Generated 24 Jul 2026</footer>
+</div></body></html>
