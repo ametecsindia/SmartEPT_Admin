@@ -58,6 +58,13 @@ class DashboardController extends Controller
             ->when($visible !== null, fn ($q) => $q->whereIn('id', $visible))
             ->get();
 
+        // Self-heal any stale "ghost" break/meeting left open from a previous day BEFORE we
+        // read the live status, so nobody shows as "On break · 16h" (agent killed mid-break).
+        app(StatusService::class)->closeStaleOpenSegments(
+            $employees->pluck('id')->all(),
+            \Illuminate\Support\Carbon::parse($today)->startOfDay()
+        );
+
         $openMap = app(StatusService::class)->openStatusMap($employees->pluck('id')->all());
         $now = now();
 

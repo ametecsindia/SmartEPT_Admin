@@ -84,7 +84,11 @@ class AttendanceController extends Controller
             $status = app(StatusService::class);
             $opts = ['device_uuid' => $data['device_uuid']];
             match ($data['event_type']) {
-                'LOGIN'  => $status->transition($employee, 'ACTIVE', $at, $opts),
+                // A fresh LOGIN resumes work and CLOSES any stale open break/meeting left
+                // from a prior session (agent killed mid-break → a 16-hour "On break" ghost
+                // on the live board). resume bypasses the ambient guard so the stale segment
+                // is closed and ACTIVE opens cleanly.
+                'LOGIN'  => $status->resumeActive($employee, $at, $opts),
                 'UNLOCK' => $status->resumeActive($employee, $at, $opts),
                 'LOCK'   => $status->forceIdle($employee, $at, 'LOCK', $opts),
                 'LOGOUT' => $status->closeAll($employee, $at),
@@ -137,10 +141,16 @@ class AttendanceController extends Controller
             $updates['check_in_at'] = $at;
             $updates['check_in_source'] = 'AGENT';
             $updates['first_activity_at'] = $at;
+        }
 
-            // QA Phase 3 (B8/D2): the late formula lives in AttendanceDerivation so agent
-            // login, biometric-only and nightly recompute all agree. late is set only on
-            // the FIRST check-in of the day (write-once — re-login never moves it).
+        // QA Phase 3 (B8/D2) + late-capture fix (Admin #6): the late formula lives in
+        // AttendanceDerivation so agent login, biometric-only and nightly recompute all
+        // agree. It is WRITE-ONCE, but must be set even when a biometric door punch created
+        // the attendance row (and stamped check_in_at) BEFORE the employee signed in —
+        // otherwise those employees never got late_minutes (captured for one emp, missing
+        // for another). arrival_source_used is null until late is derived, so it is the
+        // reliable "not computed yet" flag (late_minutes defaults to 0, so can't be).
+        if (empty($attendance->arrival_source_used)) {
             $bioInRaw = \App\Models\BiometricLog::withoutGlobalScopes()
                 ->where('employee_id', $employee->id)
                 ->where('punch_type', 'IN')
@@ -150,8 +160,8 @@ class AttendanceController extends Controller
 
             $late = app(\App\Services\AttendanceDerivation::class)
                 ->lateFor($employee, $at->toDateString(), $at, $bioIn, $at);
-            $updates['late_minutes'] = $late['minutes'] ?? 0;
             if ($late) {
+                $updates['late_minutes'] = $late['minutes'];
                 $updates['arrival_source_used'] = $late['used'];
             }
         }

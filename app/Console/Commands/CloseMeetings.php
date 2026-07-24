@@ -55,6 +55,32 @@ class CloseMeetings extends Command
             }
         }
 
+        // Also close the authoritative status-timeline MEETING segment at the scheduled
+        // end, so the live dashboard stops showing "In Meeting" after a meeting is over even
+        // when the employee never pressed Leave (bug: admin saw In Meeting though the meeting
+        // had ended and the employee side was already normal).
+        \App\Models\StatusTimeline::withoutGlobalScopes()
+            ->whereNull('ended_at')
+            ->where('state', 'MEETING')
+            ->whereNotNull('meeting_id')
+            ->get()
+            ->each(function ($seg) use ($now) {
+                $m = Meeting::withoutGlobalScopes()->find($seg->meeting_id);
+                if (! $m) {
+                    return;
+                }
+                if ($m->end_at->lte($now) || $m->status === 'CANCELLED') {
+                    $end = $m->status === 'CANCELLED' ? $now : $m->end_at;
+                    if ($end->lessThan($seg->started_at)) {
+                        $end = $seg->started_at;
+                    }
+                    $seg->forceFill([
+                        'ended_at'         => $end,
+                        'duration_seconds' => max(0, $end->getTimestamp() - $seg->started_at->getTimestamp()),
+                    ])->save();
+                }
+            });
+
         return self::SUCCESS;
     }
 }

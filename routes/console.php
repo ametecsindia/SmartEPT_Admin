@@ -46,3 +46,14 @@ Schedule::command('smartept:close-meetings')->everyMinute();
 Schedule::call(function () {
     \Illuminate\Support\Facades\Cache::put('smartept:scheduler_heartbeat', now()->toDateTimeString(), now()->addMinutes(30));
 })->everyMinute()->name('scheduler-heartbeat')->withoutOverlapping();
+
+// Live-board self-heal (Admin #3/#4): close any break/meeting status segment left open
+// across a day boundary (agent killed mid-break → a 16-hour "On break" ghost) so the live
+// dashboard never shows an impossible multi-hour break. The dashboard also self-heals on
+// read; this covers tenants nobody is viewing right now.
+Schedule::call(function () {
+    app(\App\Services\StatusService::class)->closeStaleOpenSegments(
+        \App\Models\Employee::withoutGlobalScopes()->pluck('id')->all(),
+        now()->startOfDay()
+    );
+})->everyFifteenMinutes()->name('close-stale-status')->withoutOverlapping();

@@ -214,6 +214,36 @@ class StatusService
         return $t;
     }
 
+    /**
+     * Self-heal stale open break/meeting segments left open across a day boundary — e.g.
+     * an agent killed mid-break leaves an OTHER_BREAK segment open, and the live board then
+     * shows the employee "On break" for 16+ hours. Any break/meeting segment that STARTED
+     * before $before is closed at the end of the day it started on, so it can never render
+     * as "open now". Returns how many were closed.
+     *
+     * @param  int[]  $employeeIds
+     */
+    public function closeStaleOpenSegments(array $employeeIds, Carbon $before): int
+    {
+        if (empty($employeeIds)) {
+            return 0;
+        }
+
+        $closed = 0;
+        StatusTimeline::withoutGlobalScopes()
+            ->whereIn('employee_id', $employeeIds)
+            ->whereNull('ended_at')
+            ->whereIn('state', self::BREAK_OR_MEETING)
+            ->where('started_at', '<', $before)
+            ->get()
+            ->each(function ($s) use (&$closed) {
+                $this->closeSegment($s, $s->started_at->copy()->endOfDay());
+                $closed++;
+            });
+
+        return $closed;
+    }
+
     /** The single open segment for an employee (optionally row-locked for a transition). */
     private function openSegment(int $employeeId, bool $lock = false): ?StatusTimeline
     {

@@ -70,7 +70,39 @@ class ActivityController extends Controller
             $lastActivity = $end ?? $start;
         }
 
-        EmployeeActivityEvent::insert($rows);
+        // Idempotency (fix: Active/Idle time doubled). A retried or concurrently-drained
+        // batch must never insert the same stretch twice. A stretch is uniquely identified
+        // by (employee, device, type, started_at) — non-overlapping per device — so de-dupe
+        // within the batch AND drop any row already stored before inserting.
+        $seen = [];
+        $unique = [];
+        foreach ($rows as $r) {
+            $key = $r['event_type'] . '|' . $r['started_at']->toDateTimeString();
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $unique[] = $r;
+        }
+        $starts = array_map(fn ($r) => $r['started_at']->toDateTimeString(), $unique);
+        $existing = [];
+        if (! empty($starts)) {
+            EmployeeActivityEvent::where('employee_id', $employee->id)
+                ->where('device_uuid', $data['device_uuid'])
+                ->whereIn('started_at', $starts)
+                ->get(['event_type', 'started_at'])
+                ->each(function ($e) use (&$existing) {
+                    $existing[$e->event_type . '|' . $e->started_at->toDateTimeString()] = true;
+                });
+        }
+        $rows = array_values(array_filter(
+            $unique,
+            fn ($r) => ! isset($existing[$r['event_type'] . '|' . $r['started_at']->toDateTimeString()])
+        ));
+
+        if (! empty($rows)) {
+            EmployeeActivityEvent::insert($rows);
+        }
 
         // QA Phase 1 (dual-write): reflect ACTIVE/IDLE stretches in the status timeline.
         // Consecutive same-type events collapse to one segment (StatusService also dedupes),
