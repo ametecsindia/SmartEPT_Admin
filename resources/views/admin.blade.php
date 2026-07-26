@@ -396,6 +396,7 @@
     <div class="nav active" data-view="dashboard"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/></svg></span> Live Dashboard</div>
     <div class="nav" data-view="attendance"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.4V12l3.2 1.9"/></svg></span> Attendance</div>
     <div class="nav" data-view="screenshots"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="13" rx="2"/><path d="M8.5 21h7M12 17.5V21"/><circle cx="9" cy="9.4" r="1.5"/><path d="M21 14.5l-4.2-4.2-5.3 5.2"/></svg></span> Screenshots</div>
+    <div class="nav" data-view="webcam"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m23 7-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></span> Webcam</div>
     <div class="nav" data-view="usage"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12A9 9 0 1 1 12 3"/><path d="M12 3a9 9 0 0 1 9 9h-9z"/></svg></span> Usage &amp; Compliance</div>
     <div class="nav" data-view="violations"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 4.1 2.9 17a2 2 0 0 0 1.7 3h14.8a2 2 0 0 0 1.7-3L13.7 4.1a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4.2M12 16.9h.01"/></svg></span> Violations</div>
     <div class="navgrp">MANAGE</div>
@@ -518,6 +519,20 @@
         <h3 id="ss-title">Screenshot timeline</h3>
         <div id="ss-grid" class="shots"></div>
         <div id="ss-empty" class="hide"></div>
+      </div>
+    </div>
+
+    <!-- 2b. WEBCAM (EPT25-05) -->
+    <div class="view" id="v-webcam">
+      <div class="filters">
+        <label>Date</label><input type="date" id="wc-date" style="min-width:0">
+        <button class="btn acc" id="wc-load">Load</button>
+        <span class="tag t-info" style="margin-left:auto">EVERY VIEW IS AUDIT-LOGGED</span>
+      </div>
+      <div class="card">
+        <h3>Webcam presence photos</h3>
+        <div id="wc-grid" class="shots"></div>
+        <div id="wc-empty" class="hide"></div>
       </div>
     </div>
 
@@ -767,7 +782,7 @@
         <button class="btn solid" id="mtg-new" style="margin-left:auto">+ Schedule meeting</button>
       </div>
       <div class="card"><h3>Meetings</h3>
-        <table><thead><tr><th>Title</th><th>Date</th><th>Time</th><th>Participants</th><th>Status</th><th></th></tr></thead>
+        <table><thead><tr><th>Title</th><th>Date</th><th>Time</th><th>Organizer</th><th>Participants</th><th>Actual End</th><th>Status</th><th></th></tr></thead>
         <tbody id="mtg-rows"></tbody></table>
       </div>
     </div>
@@ -1797,6 +1812,7 @@ function enterApp() {
   $('#who').innerHTML = '<b>' + esc(ME.name) + '</b><br>' + esc(ME.role_name || ME.role || '');
   if (ME.company) $('#company-name').textContent = ME.company;
   $('#login').classList.add('hide'); $('#app').classList.remove('hide');
+  if (!window.__mtgJoinPoll) { window.__mtgJoinPoll = setInterval(pollJoinable, 45000); setTimeout(pollJoinable, 4000); }
   applyAttendanceMode();
   applyPermissionNav();
   show('dashboard');
@@ -1823,7 +1839,7 @@ function applyPermissionNav() {
   if (ME.role === 'SUPER_ADMIN' || ME.role === 'COMPANY_ADMIN') return;
   const perms = ME.permissions || [];
   const NAVP = {
-    dashboard: 'dashboard.view', screenshots: 'screenshot.view', usage: 'activity.view',
+    dashboard: 'dashboard.view', screenshots: 'screenshot.view', webcam: 'webcam.view', usage: 'activity.view',
     attendance: 'attendance.view', violations: 'dashboard.view', reports: 'export.data',
     policies: 'policy.view', ops: 'audit.view',
     // QA Phase 4 (B5): the Meetings screen is gated on meeting.view.
@@ -1879,6 +1895,7 @@ const TITLES = {
   dashboard: ['Live Dashboard', 'Real-time workforce status'],
   attendance: ['Attendance', 'Daily sheet, regularization & holiday calendar'],
   screenshots: ['Screenshots', 'Policy-driven screen captures — every view is audit-logged'],
+  webcam: ['Webcam', 'Webcam presence photos — every view is audit-logged'],
   usage: ['Usage & Compliance', 'Per-employee application and website time'],
   violations: ['Violations', 'Compliance events across the company'],
   employees: ['Employees', 'Directory & lifecycle'],
@@ -1907,6 +1924,7 @@ function show(v) {
   if (v === 'dashboard') { initDashOrgFilter(); loadDashboard(); poll = setInterval(loadDashboard, 15000); }
   if (v === 'attendance') initAttendance();
   if (v === 'screenshots') initScreenshots();
+  if (v === 'webcam') initWebcam();
   if (v === 'usage') initUsage();
   if (v === 'violations') initViolations();
   if (v === 'employees') loadEmployees();
@@ -1934,6 +1952,7 @@ function refreshView() {
   if (v === 'dashboard') loadDashboard();
   else if (v === 'attendance') initAttendance();
   else if (v === 'screenshots') loadScreenshots();
+  else if (v === 'webcam') loadWebcam();
   else if (v === 'usage') initUsage();
   else if (v === 'violations') initViolations();
   else if (v === 'employees') loadEmployees();
@@ -2445,6 +2464,49 @@ $('#ss-grid').addEventListener('click', (e) => {
 });
 $('#shot-ovl').addEventListener('click', () => $('#shot-ovl').classList.remove('open'));
 
+// ---- 2b. webcam wall (EPT25-05) ----
+let WC_SEQ = 0;
+async function initWebcam() {
+  if (!$('#wc-date').value) $('#wc-date').value = today();
+  loadWebcam();
+}
+async function loadWebcam() {
+  const seq = ++WC_SEQ;
+  const date = $('#wc-date').value || today();
+  const grid = $('#wc-grid'); const empty = $('#wc-empty');
+  grid.innerHTML = '<div class="mut">Loading…</div>'; empty.className = 'hide'; empty.innerHTML = '';
+  try {
+    const d = await api('/reports/webcam?date=' + encodeURIComponent(date));
+    if (seq !== WC_SEQ) return;
+    const shots = d.data || [];
+    if (!shots.length) {
+      grid.innerHTML = ''; empty.className = 'empty';
+      empty.innerHTML = '<b>No webcam photos for this day.</b><br>Photos appear here once the desktop agent uploads them for any employee whose webcam policy has photo capture enabled.';
+      return;
+    }
+    grid.innerHTML = shots.map((s) => '<div class="shotcard"><div class="img" id="wc-img-' + s.id + '">loading…</div>'
+      + '<div class="m"><b>' + esc(s.employee_name || '—') + '</b> · ' + dt(s.captured_at)
+      + (s.presence_status ? ' · ' + esc(s.presence_status) : '')
+      + (s.face_count ? ' · ' + s.face_count + ' face' + (s.face_count > 1 ? 's' : '') : '')
+      + ' · <span style="color:var(--ink-3)">' + esc(s.trigger_reason || '') + '</span></div></div>').join('');
+    shots.forEach(async (s) => {
+      const slot = document.getElementById('wc-img-' + s.id);
+      try {
+        const blob = await apiBlob('/webcam/' + s.id + '/file');
+        const url = URL.createObjectURL(blob);
+        if (seq !== WC_SEQ) { URL.revokeObjectURL(url); return; }
+        if (slot) slot.innerHTML = '<img class="zoomable" style="cursor:zoom-in" src="' + url + '" alt="Webcam">';
+      } catch (e) { if (slot && seq === WC_SEQ) slot.textContent = e.status === 403 ? 'no access' : 'file missing'; }
+    });
+  } catch (e) {
+    if (seq !== WC_SEQ) return;
+    grid.innerHTML = ''; empty.className = 'empty';
+    empty.innerHTML = isDenied(e) ? '<b>Your role cannot view webcam photos.</b><br>The webcam.view permission is required.' : esc(e.message);
+  }
+}
+$('#wc-load') && ($('#wc-load').onclick = loadWebcam);
+$('#wc-date') && $('#wc-date').addEventListener('change', loadWebcam);
+
 // ---- 3. usage & compliance ----
 async function initUsage() {
   if (!$('#us-date').value) $('#us-date').value = today();
@@ -2599,13 +2661,37 @@ async function openViolationEvidence(id) {
       try {
         const blob = await apiBlob('/screenshots/' + s.id + '/file');
         const url = URL.createObjectURL(blob); EV_URLS.push(url);
-        if (slot) slot.innerHTML = '<img src="' + url + '" alt="Evidence">';
+        if (slot) slot.innerHTML = '<img class="zoomable" style="cursor:zoom-in" src="' + url + '" alt="Evidence">';
       } catch (err) { if (slot) slot.textContent = err.status === 403 ? 'no access' : 'file missing'; }
     });
   } catch (e) {
     body.innerHTML = isDenied(e) ? deniedCard() : '<div class="mut">' + esc(e.message) + '</div>';
   }
 }
+
+// EPT25-06: click any evidence / screenshot thumbnail to view it full-size (zoom).
+function ensureLightbox() {
+  if (document.getElementById('img-lightbox')) return;
+  const o = document.createElement('div');
+  o.id = 'img-lightbox';
+  o.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;cursor:zoom-out;padding:24px';
+  o.innerHTML = '<img alt="Zoomed evidence" style="max-width:96vw;max-height:96vh;border-radius:6px;box-shadow:0 10px 50px rgba(0,0,0,.6)">';
+  o.addEventListener('click', () => { o.style.display = 'none'; o.querySelector('img').src = ''; });
+  document.body.appendChild(o);
+}
+document.addEventListener('click', (e) => {
+  const img = e.target.closest && e.target.closest('img.zoomable');
+  if (!img || !img.src) return;
+  ensureLightbox();
+  const lb = document.getElementById('img-lightbox');
+  lb.querySelector('img').src = img.src;
+  lb.style.display = 'flex';
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const lb = document.getElementById('img-lightbox');
+  if (lb && lb.style.display === 'flex') { lb.style.display = 'none'; lb.querySelector('img').src = ''; }
+});
 
 // ---- 5. employees ----
 let EMP_EDIT_ID = null, EMP_DEV_COUNTS = null, EMP_SEARCH_TIMER = null;
@@ -4111,7 +4197,33 @@ function initMeetings() {
   loadMeetings();
 }
 
-const MTG_STATUS_TAG = { SCHEDULED: 't-warn', IN_PROGRESS: 't-ok', COMPLETED: 't-off', CANCELLED: 't-danger' };
+// EPT25-12: admin-console Join popup — poll for meetings live now that this user
+// organises or participates in, and prompt them to open/join.
+let MTG_JOIN_SEEN = new Set();
+async function pollJoinable() {
+  try {
+    if (typeof can === 'function' && !can('meeting.view')) return;
+    const d = await api('/meetings/joinable-now');
+    (d.data || []).forEach((m) => {
+      if (MTG_JOIN_SEEN.has(m.id)) return;
+      MTG_JOIN_SEEN.add(m.id);
+      showJoinPopup(m);
+    });
+  } catch (e) { /* silent — popup is best-effort */ }
+}
+function showJoinPopup(m) {
+  const w = document.createElement('div');
+  w.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:99998;background:var(--card,#fff);color:var(--ink,#1f2a2e);border:1px solid var(--line,#dde6e8);border-left:4px solid var(--accent,#0E7C8F);border-radius:10px;box-shadow:0 8px 30px rgba(20,50,60,.18);padding:14px 16px;max-width:330px;font-size:13px';
+  w.innerHTML = '<div style="font-weight:700;margin-bottom:3px">Meeting in progress</div>'
+    + '<div style="margin-bottom:9px">' + esc(m.title) + (m.is_organizer ? ' <span class="tag t-info">You organise this</span>' : ' <span class="tag t-ok">You are invited</span>') + '</div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-jp-x>Dismiss</button><button class="btn acc" data-jp-go>Join / Open</button></div>';
+  w.querySelector('[data-jp-x]').onclick = () => w.remove();
+  w.querySelector('[data-jp-go]').onclick = () => { w.remove(); if (typeof show === 'function') show('meetings'); };
+  document.body.appendChild(w);
+  setTimeout(() => { if (w.isConnected) w.remove(); }, 90000);
+}
+
+const MTG_STATUS_TAG = { SCHEDULED: 't-warn', IN_PROGRESS: 't-ok', COMPLETED: 't-off', CANCELLED: 't-danger', NO_SHOW: 't-danger', AUTO_CLOSED: 't-off' };
 async function loadMeetings() {
   const qs = new URLSearchParams();
   if ($('#mtg-filter-status').value) qs.set('status', $('#mtg-filter-status').value);
@@ -4123,19 +4235,21 @@ async function loadMeetings() {
       + '<td><span class="nm">' + esc(m.title) + '</span>' + (m.purpose ? '<div class="mut" style="font-size:11px">' + esc(m.purpose.slice(0, 60)) + '</div>' : '') + '</td>'
       + '<td>' + esc(m.meeting_date || '—') + '</td>'
       + '<td>' + (m.start_at ? dt(m.start_at) : '—') + (m.end_at ? ' – ' + new Date(m.end_at.replace(' ', 'T')).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '') + '</td>'
+      + '<td>' + esc(m.organizer || '—') + '</td>'
       + '<td>' + (m.participant_count ?? 0) + '</td>'
+      + '<td>' + (m.actual_end_at ? dt(m.actual_end_at) : '—') + '</td>'
       + '<td><span class="tag ' + (MTG_STATUS_TAG[m.status] || 't-off') + '">' + esc((m.status || '').replace('_', ' ')) + '</span></td>'
       + '<td style="text-align:right;white-space:nowrap">'
       + (can('meeting.reports') ? '<button class="btn" data-mtg-part="' + m.id + '">Participation</button> ' : '')
       + ((m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS')
           ? ((can('meeting.edit') ? '<button class="btn" data-mtg-edit="' + m.id + '">Edit</button> ' : '')
-             + (m.is_organizer ? '<button class="btn danger" data-mtg-end="' + m.id + '">End now</button> ' : '')
+             + (m.can_end ? '<button class="btn danger" data-mtg-end="' + m.id + '">End now</button> ' : '')
              + (can('meeting.cancel') ? '<button class="btn danger" data-mtg-cancel="' + m.id + '">Cancel</button>' : ''))
           : '')
       + '</td></tr>').join('')
-      || '<tr><td colspan="6" class="mut">No meetings yet. Press "Schedule meeting" to create one.</td></tr>';
+      || '<tr><td colspan="8" class="mut">No meetings yet. Press "Schedule meeting" to create one.</td></tr>';
   } catch (e) {
-    $('#mtg-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="6" class="mut">' + esc(e.message) + '</td></tr>';
+    $('#mtg-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="8" class="mut">' + esc(e.message) + '</td></tr>';
   }
 }
 

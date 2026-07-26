@@ -52,6 +52,40 @@ class MeetingController extends Controller
         return response()->json(['data' => $meetings]);
     }
 
+    /**
+     * GET /api/meetings/joinable-now — meetings that are live RIGHT NOW for the calling
+     * console user: ones they organise, or whose participant list includes their linked
+     * employee. Drives the admin-console Join popup (EPT25-12). The agent has its own
+     * employee-side Join; this covers organisers/admins who run meetings from the console.
+     */
+    public function joinableNow(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $employeeId = $user->employee?->id;
+
+        $meetings = Meeting::query()
+            ->whereIn('status', ['SCHEDULED', 'IN_PROGRESS'])
+            ->where('start_at', '<=', now())
+            ->where(function ($q) use ($user, $employeeId) {
+                $q->where('created_by_user_id', $user->id);
+                if ($employeeId) {
+                    $q->orWhereHas('participants', fn ($p) => $p->where('employee_id', $employeeId));
+                }
+            })
+            ->orderBy('start_at')
+            ->limit(20)
+            ->get()
+            ->filter(fn ($m) => $this->liveStatus($m) === 'IN_PROGRESS')
+            ->map(fn ($m) => [
+                'id'           => $m->id,
+                'title'        => $m->title,
+                'start_at'     => $m->start_at?->toDateTimeString(),
+                'is_organizer' => $m->created_by_user_id === $user->id,
+            ])->values();
+
+        return response()->json(['data' => $meetings]);
+    }
+
     /** GET /api/meetings/{meeting} — full detail incl. participant employee ids. */
     public function show(Request $request, Meeting $meeting): JsonResponse
     {

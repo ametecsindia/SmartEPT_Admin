@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\PolicyController;
 use App\Http\Controllers\Api\PresenceController;
 use App\Http\Controllers\Api\ProvisionController;
 use App\Http\Controllers\Api\ScreenshotController;
+use App\Http\Controllers\Api\WebcamController;
 use App\Http\Controllers\Api\SyncController;
 use App\Http\Controllers\Api\UsageController;
 use App\Http\Controllers\Api\UserController;
@@ -184,6 +185,13 @@ Route::middleware(['auth:sanctum', 'company.active'])->group(function () {
     Route::get('screenshots/{screenshot}/file', [ScreenshotController::class, 'file'])
         ->middleware('permission:screenshot.view')
         ->name('screenshots.file');
+
+    // ---- EPT25-05: webcam photo viewer (company-day wall + protected file) ----
+    Route::get('reports/webcam', [WebcamController::class, 'companyDay'])
+        ->middleware('permission:webcam.view');
+    Route::get('webcam/{webcam}/file', [WebcamController::class, 'file'])
+        ->middleware('permission:webcam.view')
+        ->name('webcam.file');
     Route::get('reports/employee/{employee}/presence', [PresenceController::class, 'timeline'])
         ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,MANAGER,TEAM_LEADER,COMPLIANCE_OFFICER,AUDITOR');
 
@@ -254,6 +262,7 @@ Route::middleware(['auth:sanctum', 'company.active'])->group(function () {
     // binding 404s a cross-tenant id); the permission decides WHICH action a role may take.
     Route::get('meetings', [MeetingController::class, 'index'])->middleware('permission:meeting.view');
     Route::post('meetings', [MeetingController::class, 'store'])->middleware('permission:meeting.schedule');
+    Route::get('meetings/joinable-now', [MeetingController::class, 'joinableNow'])->middleware('permission:meeting.view'); // EPT25-12 (before {meeting} binding)
     Route::get('meetings/{meeting}', [MeetingController::class, 'show'])->middleware('permission:meeting.view');
     Route::put('meetings/{meeting}', [MeetingController::class, 'update'])->middleware('permission:meeting.edit');
     Route::post('meetings/{meeting}/cancel', [MeetingController::class, 'cancel'])->middleware('permission:meeting.cancel');
