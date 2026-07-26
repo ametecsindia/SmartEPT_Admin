@@ -2586,7 +2586,7 @@ async function openViolationEvidence(id) {
       + ' · ' + dt(v.occurred_at) + '</span></div>';
     if (!d.available) {
       body.innerHTML = head + '<div class="never" style="border-left-color:var(--warn);background:var(--warn-w)">'
-        + '<b style="color:var(--warn)">' + (d.reason === 'EXPIRED' ? 'Evidence no longer available' : 'No screenshot for this violation') + '</b>'
+        + '<b style="color:var(--warn)">' + (d.reason === 'EXPIRED' ? 'Evidence no longer available' : d.reason === 'CAPTURE_FAILED' ? 'Screenshot not stored' : 'No screenshot for this violation') + '</b>'
         + esc(d.message || '') + '</div>';
       return;
     }
@@ -2666,7 +2666,7 @@ async function downloadArchive(id, label) {
     a.download = (label || ('archive-' + id)) + '.zip';
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  } catch (e) { alert((e && e.message) || 'Could not download the backup.'); }
+  } catch (e) { alert(e && e.status === 404 ? 'The backup is still being prepared or could not be found. Make sure the background scheduler is running, then try again.' : ((e && e.message) || 'Could not download the backup.')); }
 }
 async function loadArchives() {
   const tb = $('#arch-rows'); if (!tb) return;

@@ -230,14 +230,21 @@ class EmployeeController extends Controller
         abort_unless($archive->file_status === 'READY' && $archive->storage_key, 404,
             'The backup file is not ready yet — it is still being prepared.');
 
-        $disk = Storage::disk($archive->storage_driver ?: 'local');
-        abort_unless($disk->exists($archive->storage_key), 404, 'The backup file could not be found.');
-
         $this->audit($request, 'EXPORT', EmployeeArchive::class, $archive->id, ['label' => $archive->archive_label]);
 
         $safe = preg_replace('/[^A-Za-z0-9._-]+/', '_', $archive->archive_label);
 
-        return $disk->download($archive->storage_key, $safe . '.zip');
+        $disk = Storage::disk($archive->storage_driver ?: 'local');
+        if ($disk->exists($archive->storage_key)) {
+            return $disk->download($archive->storage_key, $safe . '.zip');
+        }
+
+        // Legacy fallback: archives built before the disk-root fix (EPT25-02) were written
+        // under storage/app/... instead of the 'local' disk root. Serve those directly.
+        $legacy = storage_path('app/' . $archive->storage_key);
+        abort_unless(is_file($legacy), 404, 'The backup file could not be found — it may still be preparing, or the background scheduler is not running.');
+
+        return response()->download($legacy, $safe . '.zip');
     }
 
     private function validated(Request $request, bool $creating, ?Employee $employee = null): array

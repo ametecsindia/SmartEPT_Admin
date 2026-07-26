@@ -131,11 +131,23 @@ class ComplianceController extends Controller
         ];
 
         if ($available->isEmpty()) {
-            // Agent said a shot was taken but none survive → retention purged it.
-            $reason = $ev->screenshot_captured ? 'EXPIRED' : 'NO_EVIDENCE';
-            $message = $ev->screenshot_captured
-                ? 'The screenshot for this violation is no longer available — it was removed by the data-retention policy.'
-                : 'No screenshot was captured for this violation.';
+            // EPT25-04: distinguish the three real causes instead of always blaming retention.
+            if ($shots->isNotEmpty()) {
+                // Rows exist but none has a stored file → the shot was captured on the device
+                // yet never reached server storage (an upload/storage error), NOT a purge.
+                $reason  = 'CAPTURE_FAILED';
+                $message = 'A screenshot was captured on the employee\'s device for this '
+                    . 'violation but was never stored on the server — an upload or storage '
+                    . 'error, not a data-retention purge. Open Help → Troubleshooting → '
+                    . 'Screenshot evidence to see which device(s) are affected.';
+            } elseif ($ev->screenshot_captured) {
+                // No screenshot rows survive at all → genuinely purged by data retention.
+                $reason  = 'EXPIRED';
+                $message = 'The screenshot for this violation is no longer available — it was removed by the data-retention policy.';
+            } else {
+                $reason  = 'NO_EVIDENCE';
+                $message = 'No screenshot was captured for this violation.';
+            }
 
             return response()->json(['data' => [
                 'violation' => $violation, 'available' => false, 'reason' => $reason, 'message' => $message, 'evidence' => [],

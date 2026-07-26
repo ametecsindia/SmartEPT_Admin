@@ -79,7 +79,10 @@ class BuildEmployeeArchives extends Command
             $employeeId = $archive->employee_id;
             $safe = preg_replace('/[^A-Za-z0-9._-]+/', '_', $archive->archive_label);
             $key  = 'archives/' . $archive->company_id . '/' . $archive->id . '_' . $safe . '.zip';
-            $abs  = storage_path('app/' . $key);
+            // Write through the same disk the download reads from. Laravel 11's 'local'
+            // disk root is storage/app/private, so storage_path('app/...') would land the
+            // file where the download can't find it (EPT25-02).
+            $abs  = \Illuminate\Support\Facades\Storage::disk('local')->path($key);
             @mkdir(dirname($abs), 0775, true);
             @mkdir($tmpDir, 0775, true);
 

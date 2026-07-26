@@ -73,11 +73,15 @@ class ExportController extends Controller
     public function compliance(Request $request): StreamedResponse
     {
         $from = $request->query('from', now()->toDateString());
-        $to = $request->query('to', now()->addDay()->toDateString());
+        $to = $request->query('to', now()->toDateString());
         $this->audit($request, 'EXPORT', EmployeeComplianceEvent::class, null, compact('from', 'to'));
 
+        // started_at is a DATETIME — a bare 'YYYY-MM-DD' upper bound is 00:00:00 and would
+        // drop every same-day event (EPT25-03: the CSV came back with only a header). Use
+        // inclusive whole-day boundaries so from=to=today returns that day's violations.
         $rows = EmployeeComplianceEvent::with('employee:id,employee_code,first_name,last_name')
-            ->whereBetween('started_at', [$from, $to])->orderBy('started_at')->get();
+            ->whereBetween('started_at', [$from . ' 00:00:00', $to . ' 23:59:59'])
+            ->orderBy('started_at')->get();
 
         return $this->stream('compliance.csv',
             ['Employee Code', 'Name', 'Time', 'Category', 'Type', 'Severity', 'Detected', 'Action'],
