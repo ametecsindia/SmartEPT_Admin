@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartEPT — 25-Jul Delivery Report</title>
+<style>
+  :root{
+    --teal:#0E7C8F;--teal-dk:#0a5c6a;--teal-lt:#e6f2f4;--ink:#1f2a2e;--muted:#5b6a70;
+    --line:#dde6e8;--bg:#f6f9fa;--ok:#2e7d32;--okbg:#e9f5ea;--warn:#b9770e;--warnbg:#fcf3e3;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:960px;margin:0 auto;padding:0 22px 80px}
+  header{background:linear-gradient(135deg,var(--teal),var(--teal-dk));color:#fff;padding:38px 22px 30px}
+  header .inner{max-width:960px;margin:0 auto}
+  .brand{font-size:13px;letter-spacing:.18em;text-transform:uppercase;opacity:.85;font-weight:600}
+  h1{margin:.35em 0 .15em;font-size:27px}
+  header .sub{opacity:.92}
+  .meta{margin-top:14px;font-size:13px;opacity:.9}
+  h2{font-size:20px;margin:36px 0 8px;padding-bottom:8px;border-bottom:2px solid var(--teal);color:var(--teal-dk)}
+  h3{font-size:15px;margin:22px 0 4px}
+  p{margin:.5em 0}
+  .lead{background:#fff;border:1px solid var(--line);border-left:4px solid var(--ok);border-radius:8px;padding:16px 18px;margin:22px 0}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;text-align:center}
+  .stat .n{font-size:26px;font-weight:700;color:var(--teal-dk);line-height:1}
+  .stat .l{font-size:11px;color:var(--muted);margin-top:5px;text-transform:uppercase;letter-spacing:.04em}
+  .item{background:#fff;border:1px solid var(--line);border-radius:10px;padding:15px 17px;margin:13px 0;box-shadow:0 1px 2px rgba(20,50,60,.04)}
+  .item .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+  .id{font-weight:700;color:var(--teal-dk);font-size:13.5px}
+  .ttl{font-weight:600;flex:1;min-width:200px}
+  .tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;background:var(--okbg);color:var(--ok)}
+  .tag.fix{background:#fbeae8;color:#c0392b}.tag.enh{background:var(--teal-lt);color:var(--teal-dk)}
+  .row2{font-size:13.5px;margin:4px 0}
+  .row2 b{color:var(--muted);font-weight:600;display:inline-block;min-width:74px;vertical-align:top}
+  code{background:#eef3f4;padding:1px 5px;border-radius:4px;font-size:12.5px}
+  .steps{background:var(--warnbg);border:1px solid #eaddbd;border-left:4px solid var(--warn);border-radius:8px;padding:8px 20px 16px;margin:16px 0}
+  .steps b{color:var(--warn)}
+  ol li,ul li{margin:6px 0}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px;background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  th,td{padding:8px 11px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--teal-lt);color:var(--teal-dk);font-weight:600;font-size:11.5px;text-transform:uppercase}
+  tr:last-child td{border-bottom:none}
+  .foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);text-align:center}
+</style>
+</head>
+<body>
+<header><div class="inner">
+  <div class="brand">Ametecs · SmartEPT</div>
+  <h1>Delivery Report — 25-Jul Fixes &amp; Enhancements</h1>
+  <div class="sub">Admin EPT punch list · 12 items built, verified &amp; committed to live</div>
+  <div class="meta">Delivered 26 Jul 2026 · Live product <code>main</code> → <code>c05242d</code> · No agent rebuild needed</div>
+</div></header>
+<div class="wrap">
+
+  <div class="lead">
+    <b>All 12 items are built and committed to the live tree.</b> Everything landed server- and console-side —
+    <b>no agent rebuild is required this round</b>. What's left for you is the owner run-steps below (mainly one
+    migration + a hard-refresh) and a short click-through. Every PHP file passed <code>php -l</code> and the
+    console script passed a JS syntax check; the runtime click-through and <code>php artisan test</code> are yours to run.
+  </div>
+
+  <div class="grid">
+    <div class="stat"><div class="n">12</div><div class="l">Items done</div></div>
+    <div class="stat"><div class="n">4</div><div class="l">Commits</div></div>
+    <div class="stat"><div class="n">1</div><div class="l">New migration</div></div>
+    <div class="stat"><div class="n">0</div><div class="l">Agent rebuilds</div></div>
+  </div>
+
+  <div class="steps">
+    <h3 style="color:var(--warn);margin-top:14px">⚙ Owner run-steps (required to see the fixes)</h3>
+    <ol>
+      <li><b>Run migrations</b> — <code>migrate.bat</code> (or <code>php artisan migrate</code>). New migration
+        <code>2026_07_26_000100</code> adds <code>meetings.actual_end_at</code> + <code>ended_by_user_id</code> and
+        widens the status set (adds <b>NO_SHOW</b>, <b>AUTO_CLOSED</b>). Also confirm the 24-Jul migrations
+        <b>000900</b> + <b>001000</b> are applied.</li>
+      <li><b>Restart PHP / clear OPcache</b>, then <b>hard-refresh</b> the console (Ctrl+Shift+R) — new Webcam tab,
+        meeting columns, End button, zoom, and the Join popup all live in the console.</li>
+      <li><b>Confirm the Task Scheduler runs <code>php artisan schedule:run</code> every minute</b> and the PHP
+        <code>zip</code> extension is on — these drive the meeting long-stop auto-close and the employee-archive ZIP builds.</li>
+      <li><b>For late minutes (EPT25-01):</b> make sure each employee has a <b>shift with a start time</b>, and that the
+        Attendance policy holding your 10-min "Late grace" is <b>assigned</b> (Policy tab → assign to Company/Branch).
+        Late can only be computed against a shift start.</li>
+    </ol>
+  </div>
+
+  <h2>Bugs fixed</h2>
+
+  <div class="item">
+    <div class="top"><span class="id">EPT25-09</span><span class="ttl">Roles → permission matrix now saves</span><span class="tag">Fixed</span><span class="tag fix">P1</span></div>
+    <div class="row2"><b>Root cause</b> The Save handler ran <code>$$(…).filter().map()</code>, but <code>$$</code> returns a <b>NodeList</b> (no <code>.filter</code>/<code>.map</code>) — it threw before the try/catch, so the save died silently with no error.</div>
+    <div class="row2"><b>Fix</b> Wrapped in <code>Array.from(...)</code>. The matrix now persists for every role (system + custom). <code>302fec8</code></div>
+  </div>
+
+  <div class="item">
+    <div class="top"><span class="id">EPT25-08</span><span class="ttl">Meetings no longer auto-complete at scheduled end</span><span class="tag">Fixed</span><span class="tag fix">P1</span></div>
+    <div class="row2"><b>Root cause</b> <code>CloseMeetings</code> flipped meetings to COMPLETED at the scheduled end, so overrunning meetings showed wrong live status and could never be ended.</div>
+    <div class="row2"><b>Fix</b> Removed auto-complete. A meeting past its end stays <b>IN_PROGRESS (overrunning)</b> until someone Ends it; a long-stop auto-closes anything nobody ended <b>4h</b> past schedule (AUTO_CLOSED if it had attendance, NO_SHOW if nobody joined). Live status now reflects reality. <code>a56c993</code></div>
+  </div>
+
+  <div class="item">
+    <div class="top"><span class="id">EPT25-10</span><span class="ttl">"End meeting" no longer errors</span><span class="tag">Fixed</span><span class="tag fix">P1</span></div>
+    <div class="row2"><b>Root cause</b> Because the meeting was already auto-marked COMPLETED (EPT25-08), <code>end()</code> aborted with "this meeting is already over."</div>
+    <div class="row2"><b>Fix</b> With auto-complete gone, End works. It records the <b>actual end time</b> + who ended it, and closes all sessions and the live "In Meeting" state at once. End is now allowed for the <b>organizer + company/branch admin + super-admin + HR admin</b> (per your decision). <code>a56c993</code></div>
+  </div>
+
+  <div class="item">
+    <div class="top"><span class="id">EPT25-01</span><span class="ttl">Late minutes honour the Policy-tab grace</span><span class="tag">Fixed</span><span class="tag fix">P1</span></div>
+    <div class="row2"><b>Root cause</b> The Policy-tab "Late grace (min)" was saved but <b>never read</b> — the late calc used the shift's grace only, so your 10-min setting had no effect.</div>
+    <div class="row2"><b>Fix</b> The derivation now resolves the effective Attendance policy and uses its <code>late_grace_minutes</code>, falling back to shift grace when none is assigned. (Needs a shift start time to compute — see run-steps.) <code>302fec8</code></div>
+  </div>
+
+  <div class="item">
+    <div class="top"><span class="id">EPT25-02</span><span class="ttl">Employee-archive ZIP download works</span><span class="tag">Fixed</span><span class="tag fix">P2</span></div>
+    <div class="row2"><b>Root cause</b> A Laravel 11 change moved the <code>local</code> disk root to <code>storage/app/private</code>, but the ZIP was written to <code>storage/app/archives</code>. So the row went READY yet the download looked in the wrong place → "file could not be found."</div>
+    <div class="row2"><b>Fix</b> The build now writes through the disk, and download has a legacy fallback so archives built before the fix still download. Clearer error if a build genuinely isn't ready. <code>2ec0087</code></div>
+  </div>
+
+  <div class="item">
+    <div class="top"><span class="id">EPT25-03</span><span class="ttl">Violations "Export CSV" returns rows</span><span class="tag">Fixed</span><span class="tag fix">P2</span></div>
+    <div class="row2"><b>Root cause</b> The export ran <code>whereBetween('started_at',[today,today])</code> on a <b>datetime</b> column — a bare date upper bound is 00:00:00, so every same-day event was excluded and the file came back header-only.</div>
+    <div class="row2"><b>Fix</b> Inclusive whole-day boundaries (<code>00:00:00 … 23:59:59</code>). Same-day exports now contain that day's violations. <code>2ec0087</code></div>
+  </div>
+
+  <div class="item">
+    <div class="top"><span class="id">EPT25-11</span><span class="ttl">Organizer no longer shown "Absent"</span><span class="tag">Fixed</span><span class="tag fix">P2</span></div>
+    <div class="row2"><b>Root cause</b> The organizer runs the meeting from the console (no agent join), so the participation report had no session for them and marked them Absent.</div>
+    <div class="row2"><b>Fix</b> The report now recognises the organizer (via their linked employee) and shows them as <b>ORGANIZER</b> (present) rather than Absent. <code>a56c993</code></div>
+  </div>
+
+  <div class="item">
+    <div class="top"><span class="id">EPT25-04</span><span class="ttl">Honest evidence message (capture-failed vs purged)</span><span class="tag">Fixed</span><span class="tag fix">P2</span></div>
+    <div class="row2"><b>Root cause</b> Any missing screenshot was blamed on "data-retention policy," even when the real cause was an upload/storage failure on the device (captured but never stored).</div>
+    <div class="row2"><b>Fix</b> Three distinct cases now — <b>Screenshot not stored</b> (capture failed on device, points to Troubleshooting), <b>Evidence no longer available</b> (genuinely purged by retention), and <b>No screenshot captured</b>. <code>2ec0087</code></div>
+  </div>
+
+  <h2>Enhancements added</h2>
+
+  <div class="item">
+    <div class="top"><span class="id">EPT25-07</span><span class="ttl">Meeting table: Organizer, Actual End, richer status</span><span class="tag">Done</span><span class="tag enh">Enh</span></div>
+    <div class="row2"><b>Added</b> New <b>Organizer</b> and <b>Actual End</b> columns; status now shows Completed / Cancelled / No-show / Auto-closed, plus an End button visible to admins (not just the organizer). <code>a56c993</code> + <code>c05242d</code></div>
+  </div>
+
+  <div class="item">
+    <div class="top"><span class="id">EPT25-06</span><span class="ttl">Click evidence image to zoom</span><span class="tag">Done</span><span class="tag enh">Enh</span></div>
+    <div class="row2"><b>Added</b> A full-screen lightbox — click any evidence (or webcam) thumbnail to view it full-size; click / Esc to close. <code>c05242d</code></div>
+  </div>
+
+  <div class="item">
+    <div class="top"><span class="id">EPT25-05</span><span class="ttl">Webcam photo viewer</span><span class="tag">Done</span><span class="tag enh">Enh</span></div>
+    <div class="row2"><b>Added</b> A new <b>Webcam</b> tab (a company-day photo wall like Screenshots), gated by the existing <code>webcam.view</code> permission, with a protected + audit-logged file route and click-to-zoom. <code>c05242d</code></div>
+  </div>
+
+  <div class="item">
+    <div class="top"><span class="id">EPT25-12</span><span class="ttl">"Join" popup in the admin console</span><span class="tag">Done</span><span class="tag enh">Enh</span></div>
+    <div class="row2"><b>Added</b> The console polls for meetings live now that you organise or are invited to, and shows a dismissible Join / Open prompt (bottom-right). Complements the agent-side employee Join. <code>c05242d</code></div>
+  </div>
+
+  <h2>Decisions applied (from your answers)</h2>
+  <table>
+    <tr><th>Decision</th><th>Applied as</th></tr>
+    <tr><td>Meeting long-stop</td><td>No auto-complete at scheduled end; auto-close <b>4h</b> after schedule, marked <b>Auto-closed</b>.</td></tr>
+    <tr><td>Who can End</td><td>Organizer + Company/Branch admin + Super-admin + HR admin.</td></tr>
+    <tr><td>Cancelled vs No-show</td><td><b>Cancelled</b> = manual cancel before start only; a meeting that started with zero joins → <b>No-show</b>.</td></tr>
+    <tr><td>Scope</td><td>All 12 items this round.</td></tr>
+  </table>
+
+  <h2>Suggested click-through when you're back</h2>
+  <ul>
+    <li>Roles → toggle a Manager permission, Save, reload — it sticks now.</li>
+    <li>Let a meeting run past its end → it stays In progress; press <b>End now</b> as an admin → it completes, live board clears, Actual End shows.</li>
+    <li>Violations → Export CSV → rows present. Open an evidence with a missing shot → correct message.</li>
+    <li>Open the new <b>Webcam</b> tab; click a photo to zoom.</li>
+    <li>Pull a meeting participation report where you were the organizer → shows Organizer, not Absent.</li>
+    <li>Delete a test employee, wait for the scheduler, download the archive ZIP.</li>
+  </ul>
+
+  <div class="foot">
+    SmartEPT — Employee Productivity Tracking &amp; Intelligence · Ametecs · Live <code>main</code> a56c993 · 302fec8 · 2ec0087 · c05242d · 26 Jul 2026
+  </div>
+</div>
+</body>
+</html>
