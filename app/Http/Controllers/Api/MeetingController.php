@@ -23,6 +23,7 @@ class MeetingController extends Controller
     {
         $meetings = Meeting::query()
             ->withCount('participants')
+            ->with('creator:id,name')
             ->when($request->status, fn ($q, $v) => $q->where('status', $v))
             ->when($request->from, fn ($q, $v) => $q->whereDate('start_at', '>=', $v))
             ->when($request->to, fn ($q, $v) => $q->whereDate('start_at', '<=', $v))
@@ -40,7 +41,10 @@ class MeetingController extends Controller
                 'participant_count' => $m->participants_count,
                 'notes'             => $m->notes,
                 'created_by'        => $m->creator?->name,
+                'organizer'         => $m->creator?->name,
+                'actual_end_at'     => $m->actual_end_at?->toDateTimeString(),
                 'is_organizer'      => optional($request->user())->id === $m->created_by_user_id,
+                'can_end'           => $this->canEnd($request->user(), $m),
                 'reminder_minutes'  => $m->reminder_minutes,
                 'created_at'        => $m->created_at?->toDateTimeString(),
             ]);
@@ -147,15 +151,18 @@ class MeetingController extends Controller
      */
     public function end(Request $request, Meeting $meeting): JsonResponse
     {
-        abort_unless($meeting->created_by_user_id === $request->user()->id, 403,
-            'Only the meeting organiser can end this meeting.');
-        abort_if(in_array($meeting->status, ['CANCELLED', 'COMPLETED'], true), 422,
+        $user = $request->user();
+        abort_unless($this->canEnd($user, $meeting), 403,
+            'Only the meeting organiser or an admin can end this meeting.');
+        abort_if(in_array($meeting->status, ['CANCELLED', 'COMPLETED', 'NO_SHOW', 'AUTO_CLOSED'], true), 422,
             'This meeting is already over.');
 
         $now = now();
+        // Keep the scheduled end_at as the record; actual_end_at is the truth (EPT25-08).
         $meeting->update([
-            'end_at' => ($meeting->end_at && $meeting->end_at->lessThan($now)) ? $meeting->end_at : $now,
-            'status' => 'COMPLETED',
+            'actual_end_at'    => $now,
+            'ended_by_user_id' => $user->id,
+            'status'           => 'COMPLETED',
         ]);
         $this->closeOpenSessions($meeting, $now);
 
@@ -178,21 +185,26 @@ class MeetingController extends Controller
     /** GET /api/meetings/{meeting}/participation — scheduled vs actual per participant. */
     public function participation(Request $request, Meeting $meeting): JsonResponse
     {
-        $meeting->load('participants.employee:id,employee_code,first_name,last_name');
+        $meeting->load(['participants.employee:id,employee_code,first_name,last_name', 'creator.employee:id,user_id']);
+        $organizerEmployeeId = $meeting->creator?->employee?->id;
 
         $sessions = EmployeeMeetingSession::where('meeting_id', $meeting->id)
             ->get()
             ->groupBy('employee_id');
 
-        $rows = $meeting->participants->map(function ($p) use ($sessions, $meeting) {
+        $rows = $meeting->participants->map(function ($p) use ($sessions, $meeting, $organizerEmployeeId) {
             $mine = $sessions->get($p->employee_id) ?? collect();
             $total = (int) $mine->sum('duration_seconds');
             $firstIn = $mine->min('actual_start_at');
             $lastOut = $mine->max('actual_end_at');
 
             $attended = $mine->isNotEmpty();
+            // EPT25-11: the organiser runs the meeting from the admin console (no agent
+            // session) — never mark them Absent; they are present as the organiser.
+            $isOrganizer = $organizerEmployeeId !== null && $p->employee_id === $organizerEmployeeId;
             $status = $attended ? 'ATTENDED'
-                : ($meeting->end_at->isPast() ? 'ABSENT' : 'PENDING');
+                : ($isOrganizer ? 'ORGANIZER'
+                    : ($meeting->end_at->isPast() ? 'ABSENT' : 'PENDING'));
 
             return [
                 'employee_id'    => $p->employee_id,
@@ -216,6 +228,7 @@ class MeetingController extends Controller
     public function report(Request $request): JsonResponse
     {
         $meetings = Meeting::withCount('participants')
+            ->with('creator:id,name')
             ->when($request->from, fn ($q, $v) => $q->whereDate('start_at', '>=', $v))
             ->when($request->to, fn ($q, $v) => $q->whereDate('start_at', '<=', $v))
             ->when($request->status, fn ($q, $v) => $q->where('status', $v))
@@ -233,6 +246,8 @@ class MeetingController extends Controller
             'date'              => $m->meeting_date?->toDateString(),
             'start_at'          => $m->start_at?->toDateTimeString(),
             'end_at'            => $m->end_at?->toDateTimeString(),
+            'actual_end_at'     => $m->actual_end_at?->toDateTimeString(),
+            'organizer'         => $m->creator?->name,
             'status'            => $this->liveStatus($m),
             'participants'      => $m->participants_count,
             'attended'          => (int) ($sessions[$m->id]->attended ?? 0),
@@ -292,17 +307,27 @@ class MeetingController extends Controller
     /** Derived live status (SCHEDULED → IN_PROGRESS → COMPLETED) unless CANCELLED. */
     private function liveStatus(Meeting $meeting): string
     {
-        if ($meeting->status === 'CANCELLED') {
-            return 'CANCELLED';
+        // Terminal statuses are authoritative (set by end() / cancel() / long-stop).
+        // EPT25-08: passing the scheduled end alone does NOT complete a meeting — it
+        // stays IN_PROGRESS (overrunning) until someone actually ends it.
+        if (in_array($meeting->status, ['CANCELLED', 'COMPLETED', 'NO_SHOW', 'AUTO_CLOSED'], true)) {
+            return $meeting->status;
         }
-        $now = now();
-        if ($meeting->end_at->lte($now)) {
-            return 'COMPLETED';
-        }
-        if ($meeting->start_at->lte($now)) {
+        if ($meeting->start_at && $meeting->start_at->lte(now())) {
             return 'IN_PROGRESS';
         }
 
         return 'SCHEDULED';
+    }
+
+    /** EPT25-08: the organiser OR a company/branch/HR/super admin may End a meeting. */
+    private function canEnd($user, Meeting $meeting): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        return $meeting->created_by_user_id === $user->id
+            || $user->hasRole('SUPER_ADMIN', 'COMPANY_ADMIN', 'BRANCH_ADMIN', 'HR_ADMIN');
     }
 }

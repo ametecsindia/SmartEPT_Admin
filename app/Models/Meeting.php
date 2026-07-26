@@ -12,14 +12,16 @@ class Meeting extends Model
     protected $guarded = ['id'];
 
     protected $casts = [
-        'meeting_date' => 'date',
-        'start_at'     => 'datetime',
-        'end_at'       => 'datetime',
+        'meeting_date'  => 'date',
+        'start_at'      => 'datetime',
+        'end_at'        => 'datetime',
+        'actual_end_at' => 'datetime',
     ];
 
     public function participants() { return $this->hasMany(MeetingParticipant::class); }
     public function sessions() { return $this->hasMany(EmployeeMeetingSession::class); }
     public function creator() { return $this->belongsTo(User::class, 'created_by_user_id'); }
+    public function endedBy() { return $this->belongsTo(User::class, 'ended_by_user_id'); }
 
     /**
      * Section 2: the meeting an employee may put themselves into RIGHT NOW — they are a
