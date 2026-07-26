@@ -154,6 +154,19 @@ class PolicyResolver
     /**
      * The ordered (type, id) candidates from most specific to least specific.
      */
+    /**
+     * Resolve ONE policy type for an employee to its stored attributes (or null when
+     * nothing is assigned). Used by attendance derivation to read the effective
+     * late-grace from the Attendance policy the admin set in the Policy tab (EPT25-01).
+     */
+    public function resolvePolicy(Employee $employee, string $type): ?array
+    {
+        $chain = $this->assignableChain($employee, null);
+        $assignments = $this->assignmentsFor($employee->company_id, $chain);
+
+        return $this->resolveType($type, $chain, $assignments, $employee);
+    }
+
     private function assignableChain(Employee $employee, ?EmployeeDevice $device): array
     {
         $chain = [];

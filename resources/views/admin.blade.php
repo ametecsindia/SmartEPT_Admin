@@ -3111,7 +3111,7 @@ function openRoleModal(role) {
 $('#role-add').onclick = () => openRoleModal(null);
 $('#role-x').onclick = $('#role-cancel').onclick = () => $('#role-ovl').classList.remove('open');
 $('#role-save').onclick = async () => {
-  const permIds = $$('#role-matrix [data-perm]').filter((c) => c.checked).map((c) => Number(c.dataset.perm));
+  const permIds = Array.from($$('#role-matrix [data-perm]')).filter((c) => c.checked).map((c) => Number(c.dataset.perm));
   try {
     let id = ROLE_EDIT ? ROLE_EDIT.id : null;
     if (!ROLE_EDIT) {

@@ -29,7 +29,7 @@ use Illuminate\Support\Collection;
  */
 class AttendanceDerivation
 {
-    public function __construct(private GateService $gate) {}
+    public function __construct(private GateService $gate, private PolicyResolver $policies) {}
 
     /**
      * Recompute the derived summary for one employee/day from raw punches + the
@@ -181,7 +181,23 @@ class AttendanceDerivation
             return null;
         }
 
-        $permitted = Carbon::parse($date . ' ' . $shift->start_time)->addMinutes((int) $shift->grace_minutes);
+        // EPT25-01: honour the "Late grace (min)" the admin set on the effective
+        // Attendance policy (Policy tab). Falls back to the shift grace when no
+        // attendance policy is assigned, so existing behaviour is preserved.
+        $graceMinutes = null;
+        try {
+            $attPolicy = $this->policies->resolvePolicy($employee, 'ATTENDANCE');
+            if ($attPolicy !== null
+                && array_key_exists('late_grace_minutes', $attPolicy)
+                && $attPolicy['late_grace_minutes'] !== null) {
+                $graceMinutes = (int) $attPolicy['late_grace_minutes'];
+            }
+        } catch (\Throwable $e) {
+            $graceMinutes = null; // never let policy lookup break derivation
+        }
+        $graceMinutes ??= (int) ($shift->grace_minutes ?? 0);
+
+        $permitted = Carbon::parse($date . ' ' . $shift->start_time)->addMinutes($graceMinutes);
         $minutes = $effective->greaterThan($permitted) ? (int) $effective->diffInMinutes($permitted, true) : 0;
 
         return ['minutes' => $minutes, 'used' => $used, 'permitted' => $permitted, 'effective' => $effective];
