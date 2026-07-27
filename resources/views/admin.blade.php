@@ -1466,6 +1466,10 @@
       </div>
       <label>Remind participants before (minutes) <span class="mut" style="font-weight:400">— a Join popup appears on each member\'s agent this many minutes before start. Blank = no reminder.</span></label>
       <input id="mtg-reminder" type="number" min="0" max="1440" placeholder="e.g. 5" style="max-width:160px">
+      <label>Meeting type</label>
+      <select id="mtg-mode" onchange="mtgModeToggle()"><option value="online">Online — Google Meet / Zoom link</option><option value="offline">Offline — in person</option></select>
+      <div id="mtg-online-fields"><label>Meeting link (Google Meet / Zoom) <span class="mut" style="font-weight:400">— participants click Join to open it</span></label><input id="mtg-link" type="url" placeholder="https://meet.google.com/…  or  https://zoom.us/j/…"></div>
+      <div id="mtg-offline-fields" style="display:none"><div class="grid2"><div><label>Venue</label><input id="mtg-venue" maxlength="500" placeholder="e.g. Conference Room 2, 3rd floor"></div><div><label>Host contact</label><input id="mtg-host" maxlength="255" placeholder="e.g. Rajesh · 90000 98877"></div></div></div>
       <label>Notes (optional)</label><textarea id="mtg-notes" rows="2" maxlength="2000" style="width:100%;background:var(--card-2);border:1.5px solid var(--border-2);border-radius:9px;padding:9px 11px;color:var(--ink);font-family:inherit;font-size:13px;resize:vertical"></textarea>
       <label>Participants</label>
       <div class="row" style="gap:8px;flex-wrap:wrap">
@@ -4232,7 +4236,7 @@ async function loadMeetings() {
   try {
     const d = await api('/meetings' + (qs.toString() ? '?' + qs : ''));
     $('#mtg-rows').innerHTML = (d.data || []).map((m) => '<tr>'
-      + '<td><span class="nm">' + esc(m.title) + '</span>' + (m.purpose ? '<div class="mut" style="font-size:11px">' + esc(m.purpose.slice(0, 60)) + '</div>' : '') + '</td>'
+      + '<td><span class="nm">' + esc(m.title) + '</span>' + (m.purpose ? '<div class="mut" style="font-size:11px">' + esc(m.purpose.slice(0, 60)) + '</div>' : '') + '<div style="font-size:10px;margin-top:2px">' + (m.meeting_mode === 'offline' ? '<span class="tag t-off">OFFLINE</span> ' + (m.venue ? esc(m.venue) : '') : '<span class="tag t-info">ONLINE</span>') + '</div></td>'
       + '<td>' + esc(m.meeting_date || '—') + '</td>'
       + '<td>' + (m.start_at ? dt(m.start_at) : '—') + (m.end_at ? ' – ' + new Date(m.end_at.replace(' ', 'T')).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '') + '</td>'
       + '<td>' + esc(m.organizer || '—') + '</td>'
@@ -4240,6 +4244,7 @@ async function loadMeetings() {
       + '<td>' + (m.actual_end_at ? dt(m.actual_end_at) : '—') + '</td>'
       + '<td><span class="tag ' + (MTG_STATUS_TAG[m.status] || 't-off') + '">' + esc((m.status || '').replace('_', ' ')) + '</span></td>'
       + '<td style="text-align:right;white-space:nowrap">'
+      + (m.meeting_mode === 'online' && m.meeting_link && (m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS') ? '<a class="btn acc" href="' + encodeURI(m.meeting_link) + '" target="_blank" rel="noopener">Join</a> ' : '')
       + (can('meeting.reports') ? '<button class="btn" data-mtg-part="' + m.id + '">Participation</button> ' : '')
       + ((m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS')
           ? ((can('meeting.edit') ? '<button class="btn" data-mtg-edit="' + m.id + '">Edit</button> ' : '')
@@ -4276,6 +4281,7 @@ document.addEventListener('click', async (e) => {
 
 function mtgToLocalInput(s) { return s ? s.replace(' ', 'T').slice(0, 16) : ''; }
 
+function mtgModeToggle(){ const on = $('#mtg-mode').value === 'online'; $('#mtg-online-fields').style.display = on ? '' : 'none'; $('#mtg-offline-fields').style.display = on ? 'none' : ''; }
 async function openMeetingModal(id) {
   MTG_EDIT_ID = id;
   MTG_SEL = new Set();
@@ -4297,11 +4303,13 @@ async function openMeetingModal(id) {
       $('#mtg-end').value = mtgToLocalInput(m.end_at);
       $('#mtg-notes').value = m.notes || '';
       $('#mtg-reminder').value = (m.reminder_minutes ?? '') === null ? '' : (m.reminder_minutes ?? '');
+      $('#mtg-mode').value = m.meeting_mode || 'online'; $('#mtg-link').value = m.meeting_link || ''; $('#mtg-venue').value = m.venue || ''; $('#mtg-host').value = m.host_contact || ''; mtgModeToggle();
       (m.participant_ids || []).forEach((x) => MTG_SEL.add(Number(x)));
     } catch (e) { $('#mtg-err').textContent = e.message; }
   } else {
     $('#mtg-title').value = ''; $('#mtg-purpose').value = ''; $('#mtg-notes').value = ''; $('#mtg-reminder').value = '';
     $('#mtg-start').value = ''; $('#mtg-end').value = '';
+    $('#mtg-mode').value = 'online'; $('#mtg-link').value = ''; $('#mtg-venue').value = ''; $('#mtg-host').value = ''; mtgModeToggle();
   }
   $('#mtg-f-search').value = '';
   ['#mtg-f-branch', '#mtg-f-dept', '#mtg-f-team'].forEach((q) => { $(q).selectedIndex = 0; });
@@ -4338,12 +4346,18 @@ async function saveMeeting() {
     end_at: $('#mtg-end').value,
     notes: $('#mtg-notes').value.trim() || null,
     reminder_minutes: $('#mtg-reminder').value === '' ? null : Math.max(0, parseInt($('#mtg-reminder').value, 10) || 0),
+    meeting_mode: $('#mtg-mode').value,
+    meeting_link: $('#mtg-mode').value === 'online' ? ($('#mtg-link').value.trim() || null) : null,
+    venue: $('#mtg-mode').value === 'offline' ? ($('#mtg-venue').value.trim() || null) : null,
+    host_contact: $('#mtg-mode').value === 'offline' ? ($('#mtg-host').value.trim() || null) : null,
     participant_ids: [...MTG_SEL],
   };
   if (!body.title) { $('#mtg-err').textContent = 'Title is required.'; return; }
   if (!body.start_at || !body.end_at) { $('#mtg-err').textContent = 'Start and end time are required.'; return; }
   if (body.end_at <= body.start_at) { $('#mtg-err').textContent = 'End must be after start.'; return; }
   if (!body.participant_ids.length) { $('#mtg-err').textContent = 'Select at least one participant.'; return; }
+  if (body.meeting_mode === 'online' && !body.meeting_link) { $('#mtg-err').textContent = 'Add the meeting link for an online meeting.'; return; }
+  if (body.meeting_mode === 'offline' && !body.venue) { $('#mtg-err').textContent = 'Add the venue for an offline meeting.'; return; }
   try {
     if (MTG_EDIT_ID) await api('/meetings/' + MTG_EDIT_ID, { method: 'PUT', body: JSON.stringify(body) });
     else await api('/meetings', { method: 'POST', body: JSON.stringify(body) });

@@ -38,6 +38,10 @@ class MeetingController extends Controller
                 'start_at'          => $m->start_at?->toDateTimeString(),
                 'end_at'            => $m->end_at?->toDateTimeString(),
                 'status'            => $this->liveStatus($m),
+                'meeting_mode'      => $m->meeting_mode,
+                'meeting_link'      => $m->meeting_link,
+                'venue'             => $m->venue,
+                'host_contact'      => $m->host_contact,
                 'participant_count' => $m->participants_count,
                 'notes'             => $m->notes,
                 'created_by'        => $m->creator?->name,
@@ -80,6 +84,9 @@ class MeetingController extends Controller
                 'id'           => $m->id,
                 'title'        => $m->title,
                 'start_at'     => $m->start_at?->toDateTimeString(),
+                'meeting_mode' => $m->meeting_mode,
+                'meeting_link' => $m->meeting_link,
+                'venue'        => $m->venue,
                 'is_organizer' => $m->created_by_user_id === $user->id,
             ])->values();
 
@@ -101,6 +108,10 @@ class MeetingController extends Controller
             'status'          => $this->liveStatus($meeting),
             'notes'           => $meeting->notes,
             'reminder_minutes'=> $meeting->reminder_minutes,
+            'meeting_mode'    => $meeting->meeting_mode,
+            'meeting_link'    => $meeting->meeting_link,
+            'venue'           => $meeting->venue,
+            'host_contact'    => $meeting->host_contact,
             'participant_ids' => $meeting->participants->pluck('employee_id'),
         ]]);
     }
@@ -119,6 +130,10 @@ class MeetingController extends Controller
             'meeting_date'       => Carbon::parse($data['start_at'])->toDateString(),
             'notes'              => $data['notes'] ?? null,
             'reminder_minutes'   => $data['reminder_minutes'] ?? null,
+            'meeting_mode'       => $data['meeting_mode'] ?? 'online',
+            'meeting_link'       => $data['meeting_link'] ?? null,
+            'venue'              => $data['venue'] ?? null,
+            'host_contact'       => $data['host_contact'] ?? null,
             'status'             => 'SCHEDULED',
             'created_by_user_id' => $request->user()->id,
         ]);
@@ -154,6 +169,10 @@ class MeetingController extends Controller
             'meeting_date' => Carbon::parse($data['start_at'])->toDateString(),
             'notes'        => $data['notes'] ?? null,
             'reminder_minutes' => $data['reminder_minutes'] ?? null,
+            'meeting_mode'     => $data['meeting_mode'] ?? 'online',
+            'meeting_link'     => $data['meeting_link'] ?? null,
+            'venue'            => $data['venue'] ?? null,
+            'host_contact'     => $data['host_contact'] ?? null,
         ]);
 
         $this->syncParticipants($meeting, $companyId, $data['participant_ids']);
@@ -303,6 +322,10 @@ class MeetingController extends Controller
             'end_at'            => ['required', 'date', 'after:start_at'],
             'notes'             => ['nullable', 'string', 'max:2000'],
             'reminder_minutes'  => ['nullable', 'integer', 'min:0', 'max:1440'],
+            'meeting_mode'      => ['required', 'in:online,offline'],
+            'meeting_link'      => ['nullable', 'url', 'max:1000', 'required_if:meeting_mode,online'],
+            'venue'             => ['nullable', 'string', 'max:500', 'required_if:meeting_mode,offline'],
+            'host_contact'      => ['nullable', 'string', 'max:255'],
             'participant_ids'   => ['required', 'array', 'min:1', 'max:1000'],
             'participant_ids.*' => ['integer', Rule::exists('employees', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
         ]);
