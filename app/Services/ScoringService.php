@@ -55,9 +55,15 @@ class ScoringService
         $early = (int) ($attendance->early_logout_minutes ?? 0);
 
         $present = $active + $idle;
-        $expected = $this->expectedSeconds($employee);
+        $meeting = (int) \App\Models\EmployeeMeetingSession::where('employee_id', $employee->id)
+            ->whereDate('actual_start_at', $date)->sum('duration_seconds');
+        $allotted = self::allottedBreakSeconds($employee->shift, $present);
+        $working = self::netWorkingSeconds($present, $allotted);
 
-        $productivity = $this->productivityScore($active, $productive, $idle, $away, $nonProductive, $late, $early, $expected);
+        // Productivity (QA rule): productive working time (active + meeting) as a share of the
+        // ACTUAL working window = present time minus the allotted break (pro-rated on an early
+        // logout). Idle/violations are scored separately (compliance).
+        $productivity = $this->productivityScore($active, $meeting, $working);
         $compliance = $this->complianceScore($employee, $date);
 
         // whereDate: work_date is a date-cast column; a plain where() misses on
@@ -89,18 +95,12 @@ class ScoringService
         return $summary;
     }
 
-    private function productivityScore(int $active, int $productive, int $idle, int $away, int $nonProd, int $late, int $early, int $expected): float
+    /** Productivity % (QA rule): productive working time (active + meeting) / net working window. */
+    private function productivityScore(int $active, int $meeting, int $working): float
     {
-        $expected = max(1, $expected);
-        // Base: productive active time as a share of expected working time (active counts, productive counts double-weighted).
-        $base = min(100, (($active + $productive) / (2 * $expected)) * 100);
-        $base -= min(25, ($idle / $expected) * 25);
-        $base -= min(15, ($away / $expected) * 15);
-        $base -= min(20, ($nonProd / $expected) * 20);
-        $base -= min(10, $late / 6);
-        $base -= min(10, $early / 6);
+        $working = max(1, $working);
 
-        return round(max(0, min(100, $base)), 2);
+        return round(max(0, min(100, (($active + $meeting) / $working) * 100)), 2);
     }
 
     private function complianceScore(Employee $employee, string $date): float
@@ -122,9 +122,9 @@ class ScoringService
         return round(max(0, min(100, 100 - $penalty)), 2);
     }
 
-    private function expectedSeconds(Employee $employee): int
+    /** Scheduled shift length in seconds (default 8h when no shift is set). */
+    public static function shiftExpectedSeconds($shift): int
     {
-        $shift = $employee->shift;
         if (! $shift || ! $shift->start_time || ! $shift->end_time) {
             return 8 * 3600;
         }
@@ -133,7 +133,27 @@ class ScoringService
         if ($end->lessThanOrEqualTo($start)) {
             $end->addDay();
         }
+
         return max(3600, (int) $end->diffInSeconds($start, true));
+    }
+
+    /** Allotted break for the day: the shift's break_minutes_allowed (fallback: 1 hour per 9-hour
+     *  shift), PRO-RATED to how much of the scheduled shift the employee was actually present. */
+    public static function allottedBreakSeconds($shift, int $present): int
+    {
+        $expected = self::shiftExpectedSeconds($shift);
+        $full = ($shift && $shift->break_minutes_allowed !== null)
+            ? (int) $shift->break_minutes_allowed * 60
+            : (int) round($expected / 9);
+        $fraction = $expected > 0 ? min(1.0, max(0.0, $present / $expected)) : 1.0;
+
+        return (int) round($full * $fraction);
+    }
+
+    /** Net working window used for productivity + break adherence = present − allotted break. */
+    public static function netWorkingSeconds(int $present, int $allotted): int
+    {
+        return max(1, $present - $allotted);
     }
 
     private function sum(string $model, int $employeeId, string $col, string $date, array $where = []): int

@@ -27,6 +27,8 @@ use Illuminate\Support\Facades\DB;
  * Completed days come from the nightly employee_daily_summaries aggregate; TODAY
  * is computed live so managers see the day as it unfolds.
  */
+use App\Services\ScoringService;
+
 class ProductivityController extends Controller
 {
     use ScopesVisibleEmployees;
@@ -47,7 +49,7 @@ class ProductivityController extends Controller
         $employees = Employee::where('company_id', $companyId)
             ->when($empId, fn ($q) => $q->where('id', $empId))
             ->when($visible !== null, fn ($q) => $q->whereIn('id', $visible))
-            ->with(['department:id,name', 'team:id,name'])
+            ->with(['department:id,name', 'team:id,name', 'shift:id,start_time,end_time,break_minutes_allowed'])
             ->get()->keyBy('id');
 
         // Break counts + timeouts, grouped employee|date, for the whole range.
@@ -155,6 +157,12 @@ class ProductivityController extends Controller
 
     private function row(Employee $emp, string $date, array $m): array
     {
+        $present = (int) $m['present'];
+        $productive = (int) $m['work'] + (int) ($m['meeting'] ?? 0);
+        $allotted = ScoringService::allottedBreakSeconds($emp->shift, $present);
+        $working = ScoringService::netWorkingSeconds($present, $allotted);
+        $productivity = round(min(100, $productive / max(1, $working) * 100), 1);
+
         return [
             'work_date' => $date,
             'employee_code' => $emp->employee_code,
@@ -174,8 +182,10 @@ class ProductivityController extends Controller
             // Section 14: Meeting time is productive, kept separate from breaks. The
             // productive figure adds meeting time to tracked active time.
             'meeting_seconds' => (int) ($m['meeting'] ?? 0),
-            'productive_seconds' => (int) $m['work'] + (int) ($m['meeting'] ?? 0),
-            'productivity' => (float) $m['score'],
+            'productive_seconds' => $productive,
+            'allotted_break_seconds' => $allotted,
+            'net_working_seconds' => $working,
+            'productivity' => $productivity,
             'live' => (bool) $m['live'],
         ];
     }

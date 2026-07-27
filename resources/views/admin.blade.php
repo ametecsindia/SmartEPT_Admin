@@ -910,8 +910,8 @@
         <table id="pr-table"><thead><tr>
           <th>Date</th><th>Code</th><th>Employee</th><th>Dept</th>
           <th>Logged in</th><th>Logged out</th><th>Present</th><th>Working</th><th>Idle</th>
-          <th>Breaks</th><th>Break time</th><th>Meeting</th><th>Time-outs</th><th>Non-prod.</th><th>Violations</th><th>Prod. %</th>
-        </tr></thead><tbody id="pr-rows"><tr><td colspan="16" class="mut">Pick a range and press Show.</td></tr></tbody></table>
+          <th>Breaks</th><th>Break time</th><th>Net working</th><th>Meeting</th><th>Time-outs</th><th>Non-prod.</th><th>Violations</th><th>Prod. %</th>
+        </tr></thead><tbody id="pr-rows"><tr><td colspan="17" class="mut">Pick a range and press Show.</td></tr></tbody></table>
         </div>
         <div class="mut" id="pr-note" style="margin-top:8px"></div>
       </div>
@@ -4379,7 +4379,7 @@ function prSetRange(from, to) { $('#pr-from').value = from; $('#pr-to').value = 
 function isoDate(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 async function loadProductivity() {
   const from = $('#pr-from').value || today(), to = $('#pr-to').value || today();
-  $('#pr-rows').innerHTML = '<tr><td colspan="16" class="mut">Loading…</td></tr>';
+  $('#pr-rows').innerHTML = '<tr><td colspan="17" class="mut">Loading…</td></tr>';
   try {
     const r = await api('/reports/productivity?from=' + from + '&to=' + to);
     PROD_ROWS = r.data || [];
@@ -4396,21 +4396,22 @@ async function loadProductivity() {
       '<td data-sort="' + x.idle_seconds + '">' + hms(x.idle_seconds) + '</td>' +
       '<td data-sort="' + x.break_count + '">' + x.break_count + '</td>' +
       '<td data-sort="' + x.break_seconds + '">' + hms(x.break_seconds) + '</td>' +
+      '<td data-sort="' + (x.net_working_seconds||0) + '" title="Present minus allotted break (' + hms(x.allotted_break_seconds||0) + ')"><b>' + hms(x.net_working_seconds||0) + '</b></td>' +
       '<td data-sort="' + (x.meeting_seconds || 0) + '">' + (x.meeting_seconds ? hms(x.meeting_seconds) : '—') + '</td>' +
       '<td data-sort="' + x.timeouts + '">' + x.timeouts + '</td>' +
       '<td data-sort="' + x.non_productive_seconds + '">' + hms(x.non_productive_seconds) + '</td>' +
       '<td data-sort="' + x.violations + '">' + (x.violations ? '<span class="tag t-danger">' + x.violations + '</span>' : '0') + '</td>' +
       '<td data-sort="' + x.productivity + '"><b>' + Number(x.productivity).toFixed(0) + '%</b></td></tr>'
-    ).join('') : '<tr><td colspan="16" class="mut">No activity in this range.</td></tr>';
-    $('#pr-note').textContent = PROD_ROWS.length + ' rows · ' + from + ' → ' + to + ' · working = active tracked time; present = in-office span.';
+    ).join('') : '<tr><td colspan="17" class="mut">No activity in this range.</td></tr>';
+    $('#pr-note').textContent = PROD_ROWS.length + ' rows · ' + from + ' → ' + to + ' · Productivity = productive time ÷ net working (present − allotted break, pro-rated on early logout). Allotted break comes from the shift.';
     attachTableFilter($('#pr-q'), '#pr-rows');
   } catch (e) { $('#pr-rows').innerHTML = '<tr><td colspan="16" class="mut">' + esc(e.message) + '</td></tr>'; }
 }
 // R4 item 6: extracted reports use hh:mm, not raw seconds/minutes.
 const hhmm = (sec) => { const m = Math.max(0, Math.round((sec || 0) / 60)); return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
 function prCSV() {
-  const head = ['Date','Code','Employee','Department','Team','Logged in','Logged out','Present (hh:mm)','Working (hh:mm)','Idle (hh:mm)','Breaks','Break time (hh:mm)','Time-outs','Non-productive (hh:mm)','Violations','Productivity%'];
-  const rows = PROD_ROWS.map((x) => [x.work_date,x.employee_code,x.name,x.department,x.team,x.first_in,x.last_out,hhmm(x.present_seconds),hhmm(x.work_seconds),hhmm(x.idle_seconds),x.break_count,hhmm(x.break_seconds),x.timeouts,hhmm(x.non_productive_seconds),x.violations,x.productivity]);
+  const head = ['Date','Code','Employee','Department','Team','Logged in','Logged out','Present (hh:mm)','Working (hh:mm)','Idle (hh:mm)','Breaks','Break time (hh:mm)','Allotted break (hh:mm)','Net working (hh:mm)','Time-outs','Non-productive (hh:mm)','Violations','Productivity%'];
+  const rows = PROD_ROWS.map((x) => [x.work_date,x.employee_code,x.name,x.department,x.team,x.first_in,x.last_out,hhmm(x.present_seconds),hhmm(x.work_seconds),hhmm(x.idle_seconds),x.break_count,hhmm(x.break_seconds),hhmm(x.allotted_break_seconds),hhmm(x.net_working_seconds),x.timeouts,hhmm(x.non_productive_seconds),x.violations,x.productivity]);
   const csv = [head, ...rows].map((r) => r.map((c) => '"' + String(c==null?'':c).replace(/"/g,'""') + '"').join(',')).join('\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
   a.download = 'smartept-productivity-' + $('#pr-from').value + '_' + $('#pr-to').value + '.csv'; a.click(); URL.revokeObjectURL(a.href);
