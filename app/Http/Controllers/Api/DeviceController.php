@@ -238,6 +238,9 @@ class DeviceController extends Controller
                     'title'      => $m->title,
                     'end_at'     => $m->end_at->toIso8601String(),
                     'in_session' => $inSession,
+                    'meeting_mode' => $m->meeting_mode,
+                    'meeting_link' => $m->meeting_link,
+                    'venue'        => $m->venue,
                 ];
             }
         }
@@ -253,6 +256,9 @@ class DeviceController extends Controller
                     'title'             => $rm->title,
                     'start_at'          => $rm->start_at->toIso8601String(),
                     'starts_in_seconds' => max(0, (int) now()->diffInSeconds($rm->start_at, false)),
+                    'meeting_mode'      => $rm->meeting_mode,
+                    'meeting_link'      => $rm->meeting_link,
+                    'venue'             => $rm->venue,
                 ];
             }
         }
