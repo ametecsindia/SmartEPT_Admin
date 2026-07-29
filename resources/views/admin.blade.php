@@ -4307,9 +4307,36 @@ function showJoinPopup(m) {
     + '<div style="margin-bottom:9px">' + esc(m.title) + (m.is_organizer ? ' <span class="tag t-info">You organise this</span>' : ' <span class="tag t-ok">You are invited</span>') + '</div>'
     + '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-jp-x>Dismiss</button><button class="btn acc" data-jp-go>Join / Open</button></div>';
   w.querySelector('[data-jp-x]').onclick = () => w.remove();
-  w.querySelector('[data-jp-go]').onclick = () => { w.remove(); if (typeof show === 'function') show('meetings'); };
+  w.querySelector('[data-jp-go]').onclick = () => { w.remove(); joinMeetingFlow(m.id, m.meeting_mode, 'notification'); };
   document.body.appendChild(w);
   setTimeout(() => { if (w.isConnected) w.remove(); }, 90000);
+}
+
+// Part B §11-13: the ONE join path used by the popup, the scheduler and the console.
+// Records attendance via the SmartEPT API FIRST, then (online only) opens the meeting link.
+async function joinMeetingFlow(id, mode, source) {
+  // Pre-open a tab synchronously for online meetings so the browser does not block the
+  // popup; it is navigated once the join is confirmed, or closed if the join fails.
+  let tab = null;
+  if (mode === 'online') { try { tab = window.open('', '_blank'); } catch (e) { tab = null; } }
+  try {
+    const r = await api('/meetings/' + id + '/join', { method: 'POST', body: { join_source: source || 'admin_console' } });
+    const link = r.data && r.data.meeting_link;
+    if (mode === 'online' && link) {
+      if (tab) { tab.location = link; } else { window.open(link, '_blank', 'noopener'); }
+      toast('Joined \u2014 opening the meeting link');
+    } else if (mode === 'offline') {
+      if (tab) tab.close();
+      toast('You have joined the offline meeting.');
+    } else {
+      if (tab) tab.close();
+      toast('You have joined the meeting.');
+    }
+    if (typeof loadMeetings === 'function') loadMeetings();
+  } catch (e) {
+    if (tab) tab.close();
+    toast(e.message || 'Could not join the meeting');
+  }
 }
 
 const MTG_STATUS_TAG = { SCHEDULED: 't-warn', IN_PROGRESS: 't-ok', COMPLETED: 't-off', CANCELLED: 't-danger', NO_SHOW: 't-danger', AUTO_CLOSED: 't-off' };
@@ -4329,7 +4356,8 @@ async function loadMeetings() {
       + '<td>' + (m.actual_end_at ? dt(m.actual_end_at) : '—') + '</td>'
       + '<td><span class="tag ' + (MTG_STATUS_TAG[m.status] || 't-off') + '">' + esc((m.status || '').replace('_', ' ')) + '</span></td>'
       + '<td style="text-align:right;white-space:nowrap">'
-      + (m.meeting_mode === 'online' && m.meeting_link && (m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS') ? '<a class="btn acc" href="' + encodeURI(m.meeting_link) + '" target="_blank" rel="noopener">Join</a> ' : '')
+      + ((m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS') ? '<button class="btn acc" data-mtg-join="' + m.id + '" data-mtg-mode="' + (m.meeting_mode || 'online') + '">' + (m.is_organizer ? 'Start / Join' : 'Join') + '</button> ' : '')
+      + (m.status === 'IN_PROGRESS' && !m.is_organizer ? '<button class="btn" data-mtg-leave="' + m.id + '">Leave</button> ' : '')
       + (can('meeting.reports') ? '<button class="btn" data-mtg-part="' + m.id + '">Participation</button> ' : '')
       + ((m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS')
           ? ((can('meeting.edit') ? '<button class="btn" data-mtg-edit="' + m.id + '">Edit</button> ' : '')
@@ -4349,6 +4377,14 @@ document.addEventListener('click', async (e) => {
   const cn = e.target.closest && e.target.closest('[data-mtg-cancel]');
   const en = e.target.closest && e.target.closest('[data-mtg-end]');
   const pt = e.target.closest && e.target.closest('[data-mtg-part]');
+  const jn = e.target.closest && e.target.closest('[data-mtg-join]');
+  const lv = e.target.closest && e.target.closest('[data-mtg-leave]');
+  if (jn) { joinMeetingFlow(Number(jn.dataset.mtgJoin), jn.dataset.mtgMode, 'meeting_scheduler'); return; }
+  if (lv) {
+    try { await api('/meetings/' + Number(lv.dataset.mtgLeave) + '/leave', { method: 'POST' }); toast('You left the meeting'); loadMeetings(); }
+    catch (err) { alert(err.message); }
+    return;
+  }
   if (ed) { openMeetingModal(Number(ed.dataset.mtgEdit)); }
   else if (en) {
     // Admin #9: organiser ends the meeting now -> it ends for ALL participants.

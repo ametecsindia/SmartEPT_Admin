@@ -258,9 +258,12 @@ class MeetingController extends Controller
             // EPT25-11: the organiser runs the meeting from the admin console (no agent
             // session) — never mark them Absent; they are present as the organiser.
             $isOrganizer = $organizerEmployeeId !== null && $p->employee_id === $organizerEmployeeId;
+            // Part B §15: mark ABSENT only once the meeting has actually ended,
+            // never while it is still in progress (even if it overran end_at).
+            $ended = in_array($this->liveStatus($meeting), ['COMPLETED', 'CANCELLED', 'NO_SHOW', 'AUTO_CLOSED'], true);
             $status = $attended ? 'ATTENDED'
                 : ($isOrganizer ? 'ORGANIZER'
-                    : ($meeting->end_at->isPast() ? 'ABSENT' : 'PENDING'));
+                    : ($ended ? 'ABSENT' : 'PENDING'));
 
             return [
                 'employee_id'    => $p->employee_id,
@@ -312,6 +315,132 @@ class MeetingController extends Controller
         ]);
 
         return response()->json(['data' => $rows]);
+    }
+
+    /**
+     * POST /api/meetings/{meeting}/join — Part B §11-14. The SINGLE join function used by the
+     * notification popup, the meeting scheduler and the admin console. Records real attendance
+     * (participant row + session) so a joined organiser/participant is never shown Absent, moves
+     * the joiner's live status to In Meeting (best-effort), and returns the mode + link so the
+     * caller opens Google Meet only AFTER attendance is confirmed.
+     */
+    public function join(Request $request, Meeting $meeting): JsonResponse
+    {
+        $user = $request->user();
+        $employee = $user->employee;
+        abort_unless($employee, 422, 'Your login is not linked to an employee record, so meeting attendance cannot be recorded.');
+
+        abort_if(in_array($meeting->status, ['CANCELLED', 'COMPLETED', 'NO_SHOW', 'AUTO_CLOSED'], true),
+            422, 'This meeting is not open to join.');
+
+        $isOrganizer = $meeting->created_by_user_id === $user->id;
+        $isParticipant = MeetingParticipant::where('meeting_id', $meeting->id)
+            ->where('employee_id', $employee->id)->exists();
+        abort_unless($isOrganizer || $isParticipant, 403, 'You are not part of this meeting.');
+
+        $source = $request->input('join_source', 'admin_console');
+        $now = now();
+
+        // Ensure a participant row (the organiser is often not in the invite list).
+        $participant = MeetingParticipant::firstOrCreate(
+            ['meeting_id' => $meeting->id, 'employee_id' => $employee->id],
+            ['company_id' => $meeting->company_id]
+        );
+        $participant->forceFill([
+            'participant_role'  => $isOrganizer ? 'organizer' : ($participant->participant_role ?: 'participant'),
+            'joined_at'         => $participant->joined_at ?: $now,
+            'attendance_status' => 'JOINED',
+            'join_source'       => $source,
+        ])->save();
+
+        // The organiser clicking Start/Join moves the meeting to IN_PROGRESS.
+        if ($isOrganizer && $meeting->status === 'SCHEDULED') {
+            $meeting->update(['status' => 'IN_PROGRESS']);
+        }
+
+        // Attendance session (idempotent) — participation()/reports read these.
+        $open = EmployeeMeetingSession::where('meeting_id', $meeting->id)
+            ->where('employee_id', $employee->id)->whereNull('actual_end_at')->first();
+        if (! $open) {
+            EmployeeMeetingSession::create([
+                'company_id'      => $meeting->company_id,
+                'meeting_id'      => $meeting->id,
+                'employee_id'     => $employee->id,
+                'actual_start_at' => $now,
+            ]);
+        }
+
+        // Best-effort live status -> In Meeting. Never blocks the join (an open break
+        // conflict or a console user with no agent device simply leaves status as-is).
+        try {
+            app(\App\Services\StatusService::class)->transition($employee, 'MEETING', $now, [
+                'manual' => true, 'source' => 'CONSOLE', 'meeting_id' => $meeting->id,
+            ]);
+        } catch (\Throwable $e) { /* attendance already recorded */ }
+
+        $this->audit($request, 'MEETING_JOIN', Meeting::class, $meeting->id, [
+            'employee_id' => $employee->id,
+            'role'        => $isOrganizer ? 'organizer' : 'participant',
+            'source'      => $source,
+        ]);
+
+        return response()->json(['data' => [
+            'meeting_id'        => $meeting->id,
+            'meeting_mode'      => $meeting->meeting_mode,
+            'meeting_link'      => $meeting->meeting_mode === 'online' ? $meeting->meeting_link : null,
+            'venue'             => $meeting->venue,
+            'attendance_status' => 'JOINED',
+            'status'            => $this->liveStatus($meeting),
+        ]]);
+    }
+
+    /**
+     * POST /api/meetings/{meeting}/leave — Part B §17. Closes the caller's open session(s),
+     * records left_at + attended_seconds on the participant row, and restores their live status.
+     */
+    public function leave(Request $request, Meeting $meeting): JsonResponse
+    {
+        $user = $request->user();
+        $employee = $user->employee;
+        abort_unless($employee, 422, 'Your login is not linked to an employee record.');
+
+        $now = now();
+        $closed = 0;
+        EmployeeMeetingSession::where('meeting_id', $meeting->id)
+            ->where('employee_id', $employee->id)->whereNull('actual_end_at')->get()
+            ->each(function ($s) use ($now, &$closed) {
+                $end = $s->actual_start_at && $now->lessThan($s->actual_start_at) ? $s->actual_start_at : $now;
+                $s->update([
+                    'actual_end_at'    => $end,
+                    'duration_seconds' => $s->actual_start_at ? (int) $end->diffInSeconds($s->actual_start_at, true) : 0,
+                ]);
+                $closed++;
+            });
+
+        $participant = MeetingParticipant::where('meeting_id', $meeting->id)
+            ->where('employee_id', $employee->id)->first();
+        if ($participant) {
+            $total = (int) EmployeeMeetingSession::where('meeting_id', $meeting->id)
+                ->where('employee_id', $employee->id)->sum('duration_seconds');
+            $participant->forceFill([
+                'left_at'           => $now,
+                'attendance_status' => 'LEFT',
+                'attended_seconds'  => $total,
+            ])->save();
+        }
+
+        try {
+            $status = app(\App\Services\StatusService::class);
+            if ($status->currentState($employee) === 'MEETING') {
+                $status->resumeActive($employee, $now, []);
+            }
+        } catch (\Throwable $e) { /* status mirror is best-effort */ }
+
+        $this->audit($request, 'MEETING_LEAVE', Meeting::class, $meeting->id, [
+            'employee_id' => $employee->id, 'closed_sessions' => $closed,
+        ]);
+
+        return response()->json(['data' => ['meeting_id' => $meeting->id, 'left' => true, 'closed_sessions' => $closed]]);
     }
 
     // ---- helpers ----
