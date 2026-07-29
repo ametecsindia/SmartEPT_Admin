@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Support\ScopesVisibleEmployees;
 
 /**
  * CSV exports (open directly in Excel). XLSX via PhpSpreadsheet is a later add-on; CSV keeps
@@ -22,6 +23,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class ExportController extends Controller
 {
+    use ScopesVisibleEmployees;
+
     /** GET /api/export/attendance?from=&to= */
     public function attendance(Request $request): StreamedResponse
     {
@@ -29,8 +32,11 @@ class ExportController extends Controller
         $to = $request->query('to', now()->toDateString());
         $this->audit($request, 'EXPORT', EmployeeAttendanceLog::class, null, compact('from', 'to'));
 
+        $visible = $this->visibleEmployeeIds($request->user());
         $rows = EmployeeAttendanceLog::with('employee:id,employee_code,first_name,last_name')
-            ->whereBetween('work_date', [$from, $to])->orderBy('work_date')->get();
+            ->whereBetween('work_date', [$from, $to])
+            ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
+            ->orderBy('work_date')->get();
 
         return $this->stream('attendance.csv',
             ['Employee Code', 'Name', 'Date', 'Source', 'Check In', 'Check In Via', 'Check Out', 'Check Out Via',
@@ -58,7 +64,10 @@ class ExportController extends Controller
         $idle = $sumFor(EmployeeActivityEvent::where('event_type', 'IDLE'), 'started_at');
         $break = $sumFor(EmployeeBreakLog::query(), 'start_at');
 
-        $rows = Employee::where('employment_status', 'ACTIVE')->get()->map(fn ($e) => [
+        $visible = $this->visibleEmployeeIds($request->user());
+        $rows = Employee::where('employment_status', 'ACTIVE')
+            ->when($visible !== null, fn ($q) => $q->whereIn('id', $visible))
+            ->get()->map(fn ($e) => [
             $e->employee_code, $e->fullName(),
             $this->hmFromSeconds($active[$e->id] ?? 0),
             $this->hmFromSeconds($idle[$e->id] ?? 0),
@@ -79,8 +88,10 @@ class ExportController extends Controller
         // started_at is a DATETIME — a bare 'YYYY-MM-DD' upper bound is 00:00:00 and would
         // drop every same-day event (EPT25-03: the CSV came back with only a header). Use
         // inclusive whole-day boundaries so from=to=today returns that day's violations.
+        $visible = $this->visibleEmployeeIds($request->user());
         $rows = EmployeeComplianceEvent::with('employee:id,employee_code,first_name,last_name')
             ->whereBetween('started_at', [$from . ' 00:00:00', $to . ' 23:59:59'])
+            ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
             ->orderBy('started_at')->get();
 
         return $this->stream('compliance.csv',
@@ -98,8 +109,10 @@ class ExportController extends Controller
         [$from, $to] = $this->range($request, now()->subDay()->toDateString());
         $this->audit($request, 'EXPORT', EmployeeDailySummary::class, null, compact('from', 'to'));
 
+        $visible = $this->visibleEmployeeIds($request->user());
         $rows = EmployeeDailySummary::with('employee:id,employee_code,first_name,last_name')
             ->whereDate('work_date', '>=', $from)->whereDate('work_date', '<=', $to)
+            ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
             ->orderBy('work_date')->get();
 
         return $this->stream('daily_summary_' . ($from === $to ? $from : "{$from}_{$to}") . '.csv',

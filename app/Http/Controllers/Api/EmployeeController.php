@@ -20,12 +20,17 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use App\Support\ScopesVisibleEmployees;
 
 class EmployeeController extends Controller
 {
+    use ScopesVisibleEmployees;
+
     /** GET /api/employees — tenant-scoped, filterable by team/department/branch/status. */
     public function index(Request $request): JsonResponse
     {
+        $visible = $this->visibleEmployeeIds($request->user());
+
         $employees = Employee::query()
             ->with(['team:id,name', 'department:id,name', 'branch:id,name', 'designation:id,name', 'shift:id,name'])
             ->when($request->team_id, fn ($q, $v) => $q->where('team_id', $v))
@@ -36,6 +41,7 @@ class EmployeeController extends Controller
                 $w->where('first_name', 'like', "%{$v}%")
                   ->orWhere('last_name', 'like', "%{$v}%")
                   ->orWhere('employee_code', 'like', "%{$v}%")))
+            ->when($visible !== null, fn ($q) => $q->whereIn('id', $visible))
             ->latest('id')
             ->paginate((int) $request->integer('per_page', 25));
 
@@ -43,8 +49,10 @@ class EmployeeController extends Controller
     }
 
     /** GET /api/employees/{employee} */
-    public function show(Employee $employee): JsonResponse
+    public function show(Request $request, Employee $employee): JsonResponse
     {
+        $this->assertEmployeeVisible($request, $employee->id);
+
         return response()->json(['data' => $employee->load([
             'team', 'department', 'branch', 'designation', 'shift', 'devices', 'manager:id,name',
         ])]);
@@ -98,6 +106,8 @@ class EmployeeController extends Controller
     /** PUT /api/employees/{employee} */
     public function update(Request $request, Employee $employee): JsonResponse
     {
+        $this->assertEmployeeVisible($request, $employee->id);
+
         $data = $this->validated($request, false, $employee);
         $employee->update($data);
         $this->audit($request, 'UPDATE', Employee::class, $employee->id, $data);
@@ -112,6 +122,8 @@ class EmployeeController extends Controller
      */
     public function relieve(Request $request, Employee $employee): JsonResponse
     {
+        $this->assertEmployeeVisible($request, $employee->id);
+
         $data = $request->validate([
             'reason' => ['required', 'string', 'max:500'],
         ]);
@@ -155,6 +167,8 @@ class EmployeeController extends Controller
      */
     public function destroy(Request $request, Employee $employee): JsonResponse
     {
+        $this->assertEmployeeVisible($request, $employee->id);
+
         $archiver = app(EmployeeArchiver::class);
 
         // Capture everything BEFORE we mutate the code.

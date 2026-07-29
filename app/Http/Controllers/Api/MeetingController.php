@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
+use App\Support\ScopesVisibleEmployees;
 
 /**
  * Section 2 — meeting scheduling & management (HR / Admin / Manager / TL).
@@ -18,6 +19,8 @@ use Illuminate\Validation\Rule;
  */
 class MeetingController extends Controller
 {
+    use ScopesVisibleEmployees;
+
     /** GET /api/meetings — list with participant counts + live status. */
     public function index(Request $request): JsonResponse
     {
@@ -315,7 +318,7 @@ class MeetingController extends Controller
 
     private function validateMeeting(Request $request, int $companyId): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'title'             => ['required', 'string', 'max:200'],
             'purpose'           => ['nullable', 'string', 'max:2000'],
             'start_at'          => ['required', 'date'],
@@ -329,6 +332,16 @@ class MeetingController extends Controller
             'participant_ids'   => ['required', 'array', 'min:1', 'max:1000'],
             'participant_ids.*' => ['integer', Rule::exists('employees', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
         ]);
+
+        // §18: a restricted organiser (manager/team-lead/branch-admin) may only
+        // invite employees inside their own reporting scope.
+        $visible = $this->visibleEmployeeIds($request->user());
+        if ($visible !== null) {
+            $outside = array_diff(array_map('intval', $data['participant_ids']), $visible);
+            abort_if(! empty($outside), 403, 'You can only invite employees within your reporting scope.');
+        }
+
+        return $data;
     }
 
     private function syncParticipants(Meeting $meeting, int $companyId, array $ids): void

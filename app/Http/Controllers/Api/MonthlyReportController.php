@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Support\ScopesVisibleEmployees;
 
 /**
  * Monthly payroll pack: the per-employee month summary payroll runs on, plus the
@@ -22,6 +23,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class MonthlyReportController extends Controller
 {
+    use ScopesVisibleEmployees;
+
     /** Attendance status → register letter. MISMATCH still carries presence evidence → P. */
     private const STATUS_LETTERS = [
         'PRESENT' => 'P', 'ABSENT' => 'A', 'HALF_DAY' => 'H', 'ON_LEAVE' => 'L', 'MISMATCH' => 'P',
@@ -36,7 +39,9 @@ class MonthlyReportController extends Controller
         [$start, $end] = $this->monthRange($request);
 
         $employees = Employee::with(['shift', 'team:id,name'])
-            ->where('employment_status', 'ACTIVE')->orderBy('employee_code')->get();
+            ->where('employment_status', 'ACTIVE')
+            ->when(($visible = $this->visibleEmployeeIds($request->user())) !== null, fn ($q) => $q->whereIn('id', $visible))
+            ->orderBy('employee_code')->get();
 
         $statusByEmployee = $this->statusesByEmployeeAndDate($start, $end);
 
@@ -94,7 +99,9 @@ class MonthlyReportController extends Controller
         $this->audit($request, 'EXPORT', EmployeeAttendanceLog::class, null, ['register_month' => $start->format('Y-m')]);
 
         $employees = Employee::with(['shift', 'team:id,name'])
-            ->where('employment_status', 'ACTIVE')->orderBy('employee_code')->get();
+            ->where('employment_status', 'ACTIVE')
+            ->when(($visible = $this->visibleEmployeeIds($request->user())) !== null, fn ($q) => $q->whereIn('id', $visible))
+            ->orderBy('employee_code')->get();
         $statusByEmployee = $this->statusesByEmployeeAndDate($start, $end);
         $today = now()->toDateString();
 
