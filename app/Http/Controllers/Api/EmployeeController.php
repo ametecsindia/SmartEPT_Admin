@@ -182,24 +182,37 @@ class EmployeeController extends Controller
         $counts    = $archiver->counts($employee->id);
         $snapshot  = $archiver->snapshot($employee);
 
-        $archive = EmployeeArchive::create([
-            'company_id'             => $employee->company_id,
-            'employee_id'            => $employee->id,
-            'archive_label'          => $label,
-            'original_employee_code' => $freedCode,
-            'employee_name'          => $name !== '' ? $name : $freedCode,
-            'archived_by_user_id'    => $request->user()->id,
-            'archived_at'            => now(),
-            'snapshot'               => $snapshot,
-            'counts'                 => $counts,
-            'file_status'            => 'PENDING',
-        ]);
+        // Part C #18/#19: archive + soft-delete the employee AND deactivate its linked login
+        // in ONE transaction, so a deleted employee never leaves an active user behind.
+        $archive = DB::transaction(function () use ($employee, $label, $freedCode, $name, $counts, $snapshot, $request) {
+            $archive = EmployeeArchive::create([
+                'company_id'             => $employee->company_id,
+                'employee_id'            => $employee->id,
+                'archive_label'          => $label,
+                'original_employee_code' => $freedCode,
+                'employee_name'          => $name !== '' ? $name : $freedCode,
+                'archived_by_user_id'    => $request->user()->id,
+                'archived_at'            => now(),
+                'snapshot'               => $snapshot,
+                'counts'                 => $counts,
+                'file_status'            => 'PENDING',
+            ]);
 
-        // Free the code, then soft-delete (history retained).
-        $employee->forceFill([
-            'employee_code' => $freedCode . '~del' . $employee->id . '~' . now()->format('ymdHis'),
-        ])->save();
-        $employee->delete();
+            // Free the code, then soft-delete (history retained).
+            $employee->forceFill([
+                'employee_code' => $freedCode . '~del' . $employee->id . '~' . now()->format('ymdHis'),
+            ])->save();
+            $employee->delete();
+
+            // Deactivate the linked login + revoke every token (console + agent) so the person
+            // cannot sign in and drops out of the active Users tab immediately.
+            if ($employee->user) {
+                $employee->user->tokens()->delete();
+                $employee->user->update(['status' => 'DISABLED']);
+            }
+
+            return $archive;
+        });
 
         $this->audit($request, 'DELETE', Employee::class, $employee->id, [
             'employee_code' => $freedCode,
@@ -294,6 +307,83 @@ class EmployeeController extends Controller
                 : ($fresh->file_status === 'FAILED'
                     ? ('Rebuild failed: ' . $fresh->error)
                     : 'Rebuild started.'),
+        ]]);
+    }
+
+    /**
+     * POST /api/employees/archives/{archive}/restore — Part C #21. Bring a deleted employee back:
+     * restore the row + original code, re-activate the linked login (password reset required on
+     * next sign-in), keep role/branch. Device access is NOT auto-restored. Blocks on any live
+     * conflict (code / email / biometric / user already in use) with the exact reason; optional
+     * overrides let an authorised admin supply a fresh value instead of overwriting the other record.
+     */
+    public function restoreArchive(Request $request, EmployeeArchive $archive): JsonResponse
+    {
+        abort_unless($archive->company_id === $request->user()->company_id, 403, 'Outside your tenant.');
+
+        $data = $request->validate([
+            'new_employee_code' => ['nullable', 'string', 'max:64'],
+            'new_email'         => ['nullable', 'email'],
+            'new_biometric_id'  => ['nullable', 'string', 'max:64'],
+        ]);
+
+        $companyId = $archive->company_id;
+        $employee = Employee::withTrashed()->where('company_id', $companyId)->find($archive->employee_id);
+        abort_unless($employee, 404, 'The archived employee record could not be found.');
+        abort_unless($employee->trashed(), 422, 'This employee is already active.');
+
+        $code  = $data['new_employee_code'] ?: $archive->original_employee_code;
+        $email = ! empty($data['new_email']) ? $data['new_email'] : $employee->email;
+        $bio   = $data['new_biometric_id'] ?: $employee->biometric_id;
+
+        $conflict = fn ($field, $message, $options) => response()->json([
+            'error' => ['field' => $field, 'message' => $message, 'options' => $options],
+        ], 409);
+
+        if (Employee::where('company_id', $companyId)->where('employee_code', $code)->where('id', '!=', $employee->id)->exists()) {
+            return $conflict('employee_code',
+                "Employee {$archive->original_employee_code} cannot be restored because Employee Code {$code} is currently assigned to another active employee.",
+                ['change_employee_code', 'cancel']);
+        }
+        if ($email && Employee::where('company_id', $companyId)->where('email', $email)->where('id', '!=', $employee->id)->exists()) {
+            return $conflict('email', "Email {$email} is already used by another active employee.", ['change_email', 'cancel']);
+        }
+        if ($email && User::where('email', $email)->where('id', '!=', (int) $employee->user_id)->exists()) {
+            return $conflict('email', "Email {$email} is already used by another login account.", ['change_email', 'cancel']);
+        }
+        if ($bio && Employee::where('company_id', $companyId)->where('biometric_id', $bio)->where('id', '!=', $employee->id)->exists()) {
+            return $conflict('biometric_id', "Biometric ID {$bio} is already used by another active employee.", ['change_biometric_id', 'cancel']);
+        }
+        if ($employee->user_id && Employee::where('company_id', $companyId)->where('user_id', $employee->user_id)->where('id', '!=', $employee->id)->exists()) {
+            return $conflict('user_id', 'The linked login account is already attached to another active employee.', ['cancel']);
+        }
+
+        DB::transaction(function () use ($employee, $code, $email, $bio, $request) {
+            $employee->restore();
+            $employee->forceFill([
+                'employee_code'     => $code,
+                'email'             => $email,
+                'biometric_id'      => $bio,
+                'employment_status' => 'ACTIVE',
+            ])->save();
+
+            if ($employee->user_id) {
+                $u = User::find($employee->user_id);
+                if ($u) {
+                    // Re-activate + force a password reset. Device access is NOT auto-restored.
+                    $u->forceFill(['status' => 'ACTIVE', 'must_change_password' => true])->save();
+                }
+            }
+
+            $this->audit($request, 'RESTORE_EMPLOYEE', Employee::class, $employee->id, [
+                'employee_code' => $code, 'email' => $email,
+            ]);
+        });
+
+        return response()->json(['data' => [
+            'employee_id'   => $employee->id,
+            'employee_code' => $code,
+            'message'       => 'Employee restored and the login re-activated (password reset required on next sign-in). Device access was not auto-restored.',
         ]]);
     }
 

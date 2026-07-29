@@ -329,6 +329,7 @@ Route::middleware(['auth:sanctum', 'company.active'])->group(function () {
         Route::get('employees/archives', [EmployeeController::class, 'archives']);
         Route::get('employees/archives/{archive}/download', [EmployeeController::class, 'downloadArchive']);
         Route::post('employees/archives/{archive}/rebuild', [EmployeeController::class, 'rebuildArchive']); // Part C #22 — build a stuck/failed archive now
+        Route::post('employees/archives/{archive}/restore', [EmployeeController::class, 'restoreArchive']); // Part C #21 — restore a deleted employee
     });
     Route::get('employees/{employee}', [EmployeeController::class, 'show'])
         ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,HR_ADMIN,MANAGER,TEAM_LEADER,AUDITOR');

@@ -2563,9 +2563,9 @@ if ($('#ssdel-run')) $('#ssdel-run').onclick = async () => {
   const ids = Array.from(SS_SEL);
   const msg = $('#ssdel-msg'); msg.textContent = 'Deleting\u2026'; $('#ssdel-run').disabled = true;
   try {
-    const r = await api('/ops/storage-cleanup', { method: 'POST', body: {
+    const r = await api('/ops/storage-cleanup', { method: 'POST', body: JSON.stringify({
       deletion_mode: 'selected_ids', screenshot_ids: ids, confirmation_text: 'DELETE',
-    }});
+    })});
     const failed = r.failed_count || 0;
     if (failed === 0) ids.forEach((id) => { const card = document.querySelector('[data-shot="' + id + '"]'); if (card) card.remove(); });
     $('#ssdel-ovl').classList.remove('open');
@@ -2870,6 +2870,29 @@ async function downloadArchive(id, label) {
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   } catch (e) { alert(e && e.status === 404 ? 'The backup is still being prepared or could not be found. Make sure the background scheduler is running, then try again.' : ((e && e.message) || 'Could not download the backup.')); }
 }
+async function restoreEmployee(id, code, overrides) {
+  overrides = overrides || {};
+  try {
+    const r = await api('/employees/archives/' + id + '/restore', { method: 'POST', body: JSON.stringify(overrides) });
+    toast((r.data && r.data.message) || 'Employee restored');
+    loadArchives();
+    if (typeof loadEmployees === 'function') loadEmployees();
+  } catch (e) {
+    const err = e.body && e.body.error;
+    if (e.status === 409 && err) { handleRestoreConflict(id, code, err); }
+    else { toast(e.message); }
+  }
+}
+function handleRestoreConflict(id, code, err) {
+  const map = { employee_code: 'new_employee_code', email: 'new_email', biometric_id: 'new_biometric_id' };
+  const key = map[err.field];
+  if (!key) { alert(err.message); return; }
+  const label = err.field === 'employee_code' ? 'employee code' : (err.field === 'email' ? 'email' : 'biometric ID');
+  const nv = window.prompt(err.message + '\n\nEnter a new ' + label + ' to restore with, or press Cancel:', '');
+  if (nv == null || nv.trim() === '') return;
+  const ov = {}; ov[key] = nv.trim();
+  restoreEmployee(id, code, ov);
+}
 async function rebuildArchive(id) {
   toast('Building archive\u2026');
   try {
@@ -2894,6 +2917,7 @@ async function loadArchives() {
       } else {
         backup = '<span class="tag t-warn">Preparing…</span> <button class="btn" data-arch-rebuild="' + a.id + '">Build now</button>';
       }
+      backup += ' <button class="btn" data-arch-restore="' + a.id + '" data-arch-code="' + esc(a.code) + '">Restore</button>';
       return '<tr><td><span class="nm">' + esc(a.label) + '</span></td>'
         + '<td>' + esc(a.name) + ' <span class="mut" style="font-size:11px">(' + esc(a.code) + ')</span></td>'
         + '<td>' + esc(a.archived_at || '—') + (a.archived_by ? ' <span class="mut" style="font-size:11px">by ' + esc(a.archived_by) + '</span>' : '') + '</td>'
@@ -2910,6 +2934,8 @@ document.addEventListener('click', (e) => {
   if (dl) { downloadArchive(Number(dl.dataset.archDl), dl.dataset.archLabel); return; }
   const rbld = e.target.closest && e.target.closest('[data-arch-rebuild]');
   if (rbld) { rebuildArchive(Number(rbld.dataset.archRebuild)); return; }
+  const rst = e.target.closest && e.target.closest('[data-arch-restore]');
+  if (rst) { restoreEmployee(Number(rst.dataset.archRestore), rst.dataset.archCode); return; }
   const rb = e.target.closest && e.target.closest('#arch-reload');
   if (rb) loadArchives();
 });
@@ -4363,7 +4389,7 @@ async function joinMeetingFlow(id, mode, source) {
   let tab = null;
   if (mode === 'online') { try { tab = window.open('', '_blank'); } catch (e) { tab = null; } }
   try {
-    const r = await api('/meetings/' + id + '/join', { method: 'POST', body: { join_source: source || 'admin_console' } });
+    const r = await api('/meetings/' + id + '/join', { method: 'POST', body: JSON.stringify({ join_source: source || 'admin_console' }) });
     const link = r.data && r.data.meeting_link;
     if (mode === 'online' && link) {
       if (tab) { tab.location = link; } else { window.open(link, '_blank', 'noopener'); }
@@ -5420,11 +5446,11 @@ $('#cleanup-run').onclick = async () => {
   if (!$('#cl-from').value || !$('#cl-to').value) { msg.textContent = 'Pick both dates.'; return; }
   msg.textContent = 'Deleting…';
   try {
-    const r = await api('/ops/storage-cleanup', { method: 'POST', body: {
+    const r = await api('/ops/storage-cleanup', { method: 'POST', body: JSON.stringify({
       from_date: $('#cl-from').value, to_date: $('#cl-to').value, targets: targets,
       keep_violation_evidence: $('#cl-keepviol').checked,
       delete_violation_records: $('#cl-delviol').checked,
-    }});
+    })});
     const parts = Object.entries(r.result || {}).map(([k, v]) =>
       k + ': ' + (v.rows ?? 0) + ' rows' + (v.human ? ' (' + v.human + ' freed)' : ''));
     msg.textContent = '✓ Done — ' + (parts.join(' · ') || 'nothing matched that range.');
