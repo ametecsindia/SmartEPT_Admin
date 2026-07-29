@@ -2837,6 +2837,14 @@ async function downloadArchive(id, label) {
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   } catch (e) { alert(e && e.status === 404 ? 'The backup is still being prepared or could not be found. Make sure the background scheduler is running, then try again.' : ((e && e.message) || 'Could not download the backup.')); }
 }
+async function rebuildArchive(id) {
+  toast('Building archive\u2026');
+  try {
+    const r = await api('/employees/archives/' + id + '/rebuild', { method: 'POST' });
+    toast((r.data && r.data.message) || 'Rebuild started');
+    loadArchives();
+  } catch (e) { toast(e.message); }
+}
 async function loadArchives() {
   const tb = $('#arch-rows'); if (!tb) return;
   try {
@@ -2849,9 +2857,9 @@ async function loadArchives() {
         backup = '<button class="btn solid" data-arch-dl="' + a.id + '" data-arch-label="' + esc(a.label) + '">Download ZIP</button>'
           + (a.media_files ? ' <span class="mut" style="font-size:11px">' + a.media_files + ' media' + (sz ? ' · ' + sz : '') + '</span>' : (sz ? ' <span class="mut" style="font-size:11px">' + sz + '</span>' : ''));
       } else if (a.file_status === 'FAILED') {
-        backup = '<span class="tag t-danger" title="' + esc(a.error || '') + '">Failed</span>';
+        backup = '<span class="tag t-danger" title="' + esc(a.error || '') + '">Failed</span> <button class="btn" data-arch-rebuild="' + a.id + '">Retry / Build now</button>';
       } else {
-        backup = '<span class="tag t-warn">Preparing…</span>';
+        backup = '<span class="tag t-warn">Preparing…</span> <button class="btn" data-arch-rebuild="' + a.id + '">Build now</button>';
       }
       return '<tr><td><span class="nm">' + esc(a.label) + '</span></td>'
         + '<td>' + esc(a.name) + ' <span class="mut" style="font-size:11px">(' + esc(a.code) + ')</span></td>'
@@ -2867,6 +2875,8 @@ async function loadArchives() {
 document.addEventListener('click', (e) => {
   const dl = e.target.closest && e.target.closest('[data-arch-dl]');
   if (dl) { downloadArchive(Number(dl.dataset.archDl), dl.dataset.archLabel); return; }
+  const rbld = e.target.closest && e.target.closest('[data-arch-rebuild]');
+  if (rbld) { rebuildArchive(Number(rbld.dataset.archRebuild)); return; }
   const rb = e.target.closest && e.target.closest('#arch-reload');
   if (rb) loadArchives();
 });

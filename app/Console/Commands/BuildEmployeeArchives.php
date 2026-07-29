@@ -136,6 +136,13 @@ class BuildEmployeeArchives extends Command
 
             $zip->close();
 
+            // #24: verify the ZIP is actually readable before advertising it as READY.
+            $verify = new \ZipArchive();
+            if ($verify->open($abs) !== true) {
+                throw new \RuntimeException('The generated ZIP could not be reopened for verification.');
+            }
+            $verify->close();
+
             $size = @filesize($abs) ?: 0;
             $archive->forceFill([
                 'file_status'    => 'READY',

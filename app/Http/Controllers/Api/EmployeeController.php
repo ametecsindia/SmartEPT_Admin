@@ -265,6 +265,38 @@ class EmployeeController extends Controller
         return response()->download($legacy, $safe . '.zip');
     }
 
+    /**
+     * POST /api/employees/archives/{archive}/rebuild — Part C #22/#24. Rebuild a stuck or failed
+     * archive ZIP SYNCHRONOUSLY, on demand. This is the escape hatch for an archive left on
+     * "Preparing" because the minute scheduler is not running: it resets the row and builds it
+     * now, so the admin never has to wait on a background worker that may be down.
+     */
+    public function rebuildArchive(Request $request, EmployeeArchive $archive): JsonResponse
+    {
+        abort_unless($archive->company_id === $request->user()->company_id, 403, 'Outside your tenant.');
+
+        $archive->forceFill(['file_status' => 'PENDING', 'error' => null])->save();
+        \Illuminate\Support\Facades\Artisan::call('smartept:build-archives', ['--id' => $archive->id]);
+
+        $fresh = $archive->fresh();
+        $this->audit($request, 'ARCHIVE_REBUILD', EmployeeArchive::class, $archive->id, [
+            'label' => $archive->archive_label, 'status' => $fresh->file_status,
+        ]);
+
+        return response()->json(['data' => [
+            'id'          => $fresh->id,
+            'file_status' => $fresh->file_status,
+            'error'       => $fresh->error,
+            'file_size'   => $fresh->file_size,
+            'media_files' => $fresh->media_files,
+            'message'     => $fresh->file_status === 'READY'
+                ? 'Archive rebuilt and ready to download.'
+                : ($fresh->file_status === 'FAILED'
+                    ? ('Rebuild failed: ' . $fresh->error)
+                    : 'Rebuild started.'),
+        ]]);
+    }
+
     private function validated(Request $request, bool $creating, ?Employee $employee = null): array
     {
         $req = $creating ? 'required' : 'sometimes';
