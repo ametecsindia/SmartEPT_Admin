@@ -1566,6 +1566,7 @@
         <div><label>Branch</label><select id="f-branch"></select></div>
         <div><label>Department</label><select id="f-dept"></select></div>
         <div><label>Team</label><select id="f-team"></select></div>
+        <div><label>Reporting Manager</label><select id="f-manager"></select></div>
         <div><label>Designation</label><select id="f-desig"></select></div>
         <div><label>Shift</label><select id="f-shift"></select></div>
         <div><label>Date of joining</label><input id="f-doj" type="date"></div>
@@ -2834,6 +2835,10 @@ async function openEmpModal(id) {
   fillSelect($('#f-team'), org.teams, (r) => r.name, (r) => r.id, '— none —');
   fillSelect($('#f-desig'), org.designations, (r) => r.name, (r) => r.id, '— none —');
   fillSelect($('#f-shift'), org.shifts, (r) => r.name + (r.start_time ? ' (' + String(r.start_time).slice(0, 5) + '–' + String(r.end_time || '').slice(0, 5) + ')' : ''), (r) => r.id, '— none —');
+  try {
+    const ud = await api('/users?per_page=200');
+    fillSelect($('#f-manager'), (ud && ud.data) ? ud.data : [], (u) => u.name + (u.email ? ' · ' + u.email : ''), (u) => u.id, '— none —');
+  } catch (e) { fillSelect($('#f-manager'), [], (u) => u.name, (u) => u.id, '— none —'); }
   const set = (sel, v) => { $(sel).value = v ?? ''; };
   if (id) {
     try {
@@ -2843,6 +2848,7 @@ async function openEmpModal(id) {
       set('#f-email', e.email); set('#f-mobile', e.mobile); set('#f-status', e.employment_status || 'ACTIVE');
       set('#f-branch', e.branch_id); set('#f-dept', e.department_id); set('#f-team', e.team_id);
       set('#f-desig', e.designation_id); set('#f-shift', e.shift_id);
+      set('#f-manager', e.reporting_manager_user_id);
       set('#f-doj', e.date_of_joining ? String(e.date_of_joining).slice(0, 10) : '');
       set('#f-bio', e.biometric_id);
       set('#f-track', e.tracking_mode || '');
@@ -2850,7 +2856,7 @@ async function openEmpModal(id) {
   } else {
     ['#f-first', '#f-last', '#f-code', '#f-email', '#f-mobile', '#f-doj', '#f-bio'].forEach((s) => set(s, ''));
     set('#f-status', 'ACTIVE');
-    ['#f-branch', '#f-dept', '#f-team', '#f-desig', '#f-shift', '#f-track'].forEach((s) => set(s, ''));
+    ['#f-branch', '#f-dept', '#f-team', '#f-manager', '#f-desig', '#f-shift', '#f-track'].forEach((s) => set(s, ''));
   }
   $('#emp-ovl').classList.add('open');
 }
@@ -3300,6 +3306,7 @@ $('#emp-m-save').onclick = async () => {
     branch_id: numOrNull('#f-branch'),
     department_id: numOrNull('#f-dept'),
     team_id: numOrNull('#f-team'),
+    reporting_manager_user_id: numOrNull('#f-manager'),
     designation_id: numOrNull('#f-desig'),
     shift_id: numOrNull('#f-shift'),
     date_of_joining: $('#f-doj').value || null,

@@ -97,14 +97,33 @@ class HierarchyService
         return Employee::query()->where('branch_id', $branchId)->pluck('id')->all();
     }
 
-    /** Basic reporting-manager validation — no self-report. (Cycle checks land in Phase 3.) */
+    /**
+     * Reporting-manager validation: no self-report and no cycle. Walks UP the proposed
+     * manager's own reporting chain; if it leads back to this employee's own login user,
+     * the link would close a loop and is rejected. $seen guards a pre-existing loop.
+     */
     public function validateReportingManager(?int $employeeId, ?int $reportingManagerUserId): bool
     {
         if (! $reportingManagerUserId || ! $employeeId) {
             return true;
         }
         $emp = Employee::find($employeeId);
+        if (! $emp || ! $emp->user_id) {
+            return true; // a non-login employee can never be someone's supervisor -> no cycle
+        }
+        $selfUser = (int) $emp->user_id;
 
-        return ! ($emp && $emp->user_id && (int) $emp->user_id === $reportingManagerUserId);
+        $seen = [];
+        $cursor = (int) $reportingManagerUserId;
+        while ($cursor && ! in_array($cursor, $seen, true)) {
+            if ($cursor === $selfUser) {
+                return false; // self-report or a loop back to this employee
+            }
+            $seen[] = $cursor;
+            // the manager-user's own supervisor = their employee row's reporting_manager_user_id
+            $cursor = (int) (Employee::where('user_id', $cursor)->value('reporting_manager_user_id') ?? 0);
+        }
+
+        return true;
     }
 }

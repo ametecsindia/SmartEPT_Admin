@@ -109,6 +109,10 @@ class EmployeeController extends Controller
         $this->assertEmployeeVisible($request, $employee->id);
 
         $data = $this->validated($request, false, $employee);
+        if (array_key_exists('reporting_manager_user_id', $data)
+            && ! app(\App\Services\HierarchyService::class)->validateReportingManager($employee->id, $data['reporting_manager_user_id'])) {
+            abort(422, 'That reporting manager would create a reporting loop.');
+        }
         $employee->update($data);
         $this->audit($request, 'UPDATE', Employee::class, $employee->id, $data);
 
@@ -286,6 +290,7 @@ class EmployeeController extends Controller
             'designation_id'       => ['nullable', 'integer', Rule::exists('designations', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
             'shift_id'             => ['nullable', 'integer', Rule::exists('shifts', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
             'manager_user_id'      => ['nullable', 'integer', Rule::exists('users', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
+            'reporting_manager_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
             'user_id'              => ['nullable', 'integer', Rule::exists('users', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
             'employment_status'    => ['nullable', 'in:ACTIVE,ON_LEAVE,RELIEVED'],
             'date_of_joining'      => ['nullable', 'date'],
