@@ -18,23 +18,10 @@ trait ScopesVisibleEmployees
     /** Employee ids this user may see in reports. null = unrestricted (whole company). */
     protected function visibleEmployeeIds(User $user): ?array
     {
-        // Honour base_slug so custom console roles inherit their base role's reach.
-        $slug = $user->role?->base_slug ?: $user->roleSlug();
-        $unrestricted = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'BRANCH_ADMIN', 'HR_ADMIN', 'COMPLIANCE_OFFICER', 'AUDITOR'];
-        if (in_array($slug, $unrestricted, true)) {
-            return null;
-        }
-
-        // Team + Employee are company-scoped by the BelongsToCompany global scope.
-        $teamIds = Team::query()
-            ->where(fn ($q) => $q->where('team_leader_user_id', $user->id)->orWhere('manager_user_id', $user->id))
-            ->pluck('id');
-
-        return Employee::query()
-            ->where(fn ($q) => $q->whereIn('team_id', $teamIds)
-                                 ->orWhere('manager_user_id', $user->id)
-                                 ->orWhere('user_id', $user->id))
-            ->pluck('id')->all();
+        // R6: reporting hierarchy is the SINGLE source of truth (App\Services\HierarchyService).
+        // Fixes Branch-Admin over-visibility + Manager/Team-Lead "all zeros", and adds the
+        // reporting_manager_user_id link. null = whole company (unrestricted role).
+        return app(\App\Services\HierarchyService::class)->visibleEmployeeIds($user);
     }
 
     /**

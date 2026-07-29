@@ -23,6 +23,7 @@ class Employee extends Model
     public function designation()  { return $this->belongsTo(Designation::class); }
     public function shift()        { return $this->belongsTo(Shift::class); }
     public function manager()      { return $this->belongsTo(User::class, 'manager_user_id'); }
+    public function reportingManager() { return $this->belongsTo(User::class, 'reporting_manager_user_id'); }
     public function user()         { return $this->belongsTo(User::class); }
     public function devices()      { return $this->hasMany(EmployeeDevice::class); }
     public function consents()     { return $this->hasMany(EmployeeMonitoringConsent::class); }
