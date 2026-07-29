@@ -282,7 +282,7 @@
 
   /* ---------- Screenshots ---------- */
   .shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:13px}
-  .shotcard{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--card);cursor:pointer;
+  .shotcard{border:1px solid var(--border);border-radius:12px;overflow:hidden;position:relative;background:var(--card);cursor:pointer;
     transition:transform .13s, box-shadow .13s, border-color .13s;box-shadow:var(--shadow-1)}
   .shotcard:hover{border-color:var(--accent-2);transform:translateY(-2px);box-shadow:var(--shadow-2)}
   .shotcard .img{height:112px;background:linear-gradient(135deg,#E7EDF3,#F2F5F9);display:flex;align-items:center;
@@ -517,6 +517,11 @@
       </div>
       <div class="card">
         <h3 id="ss-title">Screenshot timeline</h3>
+        <div id="ss-delbar" style="display:none;align-items:center;gap:10px;margin:6px 0 10px;padding:8px 12px;background:var(--warn-w,#fff6e6);border:1px solid var(--border);border-radius:10px">
+          <span id="ss-selcount" style="font-weight:600">0 selected</span>
+          <button class="btn danger" id="ss-del">Delete permanently</button>
+          <button class="btn" id="ss-selclear">Clear selection</button>
+        </div>
         <div id="ss-grid" class="shots"></div>
         <div id="ss-empty" class="hide"></div>
       </div>
@@ -1412,6 +1417,25 @@
         <button class="btn solid" id="import-run" disabled>Import now</button>
       </div>
       <div id="import-result" style="margin-top:14px;font-size:12px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREENSHOT SELECTED-DELETE CONFIRM (Part D) -->
+<div class="ovl" id="ssdel-ovl">
+  <div class="modal" style="width:460px">
+    <div class="mhead"><div class="mt"><b>Delete selected screenshots</b><span>Permanent &middot; image files removed &middot; audit-logged</span></div>
+      <button class="x" data-close="ssdel-ovl">&#10005;</button></div>
+    <div class="mbody">
+      <div id="ssdel-summary" class="mut" style="margin-bottom:10px"></div>
+      <div class="never" style="margin:0 0 12px"><b>This cannot be undone.</b> The selected screenshots and their image files are permanently deleted and the freed space is reclaimed.</div>
+      <label>Type <b>DELETE</b> to confirm</label>
+      <input id="ssdel-confirm" placeholder="DELETE" autocomplete="off">
+      <div class="err" id="ssdel-msg" style="min-height:18px"></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn" data-close="ssdel-ovl">Cancel</button>
+      <button class="btn danger" id="ssdel-run" disabled>Delete permanently</button>
     </div>
   </div>
 </div>
@@ -2359,6 +2383,7 @@ async function loadAllScreenshots(date) {
     grid.innerHTML = shots.map((s) => {
       SS_META[s.id] = s;
       return '<div class="shotcard" data-shot="' + s.id + '">'
+        + (ssCanDelete() ? '<label class="shot-pick" style="position:absolute;top:6px;left:6px;z-index:3;background:rgba(255,255,255,.9);border-radius:4px;padding:0 3px;cursor:pointer" title="Select to delete"><input type="checkbox" data-selshot="' + s.id + '"></label>' : '')
         + '<div class="img" id="ss-img-' + s.id + '">loading…</div>'
         + '<div class="m"><b>' + esc(s.employee_name || '—') + '</b> · ' + t(s.captured_at) + '<br>'
         + esc(s.active_app || s.window_title || '—')
@@ -2398,6 +2423,7 @@ async function loadScreenshots() {
     grid.innerHTML = shots.map((s) => {
       SS_META[s.id] = s;
       return '<div class="shotcard" data-shot="' + s.id + '">'
+        + (ssCanDelete() ? '<label class="shot-pick" style="position:absolute;top:6px;left:6px;z-index:3;background:rgba(255,255,255,.9);border-radius:4px;padding:0 3px;cursor:pointer" title="Select to delete"><input type="checkbox" data-selshot="' + s.id + '"></label>' : '')
         + '<div class="img" id="ss-img-' + s.id + '">loading…</div>'
         + '<div class="m"><b>' + t(s.captured_at) + '</b>'
         + esc(s.active_app || s.window_title || '—')
@@ -2461,6 +2487,7 @@ $('#ss-date').addEventListener('change', loadScreenshots);
 $('#ss-grid').addEventListener('click', (e) => {
   const card = e.target.closest('[data-shot]');
   if (!card) return;
+  if (e.target.closest('.shot-pick')) return; // selecting, not viewing
   const s = SS_META[card.dataset.shot];
   if (!s || !s.objectUrl) return;
   $('#shot-img').src = s.objectUrl;
@@ -2468,6 +2495,57 @@ $('#ss-grid').addEventListener('click', (e) => {
   $('#shot-ovl').classList.add('open');
 });
 $('#shot-ovl').addEventListener('click', () => $('#shot-ovl').classList.remove('open'));
+
+// ---- Part D: select + permanently delete screenshots (company/super admin only) ----
+function ssCanDelete() { return !!(ME && (ME.role === 'SUPER_ADMIN' || ME.role === 'COMPANY_ADMIN')); }
+let SS_SEL = new Set();
+function ssSelBar() {
+  const bar = $('#ss-delbar'); if (!bar) return;
+  bar.style.display = SS_SEL.size ? 'flex' : 'none';
+  const c = $('#ss-selcount'); if (c) c.textContent = SS_SEL.size + ' selected';
+}
+function ssClearSel() {
+  SS_SEL.clear();
+  document.querySelectorAll('input[data-selshot]:checked').forEach((c) => { c.checked = false; });
+  ssSelBar();
+}
+$('#ss-grid').addEventListener('change', (e) => {
+  const cb = e.target.closest('input[data-selshot]');
+  if (!cb) return;
+  const id = Number(cb.dataset.selshot);
+  if (cb.checked) SS_SEL.add(id); else SS_SEL.delete(id);
+  ssSelBar();
+});
+if ($('#ss-selclear')) $('#ss-selclear').onclick = ssClearSel;
+if ($('#ss-del')) $('#ss-del').onclick = () => {
+  if (!SS_SEL.size) return;
+  $('#ssdel-summary').innerHTML = '<b>' + SS_SEL.size + '</b> screenshot' + (SS_SEL.size === 1 ? '' : 's') + ' selected for permanent deletion.';
+  $('#ssdel-confirm').value = ''; $('#ssdel-msg').textContent = ''; $('#ssdel-run').disabled = true;
+  $('#ssdel-ovl').classList.add('open');
+};
+if ($('#ssdel-confirm')) $('#ssdel-confirm').addEventListener('input', () => {
+  $('#ssdel-run').disabled = $('#ssdel-confirm').value.trim() !== 'DELETE';
+});
+if ($('#ssdel-run')) $('#ssdel-run').onclick = async () => {
+  const ids = Array.from(SS_SEL);
+  const msg = $('#ssdel-msg'); msg.textContent = 'Deleting\u2026'; $('#ssdel-run').disabled = true;
+  try {
+    const r = await api('/ops/storage-cleanup', { method: 'POST', body: {
+      deletion_mode: 'selected_ids', screenshot_ids: ids, confirmation_text: 'DELETE',
+    }});
+    const failed = r.failed_count || 0;
+    if (failed === 0) ids.forEach((id) => { const card = document.querySelector('[data-shot="' + id + '"]'); if (card) card.remove(); });
+    $('#ssdel-ovl').classList.remove('open');
+    ssClearSel();
+    const freed = r.storage_reclaimed_human || '';
+    if (failed > 0) {
+      toast((r.deleted_count || 0) + ' deleted \u00b7 ' + failed + ' could not be deleted (re-select to retry)');
+      loadScreenshots();
+    } else {
+      toast((r.deleted_count || 0) + ' screenshot' + ((r.deleted_count === 1) ? '' : 's') + ' deleted permanently' + (freed ? ' \u00b7 ' + freed + ' reclaimed' : ''));
+    }
+  } catch (e) { msg.textContent = e.message; $('#ssdel-run').disabled = false; }
+};
 
 // ---- 2b. webcam wall (EPT25-05) ----
 let WC_SEQ = 0;

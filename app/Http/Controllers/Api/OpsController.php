@@ -130,8 +130,25 @@ class OpsController extends Controller
     public function storageCleanup(Request $request): JsonResponse
     {
         $user = $request->user();
+        $companyId = $user->company_id;
+        abort_unless($companyId, 422, 'Sign in as a company admin to run a cleanup.');
+
+        // Part D: two deletion modes. 'selected_ids' deletes explicitly-chosen screenshots and
+        // must NOT require a date range; 'date_range' is the original bulk-by-range cleanup.
+        // Conditional validation keyed on deletion_mode (fixes "the from date field is required").
+        if ($request->input('deletion_mode') === 'selected_ids') {
+            $data = $request->validate([
+                'deletion_mode'     => ['required', 'in:selected_ids,date_range'],
+                'screenshot_ids'    => ['required', 'array', 'min:1'],
+                'screenshot_ids.*'  => ['integer'],
+                'confirmation_text' => ['required', 'in:DELETE'],
+            ]);
+
+            return $this->deleteSelectedScreenshots($request, $companyId, $data['screenshot_ids']);
+        }
 
         $data = $request->validate([
+            'deletion_mode' => ['nullable', 'in:selected_ids,date_range'],
             'from_date' => ['required', 'date'],
             'to_date'   => ['required', 'date', 'after_or_equal:from_date'],
             'targets'   => ['required', 'array', 'min:1'],
@@ -139,9 +156,6 @@ class OpsController extends Controller
             'keep_violation_evidence' => ['boolean'],
             'delete_violation_records' => ['boolean'],
         ]);
-
-        $companyId = $user->company_id;
-        abort_unless($companyId, 422, 'Sign in as a company admin to run a cleanup.');
 
         $from = Carbon::parse($data['from_date'])->startOfDay();
         $to = Carbon::parse($data['to_date'])->endOfDay();
@@ -206,6 +220,55 @@ class OpsController extends Controller
         ]);
 
         return response()->json(['ok' => true, 'result' => $result]);
+    }
+
+    /**
+     * Part D — permanently delete explicitly-selected screenshots (image file + thumbnail row),
+     * tenant-scoped (Part E). A file that will not delete leaves its DB row intact so storage and
+     * DB stay in sync and the admin can retry; it is reported as a failure, never a silent success.
+     */
+    private function deleteSelectedScreenshots(Request $request, int $companyId, array $ids): JsonResponse
+    {
+        $ids = array_values(array_unique(array_map('intval', $ids)));
+        $requested = count($ids);
+        $deleted = 0; $failed = 0; $bytes = 0; $reasons = [];
+
+        EmployeeScreenshotLog::where('company_id', $companyId) // tenant guard
+            ->whereIn('id', $ids)
+            ->orderBy('id')
+            ->chunkById(200, function ($logs) use (&$deleted, &$failed, &$bytes, &$reasons) {
+                foreach ($logs as $log) {
+                    $file = $log->storage_file_id ? StorageFile::find($log->storage_file_id) : null;
+                    if ($file) {
+                        try {
+                            Storage::disk($file->storage_driver ?: 'local')->delete($file->storage_key);
+                        } catch (\Throwable $e) {
+                            $failed++;
+                            $reasons[] = 'shot ' . $log->id . ': ' . $e->getMessage();
+                            continue; // keep the row so DB/storage stay in sync + it can be retried
+                        }
+                        $bytes += (int) $file->size_bytes;
+                        $file->delete();
+                    }
+                    $log->delete();
+                    $deleted++;
+                }
+            });
+
+        $this->audit($request, 'SCREENSHOT_DELETE', null, null, [
+            'mode' => 'selected_ids', 'requested' => $requested,
+            'deleted' => $deleted, 'failed' => $failed, 'bytes' => $bytes,
+        ]);
+
+        return response()->json([
+            'success'                 => $failed === 0,
+            'requested_count'         => $requested,
+            'deleted_count'           => $deleted,
+            'failed_count'            => $failed,
+            'storage_reclaimed_bytes' => $bytes,
+            'storage_reclaimed_human' => $this->human($bytes),
+            'fail_reasons'            => array_slice($reasons, 0, 20),
+        ]);
     }
 
     /** GET /api/ops/retention — the company's auto-cleanup schedule parameters. */
