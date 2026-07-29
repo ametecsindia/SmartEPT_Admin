@@ -921,6 +921,39 @@
         <div class="mut" id="pr-note" style="margin-top:8px"></div>
       </div>
 
+      <!-- Part A: Productivity v2 (transparent, auditable) — runs alongside the classic report -->
+      <div class="card" id="pv2-card">
+        <h3>Productivity v2 &mdash; transparent formula
+          <span id="pv2-info" tabindex="0" title="Show how Productivity % is calculated" style="cursor:help;display:inline-block;width:18px;height:18px;line-height:18px;text-align:center;border-radius:50%;background:var(--accent,#0E7C8F);color:#fff;font-size:12px;margin-left:6px">i</span>
+          <span class="hint">every bucket shown &middot; Production &divide; (Production + Non&#8209;Productivity)</span>
+        </h3>
+        <div id="pv2-formula" class="never" style="display:none;margin:6px 0 12px;line-height:1.7">
+          <b>Productivity %</b> = Actual Production Hours &divide; (Actual Production Hours + Actual Non&#8209;Productivity Hours) &times; 100<br>
+          <b>Actual Production Hours</b> = Productive Active Time + Attended Meeting Time + Approved Productive Manual Time<br>
+          <b>Actual Non&#8209;Productivity Hours</b> = Non&#8209;Productive Active Time + Idle Time + Exceeded Break Time + Unapproved Offline/Timeout Time + Unclassified Active Time<br>
+          Permitted break time actually taken is excluded. Only break time beyond the allotment is counted. When there is no production and no non&#8209;productivity, Productivity % shows <b>N/A</b> (never 0%).
+        </div>
+        <div class="filters" style="border:none;box-shadow:none;padding:0;background:none;margin-bottom:12px">
+          <label>From</label><input type="date" id="pv2-from" style="min-width:0">
+          <label>To</label><input type="date" id="pv2-to" style="min-width:0">
+          <button class="btn" id="pv2-today">Today</button>
+          <button class="btn" id="pv2-week">Week</button>
+          <button class="btn" id="pv2-month">Month</button>
+          <button class="btn acc" id="pv2-load">Show</button>
+          <input id="pv2-q" placeholder="Search employee" autocomplete="off" style="min-width:0;width:150px">
+          <label>Data quality</label>
+          <select id="pv2-dq" style="min-width:0"><option value="">All</option><option>Valid</option><option>Incomplete Data</option><option>Missing Logout</option><option>Calculation Mismatch</option></select>
+          <label>Min %</label><input id="pv2-min" type="number" min="0" max="100" style="width:64px">
+          <span style="flex:1"></span>
+          <button class="btn" id="pv2-csv">&#8659; CSV</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table id="pv2-table"><thead><tr id="pv2-head"></tr></thead><tbody id="pv2-rows"><tr><td class="mut">Pick a range and press Show.</td></tr></tbody></table>
+        </div>
+        <div id="pv2-totals" class="mut" style="margin-top:10px;padding:8px 10px;background:var(--card-2,#eef6f7);border-radius:8px"></div>
+        <div class="mut" id="pv2-note" style="margin-top:8px"></div>
+      </div>
+
       <!-- Section 3 & 14: Break report -->
       <div class="card">
         <h3>Break report <span class="hint">permitted vs actual, excess &amp; the employee's reason · Meeting is never a break</span></h3>
@@ -4582,6 +4615,89 @@ function prPDF() {
   w.document.close();
 }
 
+const PV2_COLS = [
+  ['work_date','Date','raw'],['branch','Branch','raw'],['department','Department','raw'],
+  ['reporting_manager','Reporting Manager','raw'],['team_lead','Team Lead','raw'],
+  ['employee_code','Code','raw'],['employee_name','Employee','raw'],['designation','Designation','raw'],
+  ['shift_name','Shift','raw'],['shift_start','Shift Start','raw'],['shift_end','Shift End','raw'],
+  ['first_login','First Login','raw'],['last_logout','Last Logout','raw'],
+  ['present_seconds','Present','sec'],['late_seconds','Late','sec'],['early_logout_seconds','Early Logout','sec'],
+  ['offline_timeout_seconds','Offline/Timeout','sec'],['timeout_count','Timeouts','num'],
+  ['total_active_seconds','Total Active','sec'],['productive_active_seconds','Productive Active','sec'],
+  ['nonproductive_active_seconds','Non-Prod Active','sec'],['unclassified_active_seconds','Unclassified','sec'],
+  ['scheduled_meeting_seconds','Sched Meeting','sec'],['attended_meeting_seconds','Attended Meeting','sec'],
+  ['online_meeting_seconds','Online Mtg','sec'],['offline_meeting_seconds','Offline Mtg','sec'],
+  ['meetings_scheduled','Mtgs Sched','num'],['meetings_attended','Mtgs Att','num'],['meetings_missed','Mtgs Missed','num'],
+  ['idle_seconds','Idle','sec'],['break_count','Break Count','num'],['total_break_seconds','Total Break','sec'],
+  ['allotted_break_seconds','Allotted Break','sec'],['permitted_break_seconds','Permitted Used','sec'],
+  ['exceeded_break_seconds','Exceeded Break','sec'],['tea_break_seconds','Tea','sec'],
+  ['lunch_break_seconds','Lunch','sec'],['other_break_seconds','Other Break','sec'],
+  ['approved_manual_seconds','Approved Manual','sec'],['actual_production_seconds','Actual Production','sec'],
+  ['actual_nonproductivity_seconds','Actual Non-Prod','sec'],['productivity_calc_seconds','Prod Calc Time','sec'],
+  ['productivity_percent','Productivity %','pct'],['formula_version','Formula','raw'],
+  ['violations_count','Violations','num'],['screenshots_count','Screenshots','num'],
+  ['data_quality','Data Quality','raw'],['remarks','Remarks','raw'],
+];
+function pvhms(s){ s=Math.max(0,Math.round(s||0)); const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),c=s%60; return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(c).padStart(2,'0'); }
+function pv2fmt(v,t){ if(t==='sec')return pvhms(v); if(t==='pct')return (v==null?'N/A':(Number(v).toFixed(1)+'%')); if(t==='num')return (v==null?0:v); return esc(v==null?'':v); }
+let PV2_ROWS=[];
+async function loadProductivityV2(){
+  const from=$('#pv2-from').value||today(), to=$('#pv2-to').value||today();
+  if(!$('#pv2-head').innerHTML) $('#pv2-head').innerHTML=PV2_COLS.map(c=>'<th style="white-space:nowrap">'+esc(c[1])+'</th>').join('');
+  $('#pv2-rows').innerHTML='<tr><td colspan="'+PV2_COLS.length+'" class="mut">Loading…</td></tr>';
+  try{
+    const d=await api('/reports/productivity-v2?from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to));
+    PV2_ROWS=d.data||[];
+    renderPV2();
+    $('#pv2-note').textContent=(d.count||0)+' rows · '+from+' → '+to+' · Formula '+(d.formula_version||'v2.0')+' · Productivity % = Production ÷ (Production + Non-Productivity), N/A when both are zero.';
+  }catch(e){ $('#pv2-rows').innerHTML='<tr><td colspan="'+PV2_COLS.length+'" class="mut">'+esc(e.message)+'</td></tr>'; }
+}
+function pv2Filtered(){
+  const q=($('#pv2-q').value||'').toLowerCase().trim(), dq=$('#pv2-dq').value, min=parseFloat($('#pv2-min').value);
+  return PV2_ROWS.filter(r=>{
+    if(q && ((r.employee_name||'')+' '+(r.employee_code||'')).toLowerCase().indexOf(q)===-1) return false;
+    if(dq && r.data_quality!==dq) return false;
+    if(!isNaN(min) && (r.productivity_percent==null || r.productivity_percent<min)) return false;
+    return true;
+  });
+}
+function renderPV2(){
+  const rows=pv2Filtered();
+  $('#pv2-rows').innerHTML = rows.length ? rows.map(r=>'<tr'+(r.live?' style="background:var(--warn-w,#fff6e6)"':'')+'>'+
+    PV2_COLS.map(function(col){ const k=col[0], t=col[2];
+      let cls=(t==='sec'||t==='num'||t==='pct')?' style="text-align:right;white-space:nowrap"':'';
+      if(k==='data_quality' && r[k]!=='Valid') cls=' style="color:var(--warn,#b9770e);font-weight:600"';
+      let val=pv2fmt(r[k],t);
+      if(k==='productivity_percent') val='<b>'+val+'</b>';
+      return '<td'+cls+'>'+val+'</td>';
+    }).join('')+'</tr>').join('') : '<tr><td colspan="'+PV2_COLS.length+'" class="mut">No rows match.</td></tr>';
+  let present=0,pa=0,mtg=0,prod=0,idle=0,exb=0,np=0,calc=0;
+  rows.forEach(r=>{present+=r.present_seconds;pa+=r.productive_active_seconds;mtg+=r.attended_meeting_seconds;prod+=r.actual_production_seconds;idle+=r.idle_seconds;exb+=r.exceeded_break_seconds;np+=r.actual_nonproductivity_seconds;calc+=r.productivity_calc_seconds;});
+  const wp = calc>0 ? (prod/calc*100) : null;
+  $('#pv2-totals').innerHTML = rows.length ? ('<b>Filtered totals (weighted):</b> Present '+pvhms(present)+' · Productive Active '+pvhms(pa)+' · Meeting '+pvhms(mtg)+' · Production '+pvhms(prod)+' · Idle '+pvhms(idle)+' · Exceeded Break '+pvhms(exb)+' · Non-Productivity '+pvhms(np)+' · <b>Weighted Productivity '+(wp==null?'N/A':wp.toFixed(1)+'%')+'</b>') : '';
+}
+function pv2CSV(){
+  const rows=pv2Filtered();
+  const ver=(PV2_ROWS[0]?PV2_ROWS[0].formula_version:'v2.0');
+  const meta='Productivity % = Production / (Production + Non-Productivity) x 100. Production = Productive Active + Attended Meeting + Approved Manual. Non-Productivity = Non-Productive Active + Idle + Exceeded Break + Offline/Timeout + Unclassified. Permitted break excluded. Formula '+ver;
+  const head=PV2_COLS.map(c=>c[1]);
+  const body=rows.map(r=>PV2_COLS.map(function(col){ const k=col[0],t=col[2]; if(t==='sec')return pvhms(r[k]); if(k==='productivity_percent')return (r[k]==null?'N/A':r[k]); return (r[k]==null?'':r[k]); }));
+  const csv=[['# '+meta],[''],head].concat(body).map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='smartept-productivity-v2-'+($('#pv2-from').value||today())+'_'+($('#pv2-to').value||today())+'.csv'; a.click(); URL.revokeObjectURL(a.href);
+}
+function initProductivityV2(){
+  if(!$('#pv2-from').value){ const d=new Date(); $('#pv2-from').value=isoDate(new Date(d.getFullYear(),d.getMonth(),1)); $('#pv2-to').value=today(); }
+  $('#pv2-load').onclick=loadProductivityV2;
+  $('#pv2-today').onclick=()=>{ $('#pv2-from').value=today(); $('#pv2-to').value=today(); loadProductivityV2(); };
+  $('#pv2-week').onclick=()=>{ const d=new Date(); const g=(d.getDay()+6)%7; const mon=new Date(d); mon.setDate(d.getDate()-g); $('#pv2-from').value=isoDate(mon); $('#pv2-to').value=today(); loadProductivityV2(); };
+  $('#pv2-month').onclick=()=>{ const d=new Date(); $('#pv2-from').value=isoDate(new Date(d.getFullYear(),d.getMonth(),1)); $('#pv2-to').value=today(); loadProductivityV2(); };
+  $('#pv2-csv').onclick=pv2CSV;
+  $('#pv2-q').addEventListener('input',renderPV2);
+  $('#pv2-dq').addEventListener('change',renderPV2);
+  $('#pv2-min').addEventListener('input',renderPV2);
+  if($('#pv2-info')) $('#pv2-info').onclick=()=>{ const f=$('#pv2-formula'); f.style.display=(f.style.display==='none'?'':'none'); };
+}
 function initReports() {
   if (!$('#pr-from').value) { const d = new Date(); $('#pr-from').value = isoDate(new Date(d.getFullYear(), d.getMonth(), 1)); $('#pr-to').value = today(); }
   $('#pr-load').onclick = loadProductivity;
@@ -4590,6 +4706,7 @@ function initReports() {
   $('#pr-month').onclick = () => { const d = new Date(); prSetRange(isoDate(new Date(d.getFullYear(), d.getMonth(), 1)), today()); };
   $('#pr-csv').onclick = prCSV;
   $('#pr-pdf').onclick = prPDF;
+  initProductivityV2();
   loadProductivity();
   // Section 3 & 14: break + meeting reports.
   if (!$('#br-from').value) { $('#br-from').value = today(); $('#br-to').value = today(); }
