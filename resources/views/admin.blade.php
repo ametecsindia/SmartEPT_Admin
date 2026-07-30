@@ -906,6 +906,7 @@
           <button class="btn" id="pr-week">This week</button>
           <button class="btn" id="pr-month">This month</button>
           <button class="btn acc" id="pr-load">Show</button>
+          <button class="btn" id="pr-rebuild" title="Rebuild missing day-summaries for this range &mdash; use if history is empty (nightly job / scheduler not run)">&#8635; Rebuild history</button>
           <input id="pr-q" placeholder="Search employee" autocomplete="off" style="min-width:0;width:160px">
           <span style="flex:1"></span>
           <button class="btn" id="pr-csv">⇓ CSV</button>
@@ -4580,6 +4581,17 @@ function mtgSecs(s) { s = s || 0; const h = Math.floor(s / 3600), m = Math.round
 // ---- Live productivity report (17-Jul) ----
 let PROD_ROWS = [];
 const hms = (s) => { s = Math.max(0, Math.round(s || 0)); const h = Math.floor(s/3600), m = Math.round((s%3600)/60); return h ? h + 'h ' + m + 'm' : m + 'm'; };
+async function prRebuild() {
+  const from = $('#pr-from').value || today(), to = $('#pr-to').value || today();
+  const btn = $('#pr-rebuild'); const label = btn.textContent; btn.disabled = true; btn.textContent = 'Rebuilding\u2026';
+  try {
+    const r = await api('/reports/productivity/rebuild?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to), { method: 'POST' });
+    toast(r.message || ('Rebuilt ' + (r.built || 0) + ' days'));
+    loadProductivity();
+    if (typeof loadProductivityV2 === 'function' && typeof PV2_ROWS !== 'undefined' && PV2_ROWS.length) loadProductivityV2();
+  } catch (e) { toast(e.message); }
+  finally { btn.disabled = false; btn.textContent = label; }
+}
 function prSetRange(from, to) { $('#pr-from').value = from; $('#pr-to').value = to; loadProductivity(); }
 function isoDate(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 async function loadProductivity() {
@@ -4728,6 +4740,7 @@ function initProductivityV2(){
 function initReports() {
   if (!$('#pr-from').value) { const d = new Date(); $('#pr-from').value = isoDate(new Date(d.getFullYear(), d.getMonth(), 1)); $('#pr-to').value = today(); }
   $('#pr-load').onclick = loadProductivity;
+  $('#pr-rebuild').onclick = prRebuild;
   $('#pr-today').onclick = () => prSetRange(today(), today());
   $('#pr-week').onclick = () => { const d = new Date(); const g = (d.getDay()+6)%7; const mon = new Date(d); mon.setDate(d.getDate()-g); prSetRange(isoDate(mon), today()); };
   $('#pr-month').onclick = () => { const d = new Date(); prSetRange(isoDate(new Date(d.getFullYear(), d.getMonth(), 1)), today()); };

@@ -429,6 +429,70 @@ class ProductivityController extends Controller
         ];
     }
 
+    /**
+     * POST /api/reports/productivity/rebuild?from=&to= — backfill any MISSING daily summaries for
+     * the range on demand. The nightly smartept:daily-summary only runs at 00:30; when the OS
+     * scheduler is not running, past days never get summarised and the report shows only today.
+     * This rebuilds them synchronously (idempotent, role-scoped) so history appears immediately.
+     */
+    public function rebuildSummaries(Request $request): JsonResponse
+    {
+        $companyId = $request->user()->company_id;
+        $tz = $this->bizTz($request);
+        $today = $this->bizToday($tz);
+        $fromDate = $request->query('from', $today);
+        $toDate = $request->query('to', $today);
+
+        $start = Carbon::parse($fromDate);
+        $end = Carbon::parse($toDate);
+        abort_if($start->diffInDays($end) > 62, 422, 'Please rebuild at most about two months at a time.');
+
+        $visible = $this->scopedEmployeeIds($request);
+        $employees = Employee::where('company_id', $companyId)
+            ->when($visible !== null, fn ($q) => $q->whereIn('id', $visible))
+            ->where('employment_status', 'ACTIVE')
+            ->with('shift')->get();
+
+        // Days already summarised -> skip (keep the rebuild cheap + idempotent).
+        $existing = EmployeeDailySummary::where('company_id', $companyId)
+            ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
+            ->whereBetween('work_date', [$fromDate, $toDate])
+            ->get(['employee_id', 'work_date'])
+            ->mapWithKeys(fn ($r) => [$r->employee_id . '|' . $r->work_date->toDateString() => true]);
+
+        $scoring = app(ScoringService::class);
+        $calendar = app(\App\Services\WorkCalendar::class);
+        $built = 0;
+
+        for ($d = $start->copy(); $d->lte($end); $d->addDay()) {
+            $ds = $d->toDateString();
+            if ($ds >= $today) {
+                continue; // today + future are computed live by the report itself
+            }
+            foreach ($employees as $emp) {
+                if (isset($existing[$emp->id . '|' . $ds])) {
+                    continue;
+                }
+                // Build working days, or any day the employee actually has an attendance row.
+                if (! $calendar->isWorkingDay($emp, $ds)
+                    && ! EmployeeAttendanceLog::where('employee_id', $emp->id)->where('work_date', $ds)->exists()) {
+                    continue;
+                }
+                $scoring->buildSummary($emp, $ds);
+                $built++;
+            }
+        }
+
+        $this->audit($request, 'PRODUCTIVITY_REBUILD', null, null, [
+            'from' => $fromDate, 'to' => $toDate, 'built' => $built,
+        ]);
+
+        return response()->json(['ok' => true, 'built' => $built,
+            'message' => $built > 0
+                ? ($built . ' day-summaries rebuilt for ' . $fromDate . ' to ' . $toDate . '.')
+                : 'Nothing to rebuild — those days are already summarised, or have no attendance yet.']);
+    }
+
     private function row(Employee $emp, string $date, array $m): array
     {
         $present = (int) $m['present'];

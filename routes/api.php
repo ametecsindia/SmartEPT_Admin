@@ -210,6 +210,7 @@ Route::middleware(['auth:sanctum', 'company.active'])->group(function () {
         Route::get('reports/time-utilization', [UsageController::class, 'timeUtilization']); // dashboard 'where the hours went'
         Route::get('reports/productivity', [ProductivityController::class, 'report']); // 17-Jul all-employee day-wise productivity
         Route::get('reports/productivity-v2', [ProductivityController::class, 'reportV2']); // Part A — transparent auditable formula (alongside classic)
+        Route::post('reports/productivity/rebuild', [ProductivityController::class, 'rebuildSummaries']); // backfill missing daily summaries on demand
         Route::get('reports/employee/{employee}/app-usage', [UsageController::class, 'appReport']);
         Route::get('reports/employee/{employee}/website-usage', [UsageController::class, 'websiteReport']);
         Route::get('reports/employee/{employee}/compliance', [ComplianceController::class, 'report']);
