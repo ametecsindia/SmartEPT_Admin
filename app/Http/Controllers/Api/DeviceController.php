@@ -5,17 +5,22 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\EmployeeDevice;
+use App\Support\ScopesVisibleEmployees;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
 class DeviceController extends Controller
 {
+    use ScopesVisibleEmployees;
+
     /** GET /api/devices — admin/manager view of registered endpoints (tenant-scoped). */
     public function index(Request $request): JsonResponse
     {
+        $visible = $this->visibleEmployeeIds($request->user());
         $devices = EmployeeDevice::query()
             ->with('employee:id,first_name,last_name,employee_code,team_id')
+            ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
             ->when($request->status, fn ($q, $v) => $q->where('current_status', $v))
             ->latest('last_heartbeat_at')
             ->paginate((int) $request->integer('per_page', 25));
@@ -338,6 +343,11 @@ class DeviceController extends Controller
      */
     public function forceLogout(Request $request, EmployeeDevice $device): JsonResponse
     {
+        // Branch Admin / Manager may only force-logout devices of employees within their scope.
+        if ($device->employee_id) {
+            $this->assertEmployeeVisible($request, (int) $device->employee_id);
+        }
+
         $device->employee?->user?->tokens()
             ->where('name', 'device:' . $device->device_uuid)->delete();
 

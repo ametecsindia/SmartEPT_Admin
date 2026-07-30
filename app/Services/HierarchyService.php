@@ -49,25 +49,57 @@ class HierarchyService
      */
     public function subtreeEmployeeIds(User $user): array
     {
-        // Supervisors in scope: the user + team-leads of the teams they MANAGE
-        // (so a Manager sees the people under each of their Team Leads).
-        $supervisorIds = [$user->id];
-        $subLeadIds = Team::query()->where('manager_user_id', $user->id)
-            ->whereNotNull('team_leader_user_id')->pluck('team_leader_user_id')->all();
-        $supervisorIds = array_values(array_unique(array_merge($supervisorIds, $subLeadIds)));
+        // TRANSITIVE closure over the reporting tree (BFS): expand each supervisor to their
+        // reports; any report who is themselves a login user (a Team Lead / sub-manager)
+        // becomes a new supervisor to expand — so a Manager sees the Team Leads AND every
+        // member reporting to those Team Leads, all the way down. $seen guards cycles.
+        $seen = [];
+        $queue = [(int) $user->id];
+        $employeeIds = [];
 
-        $teamIds = Team::query()
-            ->where(fn ($q) => $q->whereIn('team_leader_user_id', $supervisorIds)
-                                 ->orWhereIn('manager_user_id', $supervisorIds))
-            ->pluck('id')->all();
+        while ($queue) {
+            $sup = (int) array_shift($queue);
+            if (isset($seen[$sup])) {
+                continue;
+            }
+            $seen[$sup] = true;
 
-        return Employee::query()
-            ->where(fn ($q) => $q
-                ->whereIn('reporting_manager_user_id', $supervisorIds)
-                ->orWhereIn('manager_user_id', $supervisorIds)
-                ->orWhereIn('team_id', $teamIds ?: [0])
-                ->orWhere('user_id', $user->id))
-            ->pluck('id')->all();
+            // Teams this supervisor leads or manages (their members are in scope).
+            $teamIds = Team::query()
+                ->where(fn ($q) => $q->where('team_leader_user_id', $sup)->orWhere('manager_user_id', $sup))
+                ->pluck('id')->all();
+
+            $reports = Employee::query()
+                ->where(fn ($q) => $q
+                    ->where('reporting_manager_user_id', $sup)
+                    ->orWhere('manager_user_id', $sup)
+                    ->when($teamIds, fn ($qq) => $qq->orWhereIn('team_id', $teamIds)))
+                ->get(['id', 'user_id']);
+
+            foreach ($reports as $r) {
+                $employeeIds[(int) $r->id] = true;
+                // A report who is also a login user supervises their own reports — expand them.
+                if ($r->user_id && ! isset($seen[(int) $r->user_id])) {
+                    $queue[] = (int) $r->user_id;
+                }
+            }
+
+            // Team-leads of teams this supervisor MANAGES are supervisors too (even if their
+            // own employee row was not caught above), so their sub-members are included.
+            foreach (Team::query()->where('manager_user_id', $sup)
+                ->whereNotNull('team_leader_user_id')->pluck('team_leader_user_id') as $tl) {
+                if (! isset($seen[(int) $tl])) {
+                    $queue[] = (int) $tl;
+                }
+            }
+        }
+
+        // Always include the caller's own employee row.
+        foreach (Employee::query()->where('user_id', $user->id)->pluck('id') as $id) {
+            $employeeIds[(int) $id] = true;
+        }
+
+        return array_keys($employeeIds);
     }
 
     private function ownRowOnly(User $user): array

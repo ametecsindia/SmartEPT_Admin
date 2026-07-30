@@ -1890,6 +1890,7 @@ function applyAttendanceMode() {
 // QA Phase 4 (B5): does the current user hold a permission? Super/Company Admin
 // always do (they bypass every check server-side); everyone else is checked against
 // the permission list the /auth/me + login payload carry.
+function canManageUsers() { return !!(ME && ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR_ADMIN'].includes(ME.role)); }
 function can(perm) {
   if (!ME) return false;
   if (ME.role === 'SUPER_ADMIN' || ME.role === 'COMPANY_ADMIN') return true;
@@ -4928,6 +4929,7 @@ const ROLES = [
 ];
 let USER_LIST = [], USER_EDIT_ID = null, USER_SEARCH_TIMER = null;
 async function loadUsers() {
+  if ($('#u-add')) $('#u-add').style.display = canManageUsers() ? '' : 'none';
   const q = $('#u-q').value.trim();
   try {
     const d = await api('/users?per_page=200' + (q ? '&q=' + encodeURIComponent(q) : ''));
@@ -4943,9 +4945,9 @@ async function loadUsers() {
         + '<td><span class="tag ' + (u.status === 'ACTIVE' ? 't-ok' : 't-off') + '">' + esc(u.status || '—') + '</span></td>'
         + '<td>' + (u.last_login_at ? dt(u.last_login_at) : '—') + '</td>'
         + '<td class="row" style="flex-wrap:nowrap">'
-        + '<button class="btn" data-uact="edit">Edit</button>'
+        + (canManageUsers() ? '<button class="btn" data-uact="edit">Edit</button>' : '')
         + '<button class="btn" data-uact="reset">Reset password</button>'
-        + (u.status === 'ACTIVE' ? '<button class="btn danger" data-uact="disable">Disable</button>' : '')
+        + (canManageUsers() && u.status === 'ACTIVE' ? '<button class="btn danger" data-uact="disable">Disable</button>' : '')
         + '</td></tr>';
     }).join('') || '<tr><td colspan="7" class="mut">No users' + (q ? ' matching "' + esc(q) + '"' : ' yet — add the first login account') + '.</td></tr>';
   } catch (e) {

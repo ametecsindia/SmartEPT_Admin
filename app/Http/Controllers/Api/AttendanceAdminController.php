@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\ScopesVisibleEmployees;
 use App\Http\Requests\ManualAttendanceRequest;
 use App\Models\EmployeeAttendanceLog;
 use Illuminate\Http\JsonResponse;
@@ -17,10 +18,14 @@ use Illuminate\Validation\ValidationException;
  */
 class AttendanceAdminController extends Controller
 {
+    use ScopesVisibleEmployees;
+
     /** GET /api/attendance?date=&employee_id=&status= */
     public function index(Request $request): JsonResponse
     {
+        $visible = $this->visibleEmployeeIds($request->user());
         $logs = EmployeeAttendanceLog::with('employee:id,employee_code,first_name,last_name')
+            ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
             ->when($request->query('date'), fn ($q, $v) => $q->whereDate('work_date', $v))
             ->when($request->query('employee_id'), fn ($q, $v) => $q->where('employee_id', $v))
             ->when($request->query('status'), fn ($q, $v) => $q->where('status', $v))

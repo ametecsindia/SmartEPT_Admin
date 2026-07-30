@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\MailService;
+use App\Support\ScopesVisibleEmployees;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -23,6 +24,20 @@ use Illuminate\Validation\ValidationException;
  */
 class UserController extends Controller
 {
+    use ScopesVisibleEmployees;
+
+    /** User ids the caller may manage: unrestricted -> null; else logins linked to visible employees + self. */
+    private function visibleUserIds(User $caller): ?array
+    {
+        $emps = $this->visibleEmployeeIds($caller);
+        if ($emps === null) {
+            return null;
+        }
+        $ids = Employee::whereIn('id', $emps)->pluck('user_id')->filter()->map(fn ($v) => (int) $v)->all();
+        $ids[] = (int) $caller->id;
+
+        return array_values(array_unique($ids));
+    }
     /** GET /api/users — paginated, filter ?q= (name/email) and ?role=slug. */
     public function index(Request $request): JsonResponse
     {
@@ -32,6 +47,7 @@ class UserController extends Controller
             ->with(['role:id,name,slug', 'employee:id,user_id,employee_code,first_name,last_name'])
             // Manual tenant scope: Super Admin sees every tenant, everyone else only their own.
             ->when(! $caller->isSuperAdmin(), fn ($q) => $q->where('company_id', $caller->company_id))
+            ->when(($__vis = $this->visibleUserIds($caller)) !== null, fn ($q) => $q->whereIn('id', $__vis))
             ->when($request->q, fn ($q, $v) => $q->where(fn ($w) =>
                 $w->where('name', 'like', "%{$v}%")
                   ->orWhere('email', 'like', "%{$v}%")))
@@ -166,6 +182,8 @@ class UserController extends Controller
     public function resetPassword(Request $request, User $user): JsonResponse
     {
         $this->guardTenant($request->user(), $user);
+        $vis = $this->visibleUserIds($request->user());
+        abort_unless($vis === null || in_array($user->id, $vis, true), 403, 'That user is not in your team.');
 
         $data = $request->validate(['password' => ['nullable', 'string', 'min:8', 'max:72']]);
         $temp = $data['password'] ?? Str::password(10);

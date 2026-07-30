@@ -75,12 +75,21 @@ Route::middleware(['auth:sanctum', 'company.active'])->group(function () {
     // ---- User account lifecycle (Release-1 item 1) ----
     // Admin management of login accounts: create with one-time temp password,
     // update role/status, reset password, soft-disable. Tenant-scoped in controller.
-    Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,HR_ADMIN')->group(function () {
+    // List + password reset: also Branch Admin / Manager (scoped to their team in the controller).
+    Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,HR_ADMIN,BRANCH_ADMIN,MANAGER')->group(function () {
         Route::get('users', [UserController::class, 'index']);
+        Route::post('users/{user}/reset-password', [UserController::class, 'resetPassword']);
+    });
+    // Create / change role / delete a login: HR-level only.
+    Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,HR_ADMIN')->group(function () {
         Route::post('users', [UserController::class, 'store']);
         Route::put('users/{user}', [UserController::class, 'update']);
-        Route::post('users/{user}/reset-password', [UserController::class, 'resetPassword']);
         Route::delete('users/{user}', [UserController::class, 'destroy']);
+    });
+
+    // Attendance VIEW: HR + Branch Admin / Manager / Team Lead (scoped to their reports in the controller).
+    Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,HR_ADMIN,BRANCH_ADMIN,MANAGER,TEAM_LEADER')->group(function () {
+        Route::get('attendance', [AttendanceAdminController::class, 'index']);
     });
 
     // ---- Attendance completeness (Release-1 items 2+3) ----
@@ -90,7 +99,7 @@ Route::middleware(['auth:sanctum', 'company.active'])->group(function () {
         Route::post('holidays', [HolidayController::class, 'store']);
         Route::delete('holidays/{holiday}', [HolidayController::class, 'destroy']);
 
-        Route::get('attendance', [AttendanceAdminController::class, 'index']);
+
         Route::post('attendance', [AttendanceAdminController::class, 'store']);
         Route::put('attendance/{attendance}', [AttendanceAdminController::class, 'update']);
     });
@@ -347,12 +356,13 @@ Route::middleware(['auth:sanctum', 'company.active'])->group(function () {
 
     // R2-3 device management: unbind kills the agent token + frees the seat;
     // rebind (admin approval) re-claims a seat and lets the agent register again.
+    // Force-logout: also Branch Admin / Manager (scoped to their reports in the controller).
+    Route::post('devices/{device}/force-logout', [DeviceController::class, 'forceLogout'])
+        ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,MANAGER');
     Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN')->group(function () {
         Route::post('devices/{device}/unbind', [DeviceController::class, 'unbind']);
         Route::post('devices/{device}/rebind', [DeviceController::class, 'rebind']);
         Route::put('devices/{device}/tracking-mode', [DeviceController::class, 'trackingMode']);
-        // Section 10: end an employee's agent session on a specific device.
-        Route::post('devices/{device}/force-logout', [DeviceController::class, 'forceLogout']);
     });
 
     // ---- Policy Engine ----
