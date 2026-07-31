@@ -476,7 +476,11 @@
     <!-- 1b. ATTENDANCE -->
     <div class="view" id="v-attendance">
       <div class="filters">
-        <label>Date</label><input type="date" id="at-date" style="min-width:0">
+        <label>From</label><input type="date" id="at-date" style="min-width:0">
+        <label>To</label><input type="date" id="at-to" style="min-width:0">
+        <button class="btn" data-atr="today" type="button">Today</button>
+        <button class="btn" data-atr="week" type="button">This week</button>
+        <button class="btn" data-atr="month" type="button">This month</button>
         <label>Status</label><select id="at-status">
           <option value="">All statuses</option><option value="PRESENT">PRESENT</option><option value="ABSENT">ABSENT</option>
           <option value="HALF_DAY">HALF_DAY</option><option value="ON_LEAVE">ON_LEAVE</option>
@@ -1856,7 +1860,7 @@ function applyEmployeeChrome() {
   if (!document.getElementById('emp-ro-css')) {
     var st = document.createElement('style'); st.id = 'emp-ro-css';
     st.textContent =
-      '.role-employee .btn.solid,.role-employee .btn.danger,.role-employee [data-export],' +
+      '.role-employee .btn.solid,.role-employee .btn.danger,' +
       '.role-employee #rule-add-item,.role-employee #rule-add-type,.role-employee #rule-add-status,' +
       '.role-employee #rule-action,.role-employee #rule-seed{display:none !important}' +
       '.role-employee [data-rule-status]{pointer-events:none;opacity:.65}';
@@ -1869,7 +1873,47 @@ function applyEmployeeChrome() {
   });
   var pq = document.querySelector('#dash-prod-q'); if (pq) pq.style.display = 'none';
   var pc = pq && pq.closest('.card'); var ph = pc && pc.querySelector('h3');
-  if (ph && ph.childNodes[0] && ph.childNodes[0].nodeType === 3) ph.childNodes[0].nodeValue = 'My productivity — today ';
+  if (ph && ph.childNodes[0] && ph.childNodes[0].nodeType === 3) ph.childNodes[0].nodeValue = 'My productivity ';
+  var tuc = document.querySelector('#tu-grid'); tuc = tuc && tuc.closest('.card'); var th = tuc && tuc.querySelector('h3');
+  if (th && th.childNodes[0] && th.childNodes[0].nodeType === 3) th.childNodes[0].nodeValue = 'Time utilization ';
+  buildEmpDashRange();
+}
+function buildEmpDashRange() {
+  var dv = document.getElementById('v-dashboard');
+  if (!dv || document.getElementById('emp-dash-range')) return;
+  var bar = document.createElement('div'); bar.className = 'filters'; bar.id = 'emp-dash-range';
+  bar.innerHTML =
+    '<b style="margin-right:4px">My dashboard</b>' +
+    '<button class="btn acc" data-r="today" type="button">Today</button>' +
+    '<button class="btn" data-r="week" type="button">This week</button>' +
+    '<button class="btn" data-r="month" type="button">This month</button>' +
+    '<label>From</label><input type="date" id="edr-from" style="min-width:0">' +
+    '<label>To</label><input type="date" id="edr-to" style="min-width:0">' +
+    '<button class="btn acc" id="edr-apply" type="button">Apply</button>' +
+    '<span class="mut" id="edr-lbl" style="font-size:12px;margin-left:4px"></span>';
+  dv.insertBefore(bar, dv.firstChild);
+  var fmt = function (d) { return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2); };
+  var setR = function (from, to, reload) {
+    DASH_RANGE = { from: from, to: to };
+    var ff = document.getElementById('edr-from'), tt = document.getElementById('edr-to'), lb = document.getElementById('edr-lbl');
+    if (ff) ff.value = from; if (tt) tt.value = to;
+    if (lb) lb.textContent = (from === to) ? ('\u00b7 ' + from) : ('\u00b7 ' + from + ' \u2192 ' + to);
+    if (reload !== false) loadDashboard();
+  };
+  bar.querySelectorAll('[data-r]').forEach(function (b) {
+    b.onclick = function () {
+      var d = new Date(); var to = fmt(d); var from = to;
+      if (b.dataset.r === 'week') { var dow = (d.getDay() + 6) % 7; var m = new Date(d); m.setDate(d.getDate() - dow); from = fmt(m); }
+      else if (b.dataset.r === 'month') { from = fmt(new Date(d.getFullYear(), d.getMonth(), 1)); }
+      setR(from, to, true);
+    };
+  });
+  var ap = document.getElementById('edr-apply');
+  if (ap) ap.onclick = function () {
+    var f = document.getElementById('edr-from').value, t = document.getElementById('edr-to').value;
+    if (f && t && f <= t) setR(f, t, true);
+  };
+  var td = fmt(new Date()); setR(td, td, false); // init to Today; show('dashboard') triggers the first load
 }
 // R4 item 3: organisations without a biometric device hide the Biometric screen.
 function applyAttendanceMode() {
@@ -2289,7 +2333,10 @@ function renderLiveRows() {
       + '<td>' + secH(e.active_seconds) + '</td><td>' + secH(e.idle_seconds) + '</td><td>' + t(e.last_seen) + '</td></tr>';
   }).join('') || '<tr><td colspan="6" class="mut">' + (filtering ? 'No employees match this filter right now.' : 'No employees online yet.') + '</td></tr>';
 }
+let DASH_RANGE = null;
 async function loadDashboard() {
+  const _rf = (DASH_RANGE && DASH_RANGE.from) || today();
+  const _rt = (DASH_RANGE && DASH_RANGE.to) || today();
   try {
     const d = await api('/dashboard/live-status' + dashOrgQ());
     const c = d.cards;
@@ -2326,7 +2373,7 @@ async function loadDashboard() {
     if (isDenied(e)) { $('#live-rows').innerHTML = deniedCard(); $('#kpis').innerHTML = ''; }
   }
   try {
-    const tu = await api('/reports/time-utilization?date=' + today() + dashOrgAmp());
+    const tu = await api('/reports/time-utilization?from=' + _rf + '&to=' + _rt + dashOrgAmp());
     const apps = (tu.apps || []).map((a) => ({ name: a.app_name, secs: a.secs, category: a.category }));
     const sites = (tu.sites || []).map((x) => ({ name: x.site, secs: x.secs, category: x.category }));
     $('#tu-grid').innerHTML = '<div>' + utilBars(apps, 'Top applications') + '</div><div>' + utilBars(sites, 'Top websites') + '</div>';
@@ -2334,7 +2381,7 @@ async function loadDashboard() {
     if (isDenied(e)) $('#tu-grid').innerHTML = '<div class="mut" style="font-size:12px">Your role cannot view activity data.</div>';
   }
   try {
-    const pr = await api('/reports/productivity?from=' + today() + '&to=' + today() + dashOrgAmp());
+    const pr = await api('/reports/productivity?from=' + _rf + '&to=' + _rt + dashOrgAmp());
     $('#dash-prod-rows').innerHTML = (pr.data || []).map((x) =>
       '<tr><td>' + esc(x.employee_code || '—') + '</td><td><b>' + esc(x.name) + '</b></td>'
       + '<td class="mut">' + esc(x.department || '—') + '</td>'
@@ -4999,6 +5046,16 @@ $('#cred-copy').onclick = async () => {
 let ATT_LIST = [], ATT_EDIT_ID = null;
 function initAttendance() {
   if (!$('#at-date').value) $('#at-date').value = today();
+  if (!$('#at-to').value) $('#at-to').value = today();
+  document.querySelectorAll('#v-attendance [data-atr]').forEach(function (b) {
+    b.onclick = function () {
+      var d = new Date(); var f = function (x) { return x.getFullYear() + '-' + ('0'+(x.getMonth()+1)).slice(-2) + '-' + ('0'+x.getDate()).slice(-2); };
+      var to = f(d), from = to;
+      if (b.dataset.atr === 'week') { var dow = (d.getDay() + 6) % 7; var m = new Date(d); m.setDate(d.getDate() - dow); from = f(m); }
+      else if (b.dataset.atr === 'month') { from = f(new Date(d.getFullYear(), d.getMonth(), 1)); }
+      $('#at-date').value = from; $('#at-to').value = to; loadAttendance();
+    };
+  });
   const ySel = $('#hol-year');
   if (!ySel.options.length) {
     const y = new Date().getFullYear();
@@ -5010,11 +5067,11 @@ function initAttendance() {
   loadHolidays();
 }
 async function loadAttendance() {
-  const date = $('#at-date').value || today(), st = $('#at-status').value;
+  const from = $('#at-date').value || today(), to = $('#at-to').value || from, st = $('#at-status').value;
   // Notes accumulate one line per correction — show the latest, full text on hover.
   const lastNote = (s) => { const line = String(s || '').trim().split('\n').pop() || ''; return line.length > 70 ? line.slice(0, 70) + '…' : line; };
   try {
-    const d = await api('/attendance?per_page=200&date=' + encodeURIComponent(date) + (st ? '&status=' + encodeURIComponent(st) : ''));
+    const d = await api('/attendance?per_page=200&from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to) + (st ? '&status=' + encodeURIComponent(st) : ''));
     ATT_LIST = d.data || [];
     const sc = { PRESENT: 't-ok', ABSENT: 't-danger', HALF_DAY: 't-warn', ON_LEAVE: 't-info', MISMATCH: 't-warn' };
     $('#at-rows').innerHTML = ATT_LIST.map((r) => '<tr>'

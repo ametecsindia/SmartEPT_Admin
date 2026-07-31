@@ -232,23 +232,32 @@ class UsageController extends Controller
     {
         $companyId = $request->user()->company_id;
         $tz = $this->bizTz($request);
+        // Date-range support (employee dashboard: Today / This week / This month / From-To).
+        // When ?from & ?to are supplied, aggregate across that inclusive local-date range;
+        // otherwise fall back to the single ?date (default today) — admins unchanged.
+        $from = $request->query('from');
+        $to = $request->query('to');
+        $useRange = ($from && $to);
         $date = $request->query('date', $this->bizToday($tz));
-        $day = $this->dayUtcBounds($date, $tz);
         $visible = $this->scopedEmployeeIds($request);
 
+        $inRange = fn ($q) => $useRange
+            ? $q->whereDate('start_at', '>=', $from)->whereDate('start_at', '<=', $to)
+            : $q->whereDate('start_at', $date);   // EPT-20: agent stores LOCAL time; match the local calendar day
+
         $apps = EmployeeAppUsageLog::where('company_id', $companyId)
-            ->whereDate('start_at', $date)   // EPT-20: agent stores LOCAL time; match the local calendar day
+            ->where($inRange)
             ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
             ->selectRaw('app_name, MIN(category) as category, SUM(duration_seconds) as secs')
             ->groupBy('app_name')->orderByDesc('secs')->limit(12)->get();
 
         $sites = EmployeeWebsiteUsageLog::where('company_id', $companyId)
-            ->whereDate('start_at', $date)   // EPT-20: agent stores LOCAL time; match the local calendar day
+            ->where($inRange)
             ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
             ->selectRaw('COALESCE(domain, page_title) as site, MIN(category) as category, SUM(duration_seconds) as secs')
             ->groupBy('site')->orderByDesc('secs')->limit(12)->get();
 
-        return response()->json(['date' => $date, 'apps' => $apps, 'sites' => $sites]);
+        return response()->json(($useRange ? ['from' => $from, 'to' => $to] : ['date' => $date]) + ['apps' => $apps, 'sites' => $sites]);
     }
 
 }

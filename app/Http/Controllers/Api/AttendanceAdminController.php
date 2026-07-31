@@ -24,9 +24,12 @@ class AttendanceAdminController extends Controller
     public function index(Request $request): JsonResponse
     {
         $visible = $this->visibleEmployeeIds($request->user());
+        $from = $request->query('from');
+        $to = $request->query('to');
         $logs = EmployeeAttendanceLog::with('employee:id,employee_code,first_name,last_name')
             ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
-            ->when($request->query('date'), fn ($q, $v) => $q->whereDate('work_date', $v))
+            ->when($from && $to, fn ($q) => $q->whereDate('work_date', '>=', $from)->whereDate('work_date', '<=', $to))
+            ->when(! ($from && $to) && $request->query('date'), fn ($q) => $q->whereDate('work_date', $request->query('date')))
             ->when($request->query('employee_id'), fn ($q, $v) => $q->where('employee_id', $v))
             ->when($request->query('status'), fn ($q, $v) => $q->where('status', $v))
             ->orderByDesc('work_date')->orderBy('employee_id')
