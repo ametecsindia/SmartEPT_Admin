@@ -1845,9 +1845,31 @@ function enterApp() {
   if (!window.__mtgJoinPoll) { window.__mtgJoinPoll = setInterval(pollJoinable, 45000); setTimeout(pollJoinable, 4000); }
   applyAttendanceMode();
   applyPermissionNav();
+  applyEmployeeChrome();
   show('dashboard');
   // Temp-password logins must set their own password before doing anything else.
   if (ME.must_change_password) openForcedPwd();
+}
+function applyEmployeeChrome() {
+  if (!ME || (ME.base_role || ME.role) !== 'EMPLOYEE') return;
+  document.body.classList.add('role-employee');
+  if (!document.getElementById('emp-ro-css')) {
+    var st = document.createElement('style'); st.id = 'emp-ro-css';
+    st.textContent =
+      '.role-employee .btn.solid,.role-employee .btn.danger,.role-employee [data-export],' +
+      '.role-employee #rule-add-item,.role-employee #rule-add-type,.role-employee #rule-add-status,' +
+      '.role-employee #rule-action,.role-employee #rule-seed{display:none !important}' +
+      '.role-employee [data-rule-status]{pointer-events:none;opacity:.65}';
+    document.head.appendChild(st);
+  }
+  // Live Dashboard: keep only Time Utilization + Live Productivity (own row); hide company widgets + employee picker.
+  ['#kpis', '#dash-org'].forEach(function (sel) { var el = document.querySelector(sel); if (el) el.style.display = 'none'; });
+  ['#wf-donut', '#live-rows', '#dash-dev-rows'].forEach(function (sel) {
+    var el = document.querySelector(sel); var c = el && el.closest('.card'); if (c) c.style.display = 'none';
+  });
+  var pq = document.querySelector('#dash-prod-q'); if (pq) pq.style.display = 'none';
+  var pc = pq && pq.closest('.card'); var ph = pc && pc.querySelector('h3');
+  if (ph && ph.childNodes[0] && ph.childNodes[0].nodeType === 3) ph.childNodes[0].nodeValue = 'My productivity — today ';
 }
 // R4 item 3: organisations without a biometric device hide the Biometric screen.
 function applyAttendanceMode() {
