@@ -30,6 +30,13 @@ class HierarchyService
             return null;
         }
 
+        // Employee Self-Service: an EMPLOYEE (or a custom role based on EMPLOYEE) may only
+        // ever see their OWN employee row — never a subtree, branch or the company. This is
+        // the single hard scope that makes the read-only employee portal employee-specific.
+        if ($slug === 'EMPLOYEE') {
+            return $this->ownRowOnly($user);
+        }
+
         if ($slug === 'BRANCH_ADMIN') {
             // Branch Admin: their assigned branch only (fixes the old "sees whole company" gap).
             $branchId = $user->branch_id;
