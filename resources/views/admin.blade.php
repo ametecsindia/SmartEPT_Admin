@@ -1869,6 +1869,14 @@ function applyPermissionNav() {
   if (!ME || !ME.role) return;
   if (ME.role === 'SUPER_ADMIN' || ME.role === 'COMPANY_ADMIN') return;
   const perms = ME.permissions || [];
+  // Employee Self-Service: an EMPLOYEE (or a role based on EMPLOYEE) sees ONLY the 7 read-only tabs — hide everything else.
+  if ((ME.base_role || ME.role) === 'EMPLOYEE') {
+    var EMP_TABS = ['dashboard','attendance','screenshots','usage','violations','policies','rules'];
+    document.querySelectorAll('.nav[data-view]').forEach(function (el) {
+      if (EMP_TABS.indexOf(el.getAttribute('data-view')) === -1) el.style.display = 'none';
+    });
+    return;
+  }
   const NAVP = {
     dashboard: 'dashboard.view', screenshots: 'screenshot.view', webcam: 'webcam.view', usage: 'activity.view',
     attendance: 'attendance.view', violations: 'dashboard.view', reports: 'export.data',

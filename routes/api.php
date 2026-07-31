@@ -88,14 +88,16 @@ Route::middleware(['auth:sanctum', 'company.active'])->group(function () {
     });
 
     // Attendance VIEW: HR + Branch Admin / Manager / Team Lead (scoped to their reports in the controller).
-    Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,HR_ADMIN,BRANCH_ADMIN,MANAGER,TEAM_LEADER')->group(function () {
-        Route::get('attendance', [AttendanceAdminController::class, 'index']);
+    Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,HR_ADMIN,BRANCH_ADMIN,MANAGER,TEAM_LEADER,EMPLOYEE')->group(function () {
+        Route::get('attendance', [AttendanceAdminController::class, 'index']); // Employee Self-Service: own row only (scoped in controller)
     });
 
     // ---- Attendance completeness (Release-1 items 2+3) ----
     // Holiday calendar + manual regularization: HR-level roles only, tenant-scoped.
+    // Holiday calendar VIEW: company-wide holidays, read-only for everyone incl. Employee.
+    Route::get('holidays', [HolidayController::class, 'index'])
+        ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,HR_ADMIN,BRANCH_ADMIN,MANAGER,TEAM_LEADER,COMPLIANCE_OFFICER,AUDITOR,EMPLOYEE');
     Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,HR_ADMIN')->group(function () {
-        Route::get('holidays', [HolidayController::class, 'index']);
         Route::post('holidays', [HolidayController::class, 'store']);
         Route::delete('holidays/{holiday}', [HolidayController::class, 'destroy']);
 
@@ -216,13 +218,14 @@ Route::middleware(['auth:sanctum', 'company.active'])->group(function () {
         Route::get('reports/employee/{employee}/compliance', [ComplianceController::class, 'report']);
     });
     Route::get('dashboard/violations', [ComplianceController::class, 'feed'])
-        ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,MANAGER,TEAM_LEADER,COMPLIANCE_OFFICER,AUDITOR');
+        ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,MANAGER,TEAM_LEADER,COMPLIANCE_OFFICER,AUDITOR,EMPLOYEE');
 
     // ---- Live dashboard + timeline (M5) ----
     $mgr = 'role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,MANAGER,TEAM_LEADER,COMPLIANCE_OFFICER,AUDITOR,HR_ADMIN';
-    Route::get('dashboard/live-status', [DashboardController::class, 'liveStatus'])->middleware($mgr);
-    Route::get('dashboard/summary', [DashboardController::class, 'summary'])->middleware($mgr);
-    Route::get('dashboard/device-health', [DashboardController::class, 'deviceHealth'])->middleware($mgr);
+    $mgrEmp = $mgr . ',EMPLOYEE'; // Employee Self-Service: dashboard is employee-scoped in the controller (own row only)
+    Route::get('dashboard/live-status', [DashboardController::class, 'liveStatus'])->middleware($mgrEmp);
+    Route::get('dashboard/summary', [DashboardController::class, 'summary'])->middleware($mgrEmp);
+    Route::get('dashboard/device-health', [DashboardController::class, 'deviceHealth'])->middleware($mgrEmp);
     Route::get('reports/employee/{employee}/timeline', [ReportController::class, 'timeline'])->middleware($mgr);
     // Section 3 & 14: break report (permitted/actual/excess/reason) + meeting report.
     Route::get('reports/breaks', [BreakReportController::class, 'index'])->middleware($mgr);
@@ -368,7 +371,7 @@ Route::middleware(['auth:sanctum', 'company.active'])->group(function () {
 
     // ---- Policy Engine ----
     Route::get('policies/{type}', [PolicyController::class, 'index'])
-        ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,COMPLIANCE_OFFICER,AUDITOR');
+        ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,COMPLIANCE_OFFICER,AUDITOR,EMPLOYEE');
     Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,COMPLIANCE_OFFICER')->group(function () {
         Route::post('policies/assign', [PolicyController::class, 'assign']);
         Route::post('policies/{type}', [PolicyController::class, 'store']);
