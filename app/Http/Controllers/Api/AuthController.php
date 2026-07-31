@@ -41,6 +41,16 @@ class AuthController extends Controller
             ], 403);
         }
 
+        // Employee Self-Service: an EMPLOYEE-role login must be tied to an employee record,
+        // else scoped queries have nothing to return. Deny with a clear, safe message.
+        // Only affects the EMPLOYEE role — Admin/Manager/HR/etc. are never checked here.
+        if ($user->roleSlug() === 'EMPLOYEE' && ! $user->employee()->exists()) {
+            return response()->json([
+                'error' => ['code' => 'EMPLOYEE_NOT_LINKED',
+                    'message' => 'Your employee account is not properly linked. Please contact your administrator.'],
+            ], 403);
+        }
+
         $user->forceFill(['last_login_at' => now()])->save();
         $this->audit($request, 'LOGIN', User::class, $user->id, null, $user);
 
@@ -162,6 +172,7 @@ class AuthController extends Controller
             'company'              => $user->company?->name,
             'attendance_mode'      => $user->company?->attendance_mode ?? 'BIOMETRIC',
             'role'                 => $user->roleSlug(),
+            'base_role'            => $user->role?->base_slug,
             'role_name'            => $user->role?->name,
             'permissions'          => $user->permissionSlugs(),
             // Lets UIs force the change-password screen after a temp-password login.
