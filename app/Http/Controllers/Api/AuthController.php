@@ -173,6 +173,7 @@ class AuthController extends Controller
             'attendance_mode'      => $user->company?->attendance_mode ?? 'BIOMETRIC',
             'role'                 => $user->roleSlug(),
             'base_role'            => $user->role?->base_slug,
+            'employee_id'          => $user->employee?->id,
             'role_name'            => $user->role?->name,
             'permissions'          => $user->permissionSlugs(),
             // Lets UIs force the change-password screen after a temp-password login.

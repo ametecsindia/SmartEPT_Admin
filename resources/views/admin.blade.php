@@ -2672,6 +2672,16 @@ $('#wc-date') && $('#wc-date').addEventListener('change', loadWebcam);
 // ---- 3. usage & compliance ----
 async function initUsage() {
   if (!$('#us-date').value) $('#us-date').value = today();
+  // Employee Self-Service: skip the company-wide employee list (admin-only call that
+  // 403s and would trip a false "role cannot view" lock). Show only own detail.
+  if ((ME.base_role || ME.role) === 'EMPLOYEE') {
+    var q = document.querySelector('#us-emp-q'), sel = $('#us-emp'), od = document.querySelector('#us-open-drawer');
+    if (q) { q.style.display = 'none'; var lbl = q.previousElementSibling; if (lbl && lbl.tagName === 'LABEL') lbl.style.display = 'none'; }
+    if (od) od.style.display = 'none';
+    if (sel) { sel.style.display = 'none'; sel.innerHTML = '<option value="' + (ME.employee_id || '') + '">Me</option>'; sel.value = ME.employee_id || ''; }
+    if (ME.employee_id) loadUsage(); else $('#us-sum-rows').innerHTML = deniedCard();
+    return;
+  }
   try {
     const emps = await employeesList();
     // Default view = ALL employees (17-Jul). "— All employees —" is the first option.
