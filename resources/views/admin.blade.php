@@ -1863,7 +1863,9 @@ function applyEmployeeChrome() {
       '.role-employee .btn.solid,.role-employee .btn.danger,' +
       '.role-employee #rule-add-item,.role-employee #rule-add-type,.role-employee #rule-add-status,' +
       '.role-employee #rule-action,.role-employee #rule-seed{display:none !important}' +
-      '.role-employee [data-rule-status]{pointer-events:none;opacity:.65}';
+      '.role-employee [data-rule-status]{pointer-events:none;opacity:.65}' +
+      // employee dashboard: Workforce card is hidden, so let Time-Utilization fill the row (no empty half)
+      '.role-employee .dash-charts{grid-template-columns:1fr !important}';
     document.head.appendChild(st);
   }
   // Live Dashboard: keep only Time Utilization + Live Productivity (own row); hide company widgets + employee picker.
