@@ -25,32 +25,58 @@ class ScoringService
 {
     public function buildSummary(Employee $employee, string $date): EmployeeDailySummary
     {
-        $active = $this->sum(EmployeeActivityEvent::class, $employee->id, 'started_at', $date, ['event_type' => 'ACTIVE']);
+        // Historical bucketing fix: every source for the day is bounded by the COMPANY-LOCAL
+        // calendar day, not the raw storage/app timezone. Bounds are built in the company's
+        // timezone then converted to the app (storage) timezone so the range matches the
+        // stored wall-clock values. A cross-midnight event therefore lands on the local date
+        // its instant belongs to, and when company tz == app tz (the single-tenant default)
+        // this is byte-for-byte the old whereDate() behaviour.
+        [$dayStart, $dayEnd] = $this->localDayBounds($employee, $date);
+
+        $active = (int) EmployeeActivityEvent::where('employee_id', $employee->id)
+            ->whereBetween('started_at', [$dayStart, $dayEnd])->where('event_type', 'ACTIVE')->sum('duration_seconds');
         $idle   = max(
-            $this->sum(EmployeeActivityEvent::class, $employee->id, 'started_at', $date, ['event_type' => 'IDLE']),
-            $this->sumRaw('employee_idle_logs', $employee->id, 'idle_start', $date)
+            (int) EmployeeActivityEvent::where('employee_id', $employee->id)
+                ->whereBetween('started_at', [$dayStart, $dayEnd])->where('event_type', 'IDLE')->sum('duration_seconds'),
+            (int) \DB::table('employee_idle_logs')->where('employee_id', $employee->id)
+                ->whereBetween('idle_start', [$dayStart, $dayEnd])->sum('duration_seconds')
         );
-        $break  = $this->sumRaw('employee_break_logs', $employee->id, 'start_at', $date);
+        $break  = (int) \DB::table('employee_break_logs')->where('employee_id', $employee->id)
+            ->whereBetween('start_at', [$dayStart, $dayEnd])->sum('duration_seconds');
 
         $productive = (int) EmployeeAppUsageLog::where('employee_id', $employee->id)
-            ->whereDate('start_at', $date)
+            ->whereBetween('start_at', [$dayStart, $dayEnd])
             ->whereIn('category', ['PRODUCTIVE', 'CLIENT_REQUIRED', 'COMMUNICATION'])
             ->sum('duration_seconds');
         $nonProductive = (int) EmployeeAppUsageLog::where('employee_id', $employee->id)
-            ->whereDate('start_at', $date)
+            ->whereBetween('start_at', [$dayStart, $dayEnd])
             ->whereIn('category', ['NON_PRODUCTIVE', 'BLOCKED', 'RESTRICTED'])
             ->sum('duration_seconds');
 
         $away = (int) EmployeePresenceEvent::where('employee_id', $employee->id)
-            ->whereDate('started_at', $date)->where('event_type', 'AWAY_FROM_SCREEN')->sum('duration_seconds');
+            ->whereBetween('started_at', [$dayStart, $dayEnd])->where('event_type', 'AWAY_FROM_SCREEN')->sum('duration_seconds');
 
-        $violations = EmployeeComplianceEvent::where('employee_id', $employee->id)->whereDate('started_at', $date)->count();
-        $shots = EmployeeScreenshotLog::where('employee_id', $employee->id)->whereDate('captured_at', $date)->count();
-
-        $firstLogin = EmployeeLoginSession::where('employee_id', $employee->id)->whereDate('login_at', $date)->min('login_at');
-        $lastLogout = EmployeeLoginSession::where('employee_id', $employee->id)->whereDate('login_at', $date)->max('logout_at');
+        $violations = EmployeeComplianceEvent::where('employee_id', $employee->id)->whereBetween('started_at', [$dayStart, $dayEnd])->count();
+        $shots = EmployeeScreenshotLog::where('employee_id', $employee->id)->whereBetween('captured_at', [$dayStart, $dayEnd])->count();
 
         $attendance = EmployeeAttendanceLog::where('employee_id', $employee->id)->whereDate('work_date', $date)->first();
+
+        // First login / last logout: prefer the AUTHORITATIVE attendance edges — the same
+        // earliest-arrival (check_in_at) and reconciled final-logout (check_out_at) the LIVE
+        // "today" report shows — so a historical day and today agree, and a missing logout
+        // (which leaves a login session open across days) can no longer null-out the value.
+        // Fall back to first_login_at / final_logout_at, then to the raw login sessions of
+        // THIS local day only, so a session that ran past midnight cannot drag the wrong
+        // instant onto this date.
+        $firstLogin = $attendance?->check_in_at
+            ?? $attendance?->first_login_at
+            ?? EmployeeLoginSession::where('employee_id', $employee->id)
+                ->whereBetween('login_at', [$dayStart, $dayEnd])->min('login_at');
+        $lastLogout = $attendance?->check_out_at
+            ?? $attendance?->final_logout_at
+            ?? EmployeeLoginSession::where('employee_id', $employee->id)
+                ->whereBetween('login_at', [$dayStart, $dayEnd])->max('logout_at');
+
         $late = (int) ($attendance->late_minutes ?? 0);
         $early = (int) ($attendance->early_logout_minutes ?? 0);
 
@@ -154,6 +180,23 @@ class ScoringService
     public static function netWorkingSeconds(int $present, int $allotted): int
     {
         return max(1, $present - $allotted);
+    }
+
+    /**
+     * [start, end] instants of the employee's COMPANY-LOCAL calendar day, expressed in the
+     * app (storage) timezone so a whereBetween() over datetime columns matches the stored
+     * wall-clock values. The company timezone falls back to the app default, so single-tz
+     * installs are unaffected (bounds equal the plain local day).
+     */
+    private function localDayBounds(Employee $employee, string $date): array
+    {
+        $appTz = config('app.timezone', 'UTC');
+        $companyTz = ($employee->company?->timezone ?: null) ?: $appTz;
+
+        $start = Carbon::parse($date, $companyTz)->startOfDay()->setTimezone($appTz);
+        $end   = Carbon::parse($date, $companyTz)->endOfDay()->setTimezone($appTz);
+
+        return [$start, $end];
     }
 
     private function sum(string $model, int $employeeId, string $col, string $date, array $where = []): int

@@ -490,7 +490,7 @@
       </div>
       <div class="card">
         <h3>Attendance sheet <span class="hint">corrections require a reason and are audit-logged — they feed payroll</span></h3>
-        <table><thead><tr><th>Employee</th><th>Status</th><th>Check-in</th><th>Check-out</th><th>Late (min)</th><th>Source</th><th>Notes</th><th></th></tr></thead>
+        <table><thead><tr><th>Date</th><th>Employee</th><th>Status</th><th>Check-in</th><th>Check-out</th><th>Late (min)</th><th>Source</th><th>Notes</th><th></th></tr></thead>
         <tbody id="at-rows"></tbody></table>
       </div>
       <div class="card">
@@ -1722,14 +1722,21 @@
       <div class="mt"><b>Set a new password</b><span>You signed in with a temporary password — choose your own to continue</span></div>
     </div>
     <div class="mbody">
-      <label>Current (temporary) password</label><input type="password" id="pw-cur" autocomplete="current-password">
-      <label>New password (min 8 characters)</label><input type="password" id="pw-new" autocomplete="new-password">
-      <label>Confirm new password</label><input type="password" id="pw-conf" autocomplete="new-password">
+      <label>New password (min 8 characters)</label>
+      <div style="position:relative">
+        <input type="password" id="pw-new" autocomplete="new-password" style="width:100%">
+        <button type="button" class="pw-eye" data-pweye="pw-new" aria-label="Show password" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:0;cursor:pointer;color:var(--ink-3);font-size:12px;padding:2px 6px">Show</button>
+      </div>
+      <label>Confirm new password</label>
+      <div style="position:relative">
+        <input type="password" id="pw-conf" autocomplete="new-password" style="width:100%">
+        <button type="button" class="pw-eye" data-pweye="pw-conf" aria-label="Show password" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:0;cursor:pointer;color:var(--ink-3);font-size:12px;padding:2px 6px">Show</button>
+      </div>
       <div class="err" id="pw-err"></div>
     </div>
     <div class="mfoot">
       <button class="btn" id="pw-signout">Sign out</button>
-      <button class="btn solid" id="pw-save">Change password &amp; continue</button>
+      <button class="btn solid" id="pw-save">Save and Sign In</button>
     </div>
   </div>
 </div>
@@ -1842,6 +1849,22 @@ const deniedCard = () => '<tr><td colspan="12"><div class="denied"><div class="b
 const isDenied = (e) => e && e.status === 403;
 
 // ---- session ----
+// DD-MM-YYYY from a 'YYYY-MM-DD' (or ISO) string by string split — NOT new Date(), so a
+// company-local work_date can never shift a day under UTC parsing.
+function fmtDMY(d) {
+  if (!d) return '—';
+  const s = String(d).slice(0, 10).split('-');
+  return s.length === 3 ? (s[2] + '-' + s[1] + '-' + s[0]) : String(d);
+}
+function isEmp() { return !!(ME && (ME.base_role || ME.role) === 'EMPLOYEE'); }
+function hideEmpPicker(prefix) {
+  ['#' + prefix + '-emp', '#' + prefix + '-emp-q'].forEach((sel) => {
+    const el = $(sel); if (!el) return;
+    el.style.display = 'none';
+    const lab = el.previousElementSibling;
+    if (lab && lab.tagName === 'LABEL' && /employee/i.test(lab.textContent || '')) lab.style.display = 'none';
+  });
+}
 function enterApp() {
   $('#who').innerHTML = '<b>' + esc(ME.name) + '</b><br>' + esc(ME.role_name || ME.role || '');
   if (ME.company) $('#company-name').textContent = ME.company;
@@ -1866,7 +1889,11 @@ function applyEmployeeChrome() {
       '.role-employee #rule-action,.role-employee #rule-seed{display:none !important}' +
       '.role-employee [data-rule-status]{pointer-events:none;opacity:.65}' +
       // employee dashboard: Workforce card is hidden, so let Time-Utilization fill the row (no empty half)
-      '.role-employee .dash-charts{grid-template-columns:1fr !important}';
+      '.role-employee .dash-charts{grid-template-columns:1fr !important}' +
+      // first-time password: the forced "Set a new password" modal is the ONE place an employee may act
+      '.role-employee #pwd-ovl .btn.solid{display:inline-block !important}' +
+      // privacy: an employee never gets an all-employees picker on Screenshots / Violations
+      '.role-employee #ss-emp,.role-employee #ss-emp-q,.role-employee #viol-emp,.role-employee #viol-emp-q{display:none !important}';
     document.head.appendChild(st);
   }
   // Live Dashboard: keep only Time Utilization + Live Productivity (own row); hide company widgets + employee picker.
@@ -2525,6 +2552,7 @@ let SS_META = {}; // id -> metadata for lightbox
 let SS_SEQ = 0;   // guards against overlapping loads (e.g. evidence-link jump)
 async function initScreenshots() {
   if (!$('#ss-date').value) $('#ss-date').value = today();
+  if (isEmp()) { hideEmpPicker('ss'); loadScreenshots(); return; }
   try {
     const emps = await employeesList();
     fillSelect($('#ss-emp'), emps, (e) => fullName(e) + ' (' + (e.employee_code || '#' + e.id) + ')', (e) => e.id, '— All employees —');
@@ -2852,12 +2880,16 @@ let VIOL_INIT = false;
 async function initViolations() {
   if (!VIOL_INIT) {
     VIOL_INIT = true;
-    employeesList().then((emps) => {
-      const sel = $('#viol-emp');
-      sel.innerHTML = '<option value="">All employees</option>'
-        + emps.map((e) => '<option value="' + e.id + '">' + esc(fullName(e) + ' (' + (e.employee_code || '#' + e.id) + ')') + '</option>').join('');
-      attachEmpSearch($('#viol-emp-q'), sel, emps, 'All employees');
-    }).catch(() => {});
+    if (isEmp()) {
+      hideEmpPicker('viol');
+    } else {
+      employeesList().then((emps) => {
+        const sel = $('#viol-emp');
+        sel.innerHTML = '<option value="">All employees</option>'
+          + emps.map((e) => '<option value="' + e.id + '">' + esc(fullName(e) + ' (' + (e.employee_code || '#' + e.id) + ')') + '</option>').join('');
+        attachEmpSearch($('#viol-emp-q'), sel, emps, 'All employees');
+      }).catch(() => {});
+    }
     $('#viol-load').onclick = loadViolations;
     $('#viol-emp').onchange = loadViolations;
     $('#viol-date').onchange = loadViolations;
@@ -5209,6 +5241,7 @@ async function loadAttendance() {
     ATT_LIST = d.data || [];
     const sc = { PRESENT: 't-ok', ABSENT: 't-danger', HALF_DAY: 't-warn', ON_LEAVE: 't-info', MISMATCH: 't-warn' };
     $('#at-rows').innerHTML = ATT_LIST.map((r) => '<tr>'
+      + '<td>' + fmtDMY(r.work_date) + '</td>'
       + '<td><span class="nm">' + esc(r.employee_name || '#' + r.employee_id) + '</span> <span style="color:var(--ink-3)">' + esc(r.employee_code || '') + '</span></td>'
       + '<td><span class="tag ' + (sc[r.status] || 't-off') + '">' + esc(r.status || '—') + '</span></td>'
       + '<td>' + t(r.check_in_at) + '</td><td>' + t(r.check_out_at) + '</td>'
@@ -5216,9 +5249,9 @@ async function loadAttendance() {
       + '<td>' + esc(r.source || '—') + '</td>'
       + '<td title="' + esc(r.notes || '') + '">' + (esc(lastNote(r.notes)) || '—') + '</td>'
       + '<td><button class="btn" data-att-edit="' + r.id + '">Edit</button></td></tr>').join('')
-      || '<tr><td colspan="8" class="mut">No attendance rows for ' + esc(date) + '. Rows appear from agent logins, biometric punches or the nightly marking job — use "+ Add missed day" to record one manually.</td></tr>';
+      || '<tr><td colspan="9" class="mut">No attendance rows for ' + esc(from) + '. Rows appear from agent logins, biometric punches or the nightly marking job — use "+ Add missed day" to record one manually.</td></tr>';
   } catch (e) {
-    $('#at-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="8" class="mut">' + esc(e.message) + '</td></tr>';
+    $('#at-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="9" class="mut">' + esc(e.message) + '</td></tr>';
   }
 }
 $('#at-load').onclick = loadAttendance;
@@ -5334,23 +5367,37 @@ $('#hol-rows').addEventListener('click', async (e) => {
 
 // ---- forced password change (must_change_password) ----
 function openForcedPwd() {
-  ['#pw-cur', '#pw-new', '#pw-conf'].forEach((s) => { $(s).value = ''; });
+  ['#pw-new', '#pw-conf'].forEach((s) => { const el = $(s); if (el) { el.value = ''; el.type = 'password'; } });
+  document.querySelectorAll('#pwd-ovl .pw-eye').forEach((b) => { b.textContent = 'Show'; });
   $('#pw-err').textContent = '';
   $('#pwd-ovl').classList.add('open'); // no ✕ and no click-outside — change it or sign out
 }
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('#pwd-ovl .pw-eye'); if (!b) return;
+  const inp = document.getElementById(b.dataset.pweye); if (!inp) return;
+  const reveal = inp.type === 'password';
+  inp.type = reveal ? 'text' : 'password';
+  b.textContent = reveal ? 'Hide' : 'Show';
+});
 $('#pw-save').onclick = async () => {
   $('#pw-err').textContent = '';
-  const cur = $('#pw-cur').value, nw = $('#pw-new').value, cf = $('#pw-conf').value;
-  if (!cur || !nw) { $('#pw-err').textContent = 'Enter your current and new password.'; return; }
+  const nw = $('#pw-new').value, cf = $('#pw-conf').value;
+  if (!nw || !cf) { $('#pw-err').textContent = 'Enter and confirm your new password.'; return; }
+  if (nw.length < 8) { $('#pw-err').textContent = 'Password must be at least 8 characters.'; return; }
   if (nw !== cf) { $('#pw-err').textContent = 'New password and confirmation do not match.'; return; }
+  const btn = $('#pw-save'); btn.disabled = true;
   try {
+    // A must_change_password user needs no current password — the server accepts New only,
+    // keeps the same token (no second login) and clears the force-change flag.
     await api('/auth/change-password', {
       method: 'POST',
-      body: JSON.stringify({ current_password: cur, new_password: nw, new_password_confirmation: cf }),
+      body: JSON.stringify({ new_password: nw, new_password_confirmation: cf }),
     });
     ME.must_change_password = false;
     $('#pwd-ovl').classList.remove('open');
-  } catch (e) { $('#pw-err').textContent = e.message; }
+    show('dashboard');
+  } catch (e) { $('#pw-err').textContent = (e && e.message) ? e.message : 'Could not save the password. Please try again.'; }
+  finally { btn.disabled = false; }
 };
 $('#pw-signout').onclick = () => { $('#pwd-ovl').classList.remove('open'); $('#signout').click(); };
 

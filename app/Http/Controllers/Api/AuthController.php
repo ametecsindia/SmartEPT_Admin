@@ -127,20 +127,32 @@ class AuthController extends Controller
 
     /**
      * POST /api/auth/change-password — self-service (any authenticated role).
-     * Verifies the current password, clears the must_change_password flag set
-     * by admin provisioning/reset, and revokes every OTHER token so a stolen
-     * old session dies while the device performing the change stays signed in.
+     *
+     * Two flows share this endpoint:
+     *  - Voluntary change: the caller must supply and verify their CURRENT password.
+     *  - First-time / admin-reset set: a user still flagged must_change_password is
+     *    already authenticated (they just signed in with the temp password) and only
+     *    needs to choose their own. The current password is NOT required — the forced
+     *    "Set a new password" screen shows only New + Confirm, and requiring the temp
+     *    again is both redundant and the reason the old screen could not be completed.
+     *
+     * Either way it clears must_change_password and revokes every OTHER token, so a
+     * stolen old session dies while the device performing the change stays signed in
+     * (no second login).
      */
     public function changePassword(Request $request): JsonResponse
     {
+        $user = $request->user();
+        $forcedSet = (bool) $user->must_change_password;
+
         $data = $request->validate([
-            'current_password' => ['required', 'string'],
+            // Optional (and unused) on the forced first-time set; still required + verified
+            // for a voluntary change so an idle session cannot silently reset the password.
+            'current_password' => [$forcedSet ? 'nullable' : 'required', 'string'],
             'new_password'     => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        $user = $request->user();
-
-        if (! Hash::check($data['current_password'], $user->password)) {
+        if (! $forcedSet && ! Hash::check($data['current_password'] ?? '', $user->password)) {
             throw ValidationException::withMessages([
                 'current_password' => ['The current password is incorrect.'],
             ]);
@@ -155,9 +167,13 @@ class AuthController extends Controller
             ->where('id', '!=', $user->currentAccessToken()->id)
             ->delete();
 
-        $this->audit($request, 'CHANGE_PASSWORD', User::class, $user->id);
+        $this->audit($request, $forcedSet ? 'SET_PASSWORD' : 'CHANGE_PASSWORD', User::class, $user->id);
 
-        return response()->json(['message' => 'Password changed.']);
+        return response()->json([
+            'message' => 'Password changed.',
+            // Lets the client drop the forced screen and continue without re-login.
+            'user'    => $this->userPayload($user->fresh()),
+        ]);
     }
 
     private function userPayload(User $user): array

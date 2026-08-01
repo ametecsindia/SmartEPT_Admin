@@ -104,6 +104,11 @@ class ComplianceController extends Controller
         abort_if(! $ev, 404, 'Violation not found.');
         // Tenant guard: reject a cross-tenant id outright (never leak another company's evidence).
         abort_if(! $user->isSuperAdmin() && $ev->company_id !== $user->company_id, 403, 'Outside your tenant.');
+        // Employee-level isolation: beyond the tenant, the caller must be allowed to SEE this
+        // violation's employee. Unrestricted roles (admin/compliance/auditor) pass; a manager
+        // is bound to their report scope; an EMPLOYEE may only open evidence for their OWN
+        // violations. Closes the same-tenant IDOR of guessing/altering the {event} id.
+        $this->assertEmployeeVisible($request, (int) $ev->employee_id);
 
         $shots = \App\Models\EmployeeScreenshotLog::withoutGlobalScopes()
             ->where('company_id', $ev->company_id)

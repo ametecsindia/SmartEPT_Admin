@@ -447,14 +447,20 @@ class ProductivityController extends Controller
         $end = Carbon::parse($toDate);
         abort_if($start->diffInDays($end) > 62, 422, 'Please rebuild at most about two months at a time.');
 
+        // ?force=1 RECOMPUTES days that already have a summary — needed after a calculation
+        // fix so historical rows pick up the corrected first-login / duration logic. It is
+        // non-destructive: buildSummary recomputes in place for THIS range only (never a
+        // blanket regeneration of production history).
+        $force = $request->boolean('force');
+
         $visible = $this->scopedEmployeeIds($request);
         $employees = Employee::where('company_id', $companyId)
             ->when($visible !== null, fn ($q) => $q->whereIn('id', $visible))
             ->where('employment_status', 'ACTIVE')
             ->with('shift')->get();
 
-        // Days already summarised -> skip (keep the rebuild cheap + idempotent).
-        $existing = EmployeeDailySummary::where('company_id', $companyId)
+        // Days already summarised -> skip (keep the rebuild cheap + idempotent) UNLESS forced.
+        $existing = $force ? collect() : EmployeeDailySummary::where('company_id', $companyId)
             ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
             ->whereBetween('work_date', [$fromDate, $toDate])
             ->get(['employee_id', 'work_date'])
@@ -484,12 +490,12 @@ class ProductivityController extends Controller
         }
 
         $this->audit($request, 'PRODUCTIVITY_REBUILD', null, null, [
-            'from' => $fromDate, 'to' => $toDate, 'built' => $built,
+            'from' => $fromDate, 'to' => $toDate, 'built' => $built, 'force' => $force,
         ]);
 
-        return response()->json(['ok' => true, 'built' => $built,
+        return response()->json(['ok' => true, 'built' => $built, 'forced' => $force,
             'message' => $built > 0
-                ? ($built . ' day-summaries rebuilt for ' . $fromDate . ' to ' . $toDate . '.')
+                ? ($built . ' day-summaries ' . ($force ? 'recomputed' : 'rebuilt') . ' for ' . $fromDate . ' to ' . $toDate . '.')
                 : 'Nothing to rebuild — those days are already summarised, or have no attendance yet.']);
     }
 
