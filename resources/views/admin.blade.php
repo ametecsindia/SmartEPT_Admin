@@ -1850,6 +1850,7 @@ function enterApp() {
   applyAttendanceMode();
   applyPermissionNav();
   applyEmployeeChrome();
+  applyCardAccess();
   show('dashboard');
   // Temp-password logins must set their own password before doing anything else.
   if (ME.must_change_password) openForcedPwd();
@@ -1956,6 +1957,52 @@ function buildEmpUsageRange() {
   var td = fmt(new Date()); setR(td, td, false); // init to Today; initUsage() then calls loadUsage()
 }
 // R4 item 3: organisations without a biometric device hide the Biometric screen.
+// Item B — card-level access enforcement. Hide a card the role cannot View;
+// strip a card's action buttons (add/save/delete/assign) when it cannot Edit.
+// Skipped entirely when the role has no card.* permissions (pre-migration /
+// legacy), so existing roles and Super/Company Admin are unaffected.
+const CARDS_DOM = {
+  'dashboard.workforce_status':'#wf-donut','dashboard.time_utilization':'#tu-grid',
+  'dashboard.live_productivity':'#dash-prod-rows','dashboard.employees_live':'#live-rows','dashboard.device_health':'#dash-dev-rows',
+  'attendance.attendance_sheet':'#at-rows','attendance.holiday_calendar':'#hol-rows',
+  'screenshots.screenshot_timeline':'#ss-grid','webcam.webcam_photos':'#wc-grid',
+  'usage.usage_summary':'#us-summary-card','usage.application_usage':'#us-app-rows','usage.website_usage':'#us-web-rows','usage.compliance_events':'#us-comp-card',
+  'violations.compliance_violations':'#viol-rows',
+  'employees.employee_directory':'#emp-rows','employees.employee_archive':'#emp-archive-card',
+  'org.attendance_source':'Attendance source','org.company_timezone':'Company time zone','org.break_limits':'Break time limits','org.privacy_rawip':'Privacy','org.org_roles':'#role-rows',
+  'users.login_accounts':'#u-rows','devices.registered_devices':'#dev-rows',
+  'policies.policy_list':'#pol-rows','policies.policy_form':'#pol-form-card','policies.policy_assign':'#as-policy',
+  'rules.app_web_rules':'#rule-rows','meetings.meetings':'#mtg-rows',
+  'biometric.bio_setup':'#bd-prefix','biometric.bio_punch_log':'#bio-rows','biometric.bio_mismatch':'#bio-mm-rows','biometric.bio_import':'Import punches','biometric.bio_map':'Map biometric',
+  'reports.rep_productivity':'#ms-rows','reports.rep_breaks':'#br-rows','reports.rep_meetings':'#mr-rows',
+  'license.lic_status':'Licence status','license.lic_key':'Licence key','license.lic_offline':'Offline licence file',
+  'integrations.api_keys':'#key-add','integrations.outbound_targets':'#tgt-add','integrations.integration_guide':'Integration guide',
+  'ops.cleanup_schedule':'Automatic cleanup schedule','ops.local_storage':'Local / On-premise storage','ops.cloud_storage':'Cloud Storage (Google Cloud)','ops.audit_trail':'#au-rows',
+  'help.system_health':'#dg-results','help.known_issues':'#kb-list','help.app_log':'#lg-out'
+};
+function cardEl(v) {
+  if (!v) return null;
+  if (v[0] === '#') { const n = document.querySelector(v); return n ? (n.classList.contains('card') ? n : n.closest('.card')) : null; }
+  const hs = document.querySelectorAll('#app .card h3');
+  for (let i = 0; i < hs.length; i++) { if ((hs[i].textContent || '').trim().indexOf(v) === 0) return hs[i].closest('.card'); }
+  return null;
+}
+function applyCardAccess() {
+  if (!ME || !Array.isArray(ME.permissions)) return;
+  const cardPerms = ME.permissions.filter((s) => s.indexOf('card.') === 0);
+  if (!cardPerms.length) return;
+  if (!document.getElementById('card-noedit-css')) {
+    const st = document.createElement('style'); st.id = 'card-noedit-css';
+    st.textContent = '.card-noedit .btn.solid,.card-noedit .btn.danger{display:none !important}.card-noedit [data-rule-status]{pointer-events:none;opacity:.65}';
+    document.head.appendChild(st);
+  }
+  const has = new Set(cardPerms);
+  Object.keys(CARDS_DOM).forEach((key) => {
+    const el = cardEl(CARDS_DOM[key]); if (!el) return;
+    if (!has.has('card.' + key + '.view')) { el.style.display = 'none'; return; }
+    if (!has.has('card.' + key + '.edit')) el.classList.add('card-noedit');
+  });
+}
 function applyAttendanceMode() {
   const off = ME && ME.attendance_mode === 'AGENT_ONLY';
   const nav = document.querySelector('.nav[data-view="biometric"]');
@@ -3432,9 +3479,39 @@ async function loadRoles() {
 function roleMatrixHtml(checkedIds, disabled) {
   const groups = {};
   (ROLE_DATA.permissions || []).forEach((p) => { (groups[p.group] = groups[p.group] || []).push(p); });
-  return Object.keys(groups).map((g) => '<div style="margin-bottom:10px"><b style="font-size:12px;color:var(--accent-ink)">' + esc(g) + '</b>'
-    + groups[g].map((p) => '<div class="fbool"><input type="checkbox" data-perm="' + p.id + '"' + (checkedIds.includes(p.id) ? ' checked' : '') + (disabled ? ' disabled' : '') + '> ' + esc(p.name) + '</div>').join('')
-    + '</div>').join('');
+  const chk = (p) => '<div class="fbool"><input type="checkbox" data-perm="' + p.id + '"' + (checkedIds.includes(p.id) ? ' checked' : '') + (disabled ? ' disabled' : '') + '> ' + esc(p.name) + '</div>';
+  return Object.keys(groups).map((g) => (g.indexOf('Card access · ') === 0)
+    ? cardGridHtml(g, groups[g], checkedIds, disabled)
+    : '<div style="margin-bottom:10px"><b style="font-size:12px;color:var(--accent-ink)">' + esc(g) + '</b>' + groups[g].map(chk).join('') + '</div>'
+  ).join('');
+}
+// Item B: card permissions render as a per-tab grid (Card | View | Edit).
+function cardGridHtml(g, perms, checkedIds, disabled) {
+  const label = g.replace('Card access · ', '');
+  const byCard = {}, order = [];
+  perms.forEach((p) => {
+    const m = /^card\.[^.]+\.(.+)\.(view|edit)$/.exec(p.slug || '');
+    if (!m) return;
+    if (!byCard[m[1]]) { byCard[m[1]] = {}; order.push(m[1]); }
+    byCard[m[1]][m[2]] = p;
+  });
+  const cell = (p) => p
+    ? '<input type="checkbox" data-perm="' + p.id + '"' + (checkedIds.includes(p.id) ? ' checked' : '') + (disabled ? ' disabled' : '') + '>'
+    : '<span class="mut">—</span>';
+  const rows = order.map((ck) => {
+    const v = byCard[ck].view, e = byCard[ck].edit;
+    const nm = v ? v.name : (e ? e.name.replace(' (edit)', '') : ck);
+    return '<tr><td style="padding:2px 8px 2px 0">' + esc(nm) + '</td><td style="text-align:center">' + cell(v) + '</td><td style="text-align:center">' + cell(e) + '</td></tr>';
+  }).join('');
+  return '<div style="margin-bottom:12px"><b style="font-size:12px;color:var(--accent-ink)">' + esc(label) + '</b>'
+    + '<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th style="text-align:left;color:var(--ink-3)">Card</th><th style="width:54px;color:var(--ink-3)">View</th><th style="width:54px;color:var(--ink-3)">Edit</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+// Item B: a new role's matrix starts from its selected base role's permissions
+// (which include full card access), so unticking-to-restrict behaves consistently.
+function baseCheckedIds() {
+  const bs = document.getElementById('role-base').value;
+  const br = (ROLE_DATA.data || []).find((r) => r.is_system && r.slug === bs);
+  return br ? (br.permission_ids || []) : [];
 }
 function openRoleModal(role) {
   ROLE_EDIT = role || null;
@@ -3447,7 +3524,9 @@ function openRoleModal(role) {
   $('#role-name').value = role ? role.name : '';
   if (role && role.base_slug) baseSel.value = role.base_slug;
   $('#role-name-wrap').style.display = role && role.is_system ? 'none' : '';
-  $('#role-matrix').innerHTML = roleMatrixHtml(role ? (role.permission_ids || []) : [], !!(role && role.locked));
+  const renderMatrix = () => { $('#role-matrix').innerHTML = roleMatrixHtml(role ? (role.permission_ids || []) : baseCheckedIds(), !!(role && role.locked)); };
+  renderMatrix();
+  baseSel.onchange = role ? null : renderMatrix;   // new role: matrix follows the chosen base
   $('#role-save').classList.toggle('hide', !!(role && role.locked));
   $('#role-err').textContent = '';
   $('#role-ovl').classList.add('open');
