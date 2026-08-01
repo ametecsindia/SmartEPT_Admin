@@ -143,9 +143,11 @@ class UsageController extends Controller
         $tz = $this->bizTz($request);
         $date = $request->query('date', $this->bizToday($tz));
         $day = $this->dayUtcBounds($date, $tz);
+        $from = $request->query('from'); $to = $request->query('to'); $useRange = $from && $to;
 
         $rows = EmployeeAppUsageLog::where('employee_id', $employee->id)
-            ->whereDate('start_at', $date)   // EPT-20: agent stores LOCAL time; match the local calendar day
+            ->when($useRange, fn ($q) => $q->whereDate('start_at', '>=', $from)->whereDate('start_at', '<=', $to))
+            ->when(! $useRange, fn ($q) => $q->whereDate('start_at', $date))   // EPT-20: agent stores LOCAL time; match the local calendar day
             ->selectRaw('app_name, category, SUM(duration_seconds) as seconds, MAX(compliance_status) as status')
             ->groupBy('app_name', 'category')
             ->orderByDesc('seconds')
@@ -161,9 +163,11 @@ class UsageController extends Controller
         $tz = $this->bizTz($request);
         $date = $request->query('date', $this->bizToday($tz));
         $day = $this->dayUtcBounds($date, $tz);
+        $from = $request->query('from'); $to = $request->query('to'); $useRange = $from && $to;
 
         $rows = EmployeeWebsiteUsageLog::where('employee_id', $employee->id)
-            ->whereDate('start_at', $date)   // EPT-20: agent stores LOCAL time; match the local calendar day
+            ->when($useRange, fn ($q) => $q->whereDate('start_at', '>=', $from)->whereDate('start_at', '<=', $to))
+            ->when(! $useRange, fn ($q) => $q->whereDate('start_at', $date))   // EPT-20: agent stores LOCAL time; match the local calendar day
             ->selectRaw('COALESCE(domain, page_title) as site, category, SUM(duration_seconds) as seconds, MAX(compliance_status) as status')
             ->groupBy('site', 'category')
             ->orderByDesc('seconds')

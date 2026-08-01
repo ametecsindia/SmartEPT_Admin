@@ -176,9 +176,11 @@ class ComplianceController extends Controller
     {
         $this->assertEmployeeVisible($request, $employee->id);
         $date = $request->query('date', now()->toDateString());
+        $from = $request->query('from'); $to = $request->query('to'); $useRange = $from && $to;
 
         $events = EmployeeComplianceEvent::where('employee_id', $employee->id)
-            ->whereDate('started_at', $date)
+            ->when($useRange, fn ($q) => $q->whereDate('started_at', '>=', $from)->whereDate('started_at', '<=', $to))
+            ->when(! $useRange, fn ($q) => $q->whereDate('started_at', $date))
             ->latest('started_at')
             ->limit(1000)
             ->get();

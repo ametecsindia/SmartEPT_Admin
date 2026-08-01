@@ -1917,6 +1917,44 @@ function buildEmpDashRange() {
   };
   var td = fmt(new Date()); setR(td, td, false); // init to Today; show('dashboard') triggers the first load
 }
+// ponytail: near-copy of buildEmpDashRange for the Usage tab (own ids eur-*, own USAGE_RANGE) so the live dashboard bar stays untouched
+function buildEmpUsageRange() {
+  var dv = document.getElementById('v-usage');
+  if (!dv || document.getElementById('emp-usage-range')) return;
+  var bar = document.createElement('div'); bar.className = 'filters'; bar.id = 'emp-usage-range';
+  bar.innerHTML =
+    '<b style="margin-right:4px">My usage</b>' +
+    '<button class="btn acc" data-r="today" type="button">Today</button>' +
+    '<button class="btn" data-r="week" type="button">This week</button>' +
+    '<button class="btn" data-r="month" type="button">This month</button>' +
+    '<label>From</label><input type="date" id="eur-from" style="min-width:0">' +
+    '<label>To</label><input type="date" id="eur-to" style="min-width:0">' +
+    '<button class="btn acc" id="eur-apply" type="button">Apply</button>' +
+    '<span class="mut" id="eur-lbl" style="font-size:12px;margin-left:4px"></span>';
+  dv.insertBefore(bar, dv.firstChild);
+  var fmt = function (d) { return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2); };
+  var setR = function (from, to, reload) {
+    USAGE_RANGE = { from: from, to: to };
+    var ff = document.getElementById('eur-from'), tt = document.getElementById('eur-to'), lb = document.getElementById('eur-lbl');
+    if (ff) ff.value = from; if (tt) tt.value = to;
+    if (lb) lb.textContent = (from === to) ? ('\u00b7 ' + from) : ('\u00b7 ' + from + ' \u2192 ' + to);
+    if (reload !== false) loadUsage();
+  };
+  bar.querySelectorAll('[data-r]').forEach(function (b) {
+    b.onclick = function () {
+      var d = new Date(); var to = fmt(d); var from = to;
+      if (b.dataset.r === 'week') { var dow = (d.getDay() + 6) % 7; var m = new Date(d); m.setDate(d.getDate() - dow); from = fmt(m); }
+      else if (b.dataset.r === 'month') { from = fmt(new Date(d.getFullYear(), d.getMonth(), 1)); }
+      setR(from, to, true);
+    };
+  });
+  var ap = document.getElementById('eur-apply');
+  if (ap) ap.onclick = function () {
+    var f = document.getElementById('eur-from').value, t = document.getElementById('eur-to').value;
+    if (f && t && f <= t) setR(f, t, true);
+  };
+  var td = fmt(new Date()); setR(td, td, false); // init to Today; initUsage() then calls loadUsage()
+}
 // R4 item 3: organisations without a biometric device hide the Biometric screen.
 function applyAttendanceMode() {
   const off = ME && ME.attendance_mode === 'AGENT_ONLY';
@@ -2336,6 +2374,7 @@ function renderLiveRows() {
   }).join('') || '<tr><td colspan="6" class="mut">' + (filtering ? 'No employees match this filter right now.' : 'No employees online yet.') + '</td></tr>';
 }
 let DASH_RANGE = null;
+let USAGE_RANGE = null;
 async function loadDashboard() {
   const _rf = (DASH_RANGE && DASH_RANGE.from) || today();
   const _rt = (DASH_RANGE && DASH_RANGE.to) || today();
@@ -2681,7 +2720,9 @@ async function initUsage() {
     if (q) { q.style.display = 'none'; var lbl = q.previousElementSibling; if (lbl && lbl.tagName === 'LABEL') lbl.style.display = 'none'; }
     if (od) od.style.display = 'none';
     if (sel) { sel.style.display = 'none'; sel.innerHTML = '<option value="' + (ME.employee_id || '') + '">Me</option>'; sel.value = ME.employee_id || ''; }
-    if (ME.employee_id) loadUsage(); else $('#us-sum-rows').innerHTML = deniedCard();
+    var _uf = document.getElementById('us-date'); _uf = _uf && _uf.closest('.filters'); if (_uf) _uf.style.display = 'none';
+    if (!ME.employee_id) { $('#us-sum-rows').innerHTML = deniedCard(); return; }
+    buildEmpUsageRange(); loadUsage();
     return;
   }
   try {
@@ -2719,7 +2760,9 @@ async function loadUsage() {
   $('#us-summary-card').style.display = 'none';
   $('#us-individual').style.display = '';
   $('#us-comp-card').style.display = '';
-  const q = '?date=' + encodeURIComponent(date);
+  const q = (USAGE_RANGE && USAGE_RANGE.from && USAGE_RANGE.to)
+    ? '?from=' + encodeURIComponent(USAGE_RANGE.from) + '&to=' + encodeURIComponent(USAGE_RANGE.to)
+    : '?date=' + encodeURIComponent(date);
   const secTable = (rows, keys, tbody, empty) => {
     tbody.innerHTML = (rows || []).map((r) => '<tr>'
       + '<td><b>' + esc(r[keys[0]] || '—') + '</b></td><td>' + esc(r.category || '—') + '</td>'
