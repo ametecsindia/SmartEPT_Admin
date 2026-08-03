@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartEPT — Technical &amp; Business-Logic Reference</title>
+<style>
+  :root{
+    --teal:#0E7C8F;--teal-dk:#0a5c6a;--teal-2:#0B4A56;--teal-lt:#e6f2f4;--navy:#052A33;
+    --ink:#14242a;--ink-2:#3d4f54;--muted:#5b6a70;--line:#d8e2e4;--bg:#f4f7f7;--card:#fff;--card-2:#eef4f4;
+    --ok:#1E874B;--okw:#E6F4EC;--warn:#B4791F;--warnw:#FBF1DE;--danger:#B23A48;--dangerw:#FBE9ED;
+    --p1:#c0392b;--p1bg:#fbeae8;--p2:#b9770e;--p2bg:#fcf3e3;--p3:#2e7d32;--p3bg:#eef6ef;
+    --purple:#6c4bb6;--purplebg:#efeafb;
+    --shadow:0 1px 2px rgba(5,42,51,.06),0 8px 24px rgba(5,42,51,.06);
+    --mono:"SFMono-Regular",Consolas,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-print-color-adjust:exact;print-color-adjust:exact;scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.62 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 22px 90px}
+  header.doc{background:linear-gradient(135deg,var(--navy),var(--teal-2) 55%,var(--teal));color:#fff;padding:44px 34px;border-radius:0 0 20px 20px;box-shadow:var(--shadow)}
+  header.doc .kicker{font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;color:#a9d4dc;font-weight:700}
+  header.doc h1{margin:10px 0 8px;font-size:32px;line-height:1.12;font-weight:800;letter-spacing:-.01em}
+  header.doc .sub{color:#dcedf0;font-size:15.5px;max-width:820px}
+  header.doc .meta{margin-top:20px;display:flex;flex-wrap:wrap;gap:9px}
+  header.doc .chip{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:5px 13px;font-size:12.5px;font-weight:600}
+  h2{font-size:21px;margin:44px 0 12px;padding-bottom:9px;border-bottom:2px solid var(--teal);color:var(--teal-dk);font-weight:800;letter-spacing:-.01em}
+  h2 .n{display:inline-block;min-width:30px;color:var(--teal)}
+  h3{font-size:16.5px;margin:26px 0 7px;color:var(--teal-2);font-weight:700}
+  h4{font-size:14px;margin:16px 0 5px;color:var(--navy);font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+  p{margin:9px 0}
+  a{color:var(--teal-dk)}
+  .lead{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--teal);border-radius:10px;padding:16px 20px;margin:18px 0;box-shadow:var(--shadow)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:18px 22px;box-shadow:var(--shadow);margin:14px 0}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:820px){.grid{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:15px;text-align:center;box-shadow:var(--shadow)}
+  .stat .n{font-size:25px;font-weight:800;color:var(--teal-dk);line-height:1}
+  .stat .l{font-size:11px;color:var(--muted);margin-top:6px;text-transform:uppercase;letter-spacing:.04em}
+  code,kbd{background:#eaf1f2;border:1px solid #dbe6e7;border-radius:5px;padding:1px 6px;font:12.5px/1.4 var(--mono);color:#0a4653}
+  pre{background:var(--navy);color:#dcf1f4;border-radius:11px;padding:16px 18px;overflow:auto;font:12.5px/1.55 var(--mono);margin:12px 0}
+  pre code{background:none;border:none;color:inherit;padding:0}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:var(--shadow)}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--navy);color:#eaf6f8;font-weight:700;font-size:11px;letter-spacing:.03em;text-transform:uppercase}
+  tr:last-child td{border-bottom:none}
+  tbody tr:nth-child(even){background:#fafcfc}
+  .mono{font-family:var(--mono);font-size:12px}
+  .muted{color:var(--muted);font-size:13px}
+  ul,ol{margin:8px 0 8px 2px;padding-left:22px}li{margin:5px 0}
+  .tag{display:inline-block;border-radius:999px;padding:2px 9px;font-size:10.5px;font-weight:800;white-space:nowrap;text-transform:uppercase;letter-spacing:.03em}
+  .t-ok{background:var(--okw);color:var(--ok)}.t-p1{background:var(--p1bg);color:var(--p1)}.t-p2{background:var(--p2bg);color:var(--p2)}.t-p3{background:var(--p3bg);color:var(--p3)}.t-usp{background:var(--teal-lt);color:var(--teal-dk)}
+  .callout{border:1px solid #f0d9b0;background:var(--warnw);border-radius:11px;padding:14px 18px;margin:16px 0}
+  .callout b{color:var(--warn)}
+  .usp{border:1px solid #bfe0e5;background:var(--teal-lt);border-left:4px solid var(--teal);border-radius:11px;padding:14px 18px;margin:16px 0}
+  .usp b{color:var(--teal-dk)}
+  .internal{border:1px dashed #c9a3a3;background:#fdf3f3;border-left:4px solid var(--danger);border-radius:11px;padding:6px 20px 14px;margin:16px 0}
+  .internal h3{color:var(--danger)}
+  .flow{counter-reset:s;list-style:none;padding-left:0;margin:12px 0}
+  .flow li{position:relative;padding:9px 8px 9px 42px;border-bottom:1px solid var(--line)}
+  .flow li:last-child{border-bottom:none}
+  .flow li:before{counter-increment:s;content:counter(s);position:absolute;left:0;top:8px;width:27px;height:27px;background:var(--teal);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12.5px}
+  .arch{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:16px 0}
+  @media(max-width:820px){.arch{grid-template-columns:1fr}}
+  .node{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--teal);border-radius:11px;padding:14px 16px;box-shadow:var(--shadow)}
+  .node h4{margin-top:0;color:var(--teal-dk);text-transform:none;font-size:15px;letter-spacing:0}
+  .node .role{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+  .toc{columns:2;column-gap:28px;font-size:13.5px}
+  @media(max-width:760px){.toc{columns:1}}
+  .toc a{display:block;padding:3px 0;text-decoration:none;color:var(--ink-2)}
+  .toc a:hover{color:var(--teal-dk)}
+  footer{margin-top:48px;padding-top:18px;border-top:2px solid var(--line);color:var(--muted);font-size:12.5px;text-align:center}
+  @media print{body{background:#fff}.wrap{padding:0}header.doc{border-radius:0}.card,table,pre,.stat{box-shadow:none}h2{break-after:avoid}tr{break-inside:avoid}.node,.card{break-inside:avoid}}
+</style>
+</head>
+<body>
+<header class="doc">
+  <div class="kicker">Ametecs · SmartEPT · Internal Engineering &amp; Business-Logic Reference</div>
+  <h1>SmartEPT — Technical &amp; Business-Logic Reference</h1>
+  <div class="sub">The single source of truth for what SmartEPT is, how each of its three parts works, and why every major piece exists — across the Product, the Superadmin (Central) console and the desktop Agent. Written for the Ametecs team and the owner.</div>
+  <div class="meta">
+    <span class="chip">02 Aug 2026</span>
+    <span class="chip">Product: Laravel 11 / PHP 8.2+ / MySQL</span>
+    <span class="chip">Central: Laravel 13 / PHP 8.3</span>
+    <span class="chip">Agent: Electron (Win / macOS / Linux)</span>
+    <span class="chip">Audience: Internal (dev + owner)</span>
+  </div>
+</header>
+<div class="wrap">
+
+  <div class="lead"><b>What SmartEPT is, in one line:</b> an <b>Employee Productivity Tracking &amp; Intelligence System</b> — it measures employee activity, productive vs idle time, app &amp; website usage, attendance and shift adherence, workload balance and policy compliance, and turns that into live dashboards, scores and audit-ready reports. It runs as three cooperating parts: a <b>Product</b> web app (the brain and console), a <b>Superadmin/Central</b> licensing &amp; billing platform (the business engine), and a visible, consent-based <b>desktop Agent</b> (the sensor on each employee PC). It sells both as cloud rental and as a perpetual, self-hosted licence where the client owns their own data.</div>
+
+  <div class="grid">
+    <div class="stat"><div class="n">3</div><div class="l">Cooperating parts</div></div>
+    <div class="stat"><div class="n">40+</div><div class="l">Product API controllers</div></div>
+    <div class="stat"><div class="n">55</div><div class="l">Product data models</div></div>
+    <div class="stat"><div class="n">12</div><div class="l">Policy types (engine)</div></div>
+  </div>
+
+  <h2><span class="n">0.</span> Contents</h2>
+  <div class="card toc">
+    <a href="#arch">1 · System architecture &amp; how the three parts talk</a>
+    <a href="#product">2 · Part A — Product (smartept)</a>
+    <a href="#policy">2.3 · The Policy Engine</a>
+    <a href="#status">2.4 · The Status state machine</a>
+    <a href="#attendance">2.5 · Attendance derivation</a>
+    <a href="#gate">2.6 · Gate-to-PC (USP)</a>
+    <a href="#scoring">2.7 · Productivity &amp; Compliance scoring</a>
+    <a href="#rbac">2.8 · Roles, hierarchy &amp; multi-tenant isolation</a>
+    <a href="#licclient">2.9 · Licence client (phone-home)</a>
+    <a href="#scheduler">2.10 · Scheduler &amp; background jobs</a>
+    <a href="#central">3 · Part B — Superadmin / Central</a>
+    <a href="#licensing">3.2 · Licensing architecture (RSA node-lock)</a>
+    <a href="#pricing">3.3 · Pricing v2 (Cloud + Perpetual)</a>
+    <a href="#o2c">3.4 · Order-to-cash &amp; GST invoicing</a>
+    <a href="#agent">4 · Part C — Agent (desktop)</a>
+    <a href="#flows">5 · End-to-end flows</a>
+    <a href="#distribution">6 · Distribution &amp; data-ownership model</a>
+    <a href="#gaps">7 · Internal — known gaps &amp; hardening backlog</a>
+    <a href="#appendix">8 · Appendix (endpoints, jobs, glossary)</a>
+  </div>
+
+  <!-- ============ ARCHITECTURE ============ -->
+  <h2 id="arch"><span class="n">1.</span> System architecture &amp; how the three parts talk</h2>
+  <p>SmartEPT is deliberately split so the <b>money/licensing plane</b> and the <b>operational/monitoring plane</b> never mix. This is what makes both the SaaS and on-premises editions possible from one codebase, and it is the technical foundation of the "your data stays yours" promise.</p>
+
+  <div class="arch">
+    <div class="node"><div class="role">Business engine</div><h4>Central (Superadmin)</h4><p class="muted" style="margin:.4em 0 0">Ametecs-hosted. Issues &amp; renews licences, signs offline <code>.lic</code> files, runs GST billing, orders, pay-links, dunning, tenants, the client self-service portal, and installer downloads.</p></div>
+    <div class="node"><div class="role">The brain + console</div><h4>Product (smartept)</h4><p class="muted" style="margin:.4em 0 0">One instance per client (cloud tenant or on-prem). Holds all employee/monitoring data, the policy engine, scoring, attendance, reports. Phones Central once a day with <b>licence metadata only</b>.</p></div>
+    <div class="node"><div class="role">The sensor</div><h4>Agent (desktop)</h4><p class="muted" style="margin:.4em 0 0">On each employee PC. Visible, consent-gated. Streams attendance/activity/usage/screenshots to <b>its own</b> Product instance — never to Central.</p></div>
+  </div>
+
+  <h3>The three links between them</h3>
+  <table>
+    <thead><tr><th>Link</th><th>Direction</th><th>What crosses</th><th>Why it is designed this way</th></tr></thead>
+    <tbody>
+      <tr><td><b>Licence phone-home</b></td><td>Product → Central</td><td>Only licence key, server fingerprint (SHA-256 of app-key+hostname), seat/device UIDs, and total storage GB. <b>Never</b> screenshots, activity or camera data.</td><td>The "hard wall": Central can enforce entitlement and seat caps without ever seeing operational data. Keeps the on-prem promise honest.</td></tr>
+      <tr><td><b>Offline <code>.lic</code> token</b></td><td>Central → Product</td><td>An RSA-2048 signed, node-locked entitlement file (expiry, grace, seat cap, features).</td><td>Lets a fully air-gapped on-prem install run without any call home; the product verifies the signature with a bundled public key.</td></tr>
+      <tr><td><b>One-click SSO to console</b></td><td>Central → Product</td><td>A signed hand-off so a client logs into their hosted Product console from the Central portal.</td><td>Single front door for cloud customers; no second password.</td></tr>
+      <tr><td><b>Agent sync</b></td><td>Agent → Product</td><td>Attendance/activity/idle/usage/screenshot batches, Sanctum-token authenticated, policy- and consent-gated.</td><td>All monitoring data terminates at the client's own Product instance. Central is never in this path.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="usp"><b>Design consequence (a headline USP):</b> because monitoring data only ever flows Agent → the client's own Product, an on-premises client can run SmartEPT with Central unreachable for weeks (the last signed entitlement stands within its grace window) and Ametecs still never touches their employee data. Cloud and on-prem are the <i>same</i> architecture with a different hosting location.</p></div>
+
+  <!-- ============ PRODUCT ============ -->
+  <h2 id="product"><span class="n">2.</span> Part A — Product (<span class="mono">smartept</span>)</h2>
+  <h3>2.1 · What it is &amp; why it exists</h3>
+  <p>The Product is a Laravel 11 API + single-page admin console (the <code>admin.blade.php</code> "Ocean Teal" SPA). It is the system of record for everything about a client's workforce monitoring: who works where, on what policy, what they did, and how it scored. Every client gets their own instance (a cloud tenant or an on-prem deployment); a company row (<code>companies</code>) tenants all data and a global scope binds every query to it.</p>
+
+  <h3>2.2 · Module map (console screens)</h3>
+  <table>
+    <thead><tr><th>Screen</th><th>What it does</th><th>Key models / services</th></tr></thead>
+    <tbody>
+      <tr><td><b>Dashboard</b></td><td>Live status board (who is Active / Idle / on Break / in Meeting / Offline right now), break/idle/meeting widgets, device health, day summary.</td><td>DashboardController, StatusService, StatusTimeline</td></tr>
+      <tr><td><b>Employees</b></td><td>Onboard / edit / relieve employees; bulk import; archive &amp; restore (ZIP export of a leaver's data).</td><td>Employee, EmployeeArchiver</td></tr>
+      <tr><td><b>Org</b></td><td>Company → Branch → Department → Team → Designation → Shift structure.</td><td>Company, Branch, Department, Team, Shift</td></tr>
+      <tr><td><b>Devices</b></td><td>Registered agent devices, bind/unbind, force-logout, per-device tracking mode.</td><td>EmployeeDevice, DeviceController</td></tr>
+      <tr><td><b>Policies / Rules</b></td><td>The 12 policy types and how they are assigned down the org tree.</td><td>PolicyResolver, PolicyAssignment</td></tr>
+      <tr><td><b>Attendance</b></td><td>Derived daily sheet (check-in/out, late, half-day, absent), manual regularization, holidays, attendance register export.</td><td>AttendanceDerivation, EmployeeAttendanceLog</td></tr>
+      <tr><td><b>Biometric</b></td><td>Cloud/physical punch-device integration, mappings, mismatch report, the Gate.</td><td>BiometricDevice, GateService, BiometricCloudSync</td></tr>
+      <tr><td><b>Meetings</b></td><td>Schedule / join / end meetings; participation &amp; attendance; auto-close.</td><td>Meeting, MeetingParticipant, EmployeeMeetingSession</td></tr>
+      <tr><td><b>Usage</b> (Apps / Sites / Timeline / Compliance tabs)</td><td>App &amp; website usage, categorised productive/non-productive; time-utilization "where the hours went".</td><td>EmployeeAppUsageLog, EmployeeWebsiteUsageLog</td></tr>
+      <tr><td><b>Screenshots / Webcam / Violations</b></td><td>Evidence gallery (policy-gated), webcam presence, compliance violation feed with per-event evidence.</td><td>ScreenshotController, PresenceController, ComplianceController</td></tr>
+      <tr><td><b>Reports</b></td><td>Productivity (classic + transparent v2), breaks, meetings, monthly summary, employee timeline; CSV exports.</td><td>ProductivityController, ScoringService, ExportController</td></tr>
+      <tr><td><b>Integrations</b></td><td>API keys + outbound push targets (SmartEPT → SmartPRS/SmartDCM); public read/ingest API v1.</td><td>ApiKey, IntegrationTarget, OutboundPusher</td></tr>
+      <tr><td><b>License</b></td><td>Install &amp; validate the client's own SmartEPT licence (key or <code>.lic</code> import).</td><td>InstallationLicense, LicenseClient, LicenseFile</td></tr>
+      <tr><td><b>Users &amp; Roles</b></td><td>Login users, RBAC roles, granular permission matrix.</td><td>User, Role, Permission</td></tr>
+      <tr><td><b>Ops / Help</b></td><td>Storage governance, retention/purge, backups, DB-clear (2-step code), diagnostics, and the in-app Help → Troubleshooting self-check.</td><td>OpsController, DiagnosticsController, StorageService</td></tr>
+    </tbody>
+  </table>
+
+  <h3>2.2b · Data model at a glance</h3>
+  <p>55 models group into six families. Raw capture tables are append-only; derived tables (daily summary, attendance) are recomputed idempotently so a delayed punch or re-sync always converges to the same answer.</p>
+  <div class="grid2">
+    <div class="card"><h4>Org &amp; identity</h4><p class="muted">Company, Branch, Department, Team, Designation, Shift, User, Employee, Role, Permission, EmployeeDevice</p></div>
+    <div class="card"><h4>Policy (12 types)</h4><p class="muted">Monitoring, Screenshot, Webcam, Application, Website, Network, Device, Usb, VpnProxy, Break, Attendance, Compliance — plus PolicyAssignment &amp; MonitoringConsent</p></div>
+    <div class="card"><h4>Raw capture (append-only)</h4><p class="muted">ActivityEvent, IdleLog, BreakLog, LoginSession, AttendanceLog, AppUsageLog, WebsiteUsageLog, PresenceEvent, ScreenshotLog, WebcamLog, ComplianceEvent, StatusTimeline</p></div>
+    <div class="card"><h4>Derived / reporting</h4><p class="muted">EmployeeDailySummary, StatusTimeline segments, MonthlyReport (computed), EmployeeArchive</p></div>
+    <div class="card"><h4>Biometric &amp; meetings</h4><p class="muted">BiometricDevice, BiometricLog, BiometricEmployeeMapping, Meeting, MeetingParticipant, MeetingSession</p></div>
+    <div class="card"><h4>Governance</h4><p class="muted">AuditLog, MailLog, Setting, StorageFile, InstallationLicense, ApiKey, IntegrationTarget, AgentTamperEvent</p></div>
+  </div>
+
+  <h3 id="policy">2.3 · The Policy Engine — <span class="muted" style="font-weight:400">safe by default</span></h3>
+  <p><code>PolicyResolver</code> is the heart of the Product. For each employee/device it walks the assignment precedence <b>DEVICE › EMPLOYEE › TEAM › DEPARTMENT › BRANCH › COMPANY</b> (most-specific wins), resolves each of the 12 policy types, and composes them into the single "bundle" the agent obeys.</p>
+  <ul>
+    <li><b>Safe by default:</b> a device with no applicable assignment gets an <i>empty</i> bundle — tracking disabled. Nothing is ever captured that a policy hasn't explicitly enabled.</li>
+    <li><b>Tracking-mode override</b> (full / attendance-only / paused) resolves at the most-specific level and is also written into the policy flags, so even a server-side consumer that ignores the mode flag still stops capturing.</li>
+    <li><b>Resolved cadence surfaced:</b> the screenshot policy exposes <code>effective_interval_seconds</code> + a version, so the agent schedules on the real value and stamps every shot with the policy id/version it obeyed (this is what fixed the "a shot every minute" bug).</li>
+  </ul>
+
+  <h3 id="status">2.4 · The Status state machine — one authoritative "what are they doing right now"</h3>
+  <p><code>StatusService</code> + the <code>status_timeline</code> table are the backbone that fixed a whole cluster of duration/consistency defects. The timeline is an ordered stream of non-overlapping segments with <b>exactly one open segment per employee</b>. Every transition runs inside a DB transaction with a row lock, so two events arriving together can never open two segments.</p>
+  <table>
+    <thead><tr><th>Rule</th><th>Behaviour</th></tr></thead>
+    <tbody>
+      <tr><td>Idempotency</td><td>A repeated <code>event_uuid</code> is a no-op (returns the existing segment).</td></tr>
+      <tr><td>Heartbeat dedupe</td><td>Same state (and same meeting) as the open segment → no-op.</td></tr>
+      <tr><td>Ambient guard</td><td>Background ACTIVE/IDLE may not clobber an open <i>manual</i> break/meeting — only an explicit resume or a forced idle (lock/display-off/suspend) may.</td></tr>
+      <tr><td>Exclusivity (D1)</td><td>A manual break/meeting started while a <i>different</i> break/meeting is open throws a conflict → HTTP 409. This is why "two breaks at once" and "break + meeting together" can no longer happen.</td></tr>
+      <tr><td>Forced idle</td><td>Overrides a MEETING but respects a manual break (you are still on lunch even if the screen locks).</td></tr>
+    </tbody>
+  </table>
+  <p class="muted">Every dashboard card, widget and report reads this one definition — so live status, durations and history always agree.</p>
+
+  <h3 id="attendance">2.5 · Attendance derivation — raw punches → the day's sheet</h3>
+  <p><code>AttendanceDerivation</code> turns raw biometric punches + agent login sessions into the derived daily attendance summary. It is payroll-feeding, so the rules are strict and auditable:</p>
+  <ul>
+    <li><b>Raw stays raw</b> — biometric logs are never mutated; only the summary row is written, with provenance columns showing how each value was derived.</li>
+    <li><b>Shift-aware checkout (B7):</b> an intermediate OUT (lunch, a walk to the floor) is <i>not</i> a checkout. Checkout = the <b>trailing OUT</b> (the last OUT with no later IN), reconciled with the agent's real logout. A mid-day door OUT can never create an early checkout again.</li>
+    <li><b>Configurable late (B8/D2):</b> effective arrival is chosen per the company's <code>late_arrival_source</code> — agent login, biometric IN, later-of-both, or shift. Biometric-only employees now get late minutes too. Late is write-once: re-login never moves it (first arrival wins).</li>
+    <li><b>Idempotent:</b> re-running on a day (delayed punch, re-sync, nightly) converges to the same summary. Never overwrites an approved manual (HR regularization) row unless an explicit reconcile flag is passed.</li>
+  </ul>
+
+  <h3 id="gate">2.6 · Gate-to-PC — the door punch drives the work day <span class="tag t-usp">USP</span></h3>
+  <p><code>GateService</code> implements the Biometric Gate (Ejaz's design, "Doc 11"). When enabled for a company, an employee's PC agent is <b>walled</b> until the person physically punches in at the door — attaching real-world presence to digital tracking.</p>
+  <ul>
+    <li><b>No IN punch yet</b> → the agent shows the gate wall; status Inactive; ingestion of activity/idle/screenshots is refused (HTTP 423). The agent fails <b>closed</b>.</li>
+    <li><b>IN punch</b> → gate lifts, work session allowed, status Active.</li>
+    <li><b>Mid-day OUT</b> while a session is open → automatic "out of office" break (source BIOMETRIC) and the agent soft-locks; the return IN closes the break to the second. Out+in under 2 minutes merges away.</li>
+    <li><b>Break governance</b> — beyond 45 min raises a compliance event; beyond 3 h HR is emailed.</li>
+    <li><b>Two switches</b> — <code>biometric_gate</code> (auto/on/off; explicit off = pilot/observe) and <code>gate_enabled</code> (forces the gate on even before a punch device is registered, for API/manual-punch orgs). Companies with no biometric device are never gated — credentials alone start the day.</li>
+    <li><b>Emergency override</b> — an audited <code>POST /agent-override/gate</code> for admins (door hardware down, etc.).</li>
+  </ul>
+  <p class="muted">Residual (D4): absolute tamper-proofing against a full-Administrator user isn't achievable from an Electron/tray app; the server-authoritative gate + exit-lock + tamper logging is the strongest supported protection. A protected Windows service is a separate build if ever required.</p>
+
+  <h3 id="scoring">2.7 · Productivity &amp; Compliance scoring — the exact formulas</h3>
+  <p><code>ScoringService::buildSummary()</code> runs server-side (scores cannot be faked at the endpoint) and writes one <code>employee_daily_summaries</code> row per employee/day. Every source is bounded by the <b>company-local calendar day</b>, so cross-midnight events land on the right date and single-timezone installs behave exactly as a plain local day.</p>
+  <h4>Productivity score</h4>
+  <pre><code>present        = active + idle
+allotted_break = shift.break_minutes_allowed (or 1h per 9h shift),
+                 pro-rated by present / expected-shift
+net_working    = present − allotted_break        (min 1s)
+productivity % = (active + meeting) / net_working × 100   → clamped 0–100</code></pre>
+  <div class="callout"><b>Worked example.</b> A 9-hour shift with 1 hour allotted break. Priya is <b>present 8h30m</b> (active 6h40m + idle 1h50m), of which <b>40m was a scheduled meeting</b>. Pro-rated allotted break ≈ 57m (she was present ~94% of the shift). Net working window = 8h30m − 57m ≈ <b>7h33m</b>. Productive time = active 6h40m + meeting 40m = <b>7h20m</b>. Productivity = 7h20m / 7h33m ≈ <b>97%</b>. Idle and violations don't reduce productivity directly — they surface as idle time and in the separate compliance score.</div>
+  <h4>Compliance score</h4>
+  <pre><code>compliance % = 100 − Σ( weight × severity_multiplier )   → clamped 0–100
+
+weight:  AGENT_TAMPER 15 · UNAUTHORIZED_NETWORK 8 · SCREENSHOT_DISABLED 8
+         USB_VIOLATION 6 · VPN_PROXY_DETECTED 6 · BLOCKED_APP/WEBSITE 5 · CAMERA_BLOCKED 3
+severity multiplier:  LOW 0.5 · MEDIUM 1 · HIGH 1.5 · CRITICAL 2</code></pre>
+  <p class="muted">A "transparent v2" productivity report (<code>reports/productivity-v2</code>) exposes the same numbers as an auditable breakdown alongside the classic report, so a manager can see exactly how a score was built.</p>
+
+  <h3 id="rbac">2.8 · Roles, reporting hierarchy &amp; multi-tenant isolation</h3>
+  <p>Two independent scopes stack: <b>tenant</b> (a global company scope on every model) and <b>visibility</b> (<code>HierarchyService</code>).</p>
+  <ul>
+    <li><b>Unrestricted roles</b> (Super/Company/HR Admin, Compliance Officer, Auditor) see the whole company.</li>
+    <li><b>Branch Admin</b> → their own branch only.</li>
+    <li><b>Manager / Team Leader</b> → their reporting <i>subtree</i> only, computed as a transitive closure over the reporting tree (a manager sees their team leads and everyone under those leads).</li>
+    <li><b>Employee</b> → their <i>own row only</i> — the single hard scope behind the read-only Employee Self-Service portal.</li>
+    <li><b>Granular permissions</b> (e.g. <code>meeting.*</code>, <code>audit.export</code>, <code>evidence.view</code>, <code>gate.override</code>) gate individual actions on top of roles; the Roles matrix is fully editable (custom roles).</li>
+  </ul>
+
+  <h3 id="licclient">2.9 · Licence client — the daily phone-home (the hard wall)</h3>
+  <p><code>LicenseClient</code> validates the installed key against Central once a day (scheduled 01:00) and caches the entitlement bundle. It is availability-first: if Central is unreachable the last cached verdict stands, enforced locally against the bundle's expiry + grace. Only licence metadata + storage-GB is sent — never operational data. The <code>EnsureLicensed</code> middleware is the wall the agent endpoints sit behind.</p>
+
+  <h3 id="scheduler">2.10 · Scheduler &amp; background jobs</h3>
+  <p>Everything time-based hangs off one cron entry (<code>php artisan schedule:run</code> every minute). A 1-minute heartbeat stamps a cache key; Help → Troubleshooting turns red if the OS scheduler stops — the tell-tale that would otherwise silently break biometric sync, meeting auto-close and nightly attendance.</p>
+  <table>
+    <thead><tr><th>Job</th><th>Cadence</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>mark-attendance</td><td>00:15</td><td>Finalise yesterday's sheet (auto-absent / half-day / stale sessions) before scoring.</td></tr>
+      <tr><td>daily-summary</td><td>00:30</td><td>Compute productivity/compliance summaries on the finished sheet.</td></tr>
+      <tr><td>validate-license</td><td>01:00</td><td>Daily phone-home to Central (metadata only).</td></tr>
+      <tr><td>backup-database</td><td>01:30</td><td>Nightly gzipped backup (keeps newest 14).</td></tr>
+      <tr><td>purge-expired</td><td>02:00</td><td>Retention purge per company windows.</td></tr>
+      <tr><td>push-integrations</td><td>02:00</td><td>Outbound push (SmartEPT → SmartPRS etc.), previous day.</td></tr>
+      <tr><td>biometric-sync</td><td>every 5 min</td><td>Continuous cloud punch import so the Gate reacts within minutes.</td></tr>
+      <tr><td>build-archives / close-meetings / heartbeat</td><td>every minute</td><td>Leaver-archive ZIPs; auto-close meetings on time; scheduler self-diagnosis.</td></tr>
+      <tr><td>alerts / error-digest</td><td>30 min / 07:30</td><td>Silent-agent + violation-spike alerts; morning error digest to admins.</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ============ CENTRAL ============ -->
+  <h2 id="central"><span class="n">3.</span> Part B — Superadmin / Central (<span class="mono">smartept-central</span>)</h2>
+  <h3>3.1 · What it is &amp; why it exists</h3>
+  <p>Central is a mature Laravel 13 B2B licensing + billing platform with three faces: <b>Super Admin</b> (Ametecs staff — tenants, licences, plans, settings, admin users, reports), <b>Admin/sales-support</b> (orders, quotes, invoices, trials, leads, coupons, support desk), and the <b>Client portal</b> (self-service buy/renew, invoices, downloads, tickets, one-click SSO to the hosted console). A public landing + OTP-verified signup + a tokenised pay page complete the funnel. It is the only part Ametecs hosts for every customer.</p>
+
+  <h3 id="licensing">3.2 · Licensing architecture (RSA-2048, node-locked)</h3>
+  <ul>
+    <li><b>Offline <code>.lic</code> tokens</b> are RSA-signed (SHA-256). The <b>private key stays on Central and never ships</b>; the Product verifies with a bundled public key — so an air-gapped on-prem install validates with no call home.</li>
+    <li><b>Node-locked</b> to the server fingerprint the licence first phones home from; <b>seat cap</b> enforced on device activation; an HMAC check-digit is baked into the key.</li>
+    <li><b>Server-move path:</b> an admin "reset server fingerprint" action re-binds a licence to a new machine for legitimate migrations.</li>
+    <li><b>7-day evaluation</b> and grace windows are part of the entitlement bundle; enforcement is warn-first, hardening to a wall at expiry (per the distribution standard).</li>
+  </ul>
+
+  <h3 id="pricing">3.3 · Pricing v2 — one product, priced by user scale</h3>
+  <p>Pricing v2 collapses the old Core/Professional/Enterprise tiers into a <b>single all-features product</b> sold two ways. Both are admin-editable in Settings; the figures below are the seeded defaults.</p>
+  <div class="grid2">
+    <div class="card"><h4>Cloud (rental) — per user / month</h4>
+      <table style="box-shadow:none;margin:6px 0">
+        <thead><tr><th>Users</th><th>₹ / user / month</th></tr></thead>
+        <tbody>
+          <tr><td>1–30</td><td>45</td></tr><tr><td>31–100</td><td>28</td></tr><tr><td>101–250</td><td>20</td></tr>
+          <tr><td>251–500</td><td>15</td></tr><tr><td>501–1000</td><td>12</td></tr><tr><td>1001–2000</td><td>9</td></tr>
+          <tr><td>2001–5000</td><td>6</td></tr><tr><td>5000+</td><td>custom quote</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card"><h4>Perpetual (own it) — one-time by user capacity</h4>
+      <table style="box-shadow:none;margin:6px 0">
+        <thead><tr><th>Users</th><th>One-time ₹</th></tr></thead>
+        <tbody>
+          <tr><td>1–30</td><td>25,000</td></tr><tr><td>31–100</td><td>50,000</td></tr><tr><td>101–250</td><td>85,000</td></tr>
+          <tr><td>251–500</td><td>1,25,000</td></tr><tr><td>501–1000</td><td>2,00,000</td></tr><tr><td>1001–2000</td><td>3,25,000</td></tr>
+          <tr><td>2001–5000</td><td>5,00,000</td></tr><tr><td>5000+</td><td>custom quote</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <p class="muted">Commercial knobs: setup includes 30 devices; AMC default <b>18%</b> (of the 15–20% band); grandfather cap on legacy renewals (default +20%); quotation / pay-link validity 7 days. Perpetual buyers own their instance and data; AMC (year-1 included) keeps them on updates &amp; support.</p>
+
+  <h3 id="o2c">3.4 · Order-to-cash &amp; GST invoicing</h3>
+  <ol class="flow">
+    <li><b>Quote</b> — admin or client raises an order/quote (<code>PricingService</code> computes it from the bands; optional PO number; coupons applied). Gets <code>valid_until = today + 7</code>.</li>
+    <li><b>Pay link</b> — a tokenised <code>/pay/{number}/{token}</code> page (20-char HMAC). Expired links refuse payment (HTTP 410) with a friendly "contact sales".</li>
+    <li><b>Gateway</b> — Razorpay or Stripe. Webhook signatures verified with <code>hash_equals</code>, fail-closed when the secret is unset, de-duplicated via <code>webhook_events</code>.</li>
+    <li><b>Ledger</b> — <code>recordPayment()</code> is idempotent per payment id, runs in a transaction with <code>lockForUpdate</code>, provisions the licence on the first money/credit event, and settles when the balance is covered. Partial &amp; credit instalments supported.</li>
+    <li><b>GST invoice</b> — FY-series numbering issued as <code>MAX+1</code> under a row lock (deletions can't duplicate); CGST/SGST/IGST split by seller-vs-buyer state; SAC + place-of-supply snapshotted; credit notes for refunds.</li>
+    <li><b>Provision</b> — <code>ProductProvisioner</code> creates/updates the tenant's licence &amp; entitlement; the client can SSO straight into their console.</li>
+  </ol>
+  <p><b>Dunning</b> (<code>RunDunning</code>, daily) sends renewal reminders (T-30/7/1/0), trial reminders (T-3/1/0 → expired), lapsed-licence expiry, and purge windows that <b>keep billing/GST records</b>. Storage governance warns at 90% and pauses screenshots at 100%.</p>
+
+  <!-- ============ AGENT ============ -->
+  <h2 id="agent"><span class="n">4.</span> Part C — Agent (<span class="mono">SmartEPT_agent</span>, desktop)</h2>
+  <h3>4.1 · What it is &amp; why it is visible + consent-based</h3>
+  <p>The Agent is an Electron desktop client (no native modules, so <code>npm install &amp;&amp; npm start</code> just works) for Windows, macOS and Linux. Its defining principle is <b>visibility and consent</b>: the window stays visible, there is no hidden mode, and the server rejects tracking/media until recorded consent exists where the policy requires it. This is a deliberate trust &amp; legal posture, not a limitation.</p>
+
+  <h3>4.2 · Architecture &amp; tracking modules</h3>
+  <table>
+    <thead><tr><th>Module</th><th>Responsibility</th></tr></thead>
+    <tbody>
+      <tr><td><code>main.js</code></td><td>Electron main process — orchestrates tracking + sync + IPC.</td></tr>
+      <tr><td><code>tracking/idle.js</code></td><td>Active vs Idle via the OS idle timer (<code>powerMonitor</code>) against the policy threshold; active stretches split per foreground app.</td></tr>
+      <tr><td><code>tracking/activeWindow.js</code></td><td>Foreground window/process via a short PowerShell call (no native deps).</td></tr>
+      <tr><td><code>tracking/session.js</code></td><td>Lock/unlock/suspend/resume → attendance session events.</td></tr>
+      <tr><td><code>tracking/screenshot.js</code></td><td>Policy-gated screen capture (<code>desktopCapturer</code>), JPEG-compressed, uploaded on the effective interval; offline shots stashed &amp; retried; no stacking of timers.</td></tr>
+      <tr><td><code>tracking/usage.js</code></td><td>App &amp; website usage batches (website best-effort from the browser window title); blocked-app/site enforcement raises a visible warning + compliance event + optional shot.</td></tr>
+      <tr><td><code>tracking/clock.js</code></td><td><b>Server-authoritative clock</b> — offset learned from server time + a monotonic base; every stamp uses <code>clock.now()</code> so changing the PC clock can't distort recorded time.</td></tr>
+      <tr><td><code>tracking/guards.js</code></td><td>Break/meeting mutual-exclusion guards ("end current break first").</td></tr>
+      <tr><td><code>renderer/presence*</code></td><td>Hidden local <b>webcam-presence</b> worker — samples the webcam locally and reports only status + numbers (brightness, face count). No video or photo is recorded, streamed or uploaded unless a photo policy is explicitly enabled.</td></tr>
+      <tr><td><code>sync.js</code> + <code>store.js</code></td><td>Offline-tolerant sync — events persist to a local JSON queue (screenshots to a pending folder) and drain on reconnect; pending count shown in the UI. Stable device UUID.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>4.3 · Consent, gate wall, exit-lock &amp; tamper</h3>
+  <ul>
+    <li><b>Consent flow</b> — login → device registration → consent → live status. The server-side policy bundle + recorded consent gate everything.</li>
+    <li><b>Gate wall</b> — on a gated company the agent shows the wall and fails closed until a synced door punch lifts it (§2.6).</li>
+    <li><b>Exit-lock</b> — an admin-password exit modal (5 tries → lockout); tamper events (exit/uninstall/service-stop attempts) are reported to the server; an NSIS uninstall guard is built into the Windows installer.</li>
+    <li><b>Heartbeat</b> every 30s; "today" totals are pulled from the server as the source of truth.</li>
+  </ul>
+  <p class="muted">Current version line: agent <code>master</code> v0.11.0 (QA phase). Cross-platform build scripts: <code>npm run dist</code> (Windows NSIS), <code>build-mac.command</code>, <code>build-linux.sh</code>.</p>
+
+  <!-- ============ FLOWS ============ -->
+  <h2 id="flows"><span class="n">5.</span> End-to-end flows</h2>
+  <h3>5.1 · An employee's work day</h3>
+  <ol class="flow">
+    <li>Employee punches IN at the door → biometric sync imports the punch (≤5 min) → Gate lifts.</li>
+    <li>Agent (consent recorded) starts tracking on the resolved policy bundle; every stamp uses the server clock.</li>
+    <li>Active/idle, app/website usage, screenshots (if enabled) batch to the Product; a blocked app raises a visible warning + compliance event.</li>
+    <li>Breaks/meetings flow through <code>StatusService</code> (one open segment, exclusivity enforced); the live dashboard updates.</li>
+    <li>Mid-day door OUT → auto "out of office" break + soft-lock; return IN closes it to the second.</li>
+    <li>Night: <code>mark-attendance</code> finalises the sheet (trailing-OUT checkout, late per source), then <code>daily-summary</code> scores productivity &amp; compliance.</li>
+  </ol>
+  <h3>5.2 · Buy → licence → run</h3>
+  <ol class="flow">
+    <li>Lead signs up (OTP) on Central → gets a 7-day trial tenant, or an admin raises a quote.</li>
+    <li>Client pays the tokenised pay-link (Razorpay/Stripe) → ledger records payment → GST invoice issued.</li>
+    <li>Provisioner issues the licence; cloud clients SSO into their hosted console, on-prem clients import the signed <code>.lic</code>.</li>
+    <li>The Product phones home daily (metadata only); entitlement + seat cap enforced locally with grace if Central is unreachable.</li>
+  </ol>
+
+  <!-- ============ DISTRIBUTION ============ -->
+  <h2 id="distribution"><span class="n">6.</span> Distribution &amp; data-ownership model</h2>
+  <p>SmartEPT ships two editions from one architecture, per the Ametecs B2B distribution &amp; licensing standard:</p>
+  <div class="grid2">
+    <div class="card"><h4>SaaS — Cloud (rental)</h4><p class="muted">Ametecs hosts the client's Product instance; billed per user/month by band; renewals + dunning via Central; one-click SSO. Lowest friction, opex.</p></div>
+    <div class="card"><h4>On-premises — Perpetual (own it)</h4><p class="muted">Client hosts their own Product instance; one-time licence by user capacity + optional AMC. RSA-signed node-locked <code>.lic</code> runs offline. <b>The client owns their server and their data — Ametecs never sees it.</b></p></div>
+  </div>
+  <div class="usp"><b>Client Data Ownership &amp; Perpetual Licence</b> are two of the three headline USPs (with Gate-to-PC). They are not marketing veneer — they fall straight out of the phone-home hard wall and the offline signed-licence design described above.</div>
+
+  <!-- ============ INTERNAL GAPS ============ -->
+  <h2 id="gaps"><span class="n">7.</span> Internal — known gaps &amp; hardening backlog</h2>
+  <div class="internal">
+    <h3>⚠ Internal only — do not share with clients</h3>
+    <p>From the 27-Jul-2026 Central deep scan and the 23-Jul QA phase. None of these block running the business today; they are the pre-scale hardening queue. Full detail lives in the respective delivery reports.</p>
+    <h4>Central — security &amp; billing</h4>
+    <table>
+      <thead><tr><th>ID</th><th>Item</th><th>Pri</th></tr></thead>
+      <tbody>
+        <tr><td>S1</td><td>Payment &amp; mail secrets stored plaintext at rest → encrypt (Crypt cast / secrets manager).</td><td><span class="tag t-p1">P1</span></td></tr>
+        <tr><td>S2</td><td>No 2FA on the admin console → add TOTP (super role first).</td><td><span class="tag t-p1">P1</span></td></tr>
+        <tr><td>B2</td><td>AMC (perpetual) expiry has no renewal reminder → add AMC dunning (protects v2 recurring revenue).</td><td><span class="tag t-p2">P2</span></td></tr>
+        <tr><td>B1</td><td><code>.lic</code> hardcodes 7-day grace, ignoring the licence's real grace → use <code>$licence-&gt;grace_days</code>.</td><td><span class="tag t-p2">P2</span></td></tr>
+        <tr><td>S3 / B3–B5 / S4</td><td>Long admin session; failed-payment webhooks unhandled; Stripe/Razorpay ledger inconsistency; no unique index on <code>webhook_events</code>; pay-page throttle.</td><td><span class="tag t-p3">P2–P3</span></td></tr>
+        <tr><td>M1–M10</td><td>Webhook-failure panel, GST e-invoicing (IRN+QR at threshold), USD export/LUT handling, self-serve storage top-up, auto-renew, data-subject request path, more security tests.</td><td><span class="tag t-p3">Improve</span></td></tr>
+      </tbody>
+    </table>
+    <h4>Product / Agent — QA residuals</h4>
+    <ul>
+      <li><b>D4</b> — native tamper-proofing has an inherent ceiling in an Electron/tray app; a protected Windows service is a larger separate build if required.</li>
+      <li><b>D6</b> — full "every timestamp carries an explicit UTC offset" rollout is deferred to avoid regressing timezone-aware day bucketing; the agent is already server-time-authoritative and macOS-format-safe.</li>
+      <li><b>Scheduler dependency</b> — cloud biometric auto-sync, meeting auto-close &amp; nightly attendance all require the OS to run <code>schedule:run</code> every minute (now self-diagnosing via the Troubleshooting tile).</li>
+      <li><b>Custom roles</b> — pre-existing custom company roles need new permissions ticked in the Roles matrix after each permission-adding update.</li>
+    </ul>
+    <h4>Owner-run go-live steps (cloud can't touch PHP/DB)</h4>
+    <p class="muted">Product: <code>migrate.bat</code>, rebuild agent (<code>npm run dist</code>), confirm <code>schedule:run</code>, PHP <code>zip</code> ext on, assign an attendance policy + shift start (for late minutes), <code>view:clear</code>. Central: <code>migrate.bat</code> → <code>PricingV2Seeder</code> → <code>cache:clear</code>, then a quote + pay + GST-invoice test.</p>
+  </div>
+
+  <!-- ============ APPENDIX ============ -->
+  <h2 id="appendix"><span class="n">8.</span> Appendix</h2>
+  <h3>8.1 · Endpoint surface (summary)</h3>
+  <p class="muted">Product API (<code>routes/api.php</code>): public <code>auth/login</code>, <code>provision</code>; authenticated console CRUD (users, org, employees, devices, policies, roles, holidays, integrations, licence, ops); the <b>agent</b> group (<code>register-device</code>, <code>policy</code>, <code>heartbeat</code>, <code>consent</code>, <code>today</code>, <code>sync-batch</code>, and the tracking-mode+consent-gated <code>attendance-event</code>, <code>activity-events</code>, <code>idle-event</code>, <code>break-event</code>, <code>meeting-event</code>, <code>presence/webcam/screenshot</code>, <code>app/website-usage</code>, <code>compliance-event</code>, <code>tamper-attempt</code>, <code>gate-status</code>); reports/exports; and the public <code>v1</code> API-key ingest/read. Central (<code>routes/web.php</code>): client portal + public checkout/webhooks + the admin API (tenants, licences, orders, invoices, plans, coupons, leads, tickets, settings, reports, admin-users).</p>
+  <h3>8.2 · Middleware wall (Product)</h3>
+  <p class="muted"><code>ApiKeyAuth · EnforceTrackingMode · EnsureActiveEmployment · EnsureCompanyActive · EnsureConsent · EnsureLicensed · EnsurePermission · EnsureRole · ForceHttps</code></p>
+  <h3>8.3 · Glossary</h3>
+  <table>
+    <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td>Gate-to-PC</td><td>Biometric-punch wall that blocks PC tracking until the employee physically punches in.</td></tr>
+      <tr><td>Policy bundle</td><td>The composed set of 12 resolved policies the agent obeys for an employee/device.</td></tr>
+      <tr><td>Status timeline</td><td>The single ordered stream of non-overlapping work-state segments (one open at a time).</td></tr>
+      <tr><td>Phone-home</td><td>The daily licence-metadata-only call from a Product instance to Central.</td></tr>
+      <tr><td>.lic</td><td>RSA-signed, node-locked offline entitlement file for on-prem installs.</td></tr>
+      <tr><td>Perpetual band</td><td>One-time price by licensed-user capacity (own-it edition).</td></tr>
+    </tbody>
+  </table>
+
+  <footer>
+    SmartEPT — Technical &amp; Business-Logic Reference · <b>M/s. AMETECS INDIA PRIVATE LIMITED</b> · GST 36AAHCT0971F1ZB · Hyderabad<br>
+    Internal engineering document · 02 Aug 2026 · Product (smartept) + Central (smartept-central) + Agent (SmartEPT_agent) · WhatsApp 90000 98877
+  </footer>
+</div>
+</body>
+</html>
