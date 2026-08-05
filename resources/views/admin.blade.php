@@ -379,7 +379,8 @@
 <!-- LOGIN -->
 <div class="login" id="login">
   <div class="box">
-    <div class="lock" style="justify-content:center"><img src="/img/smartept-logo-h-light.png" alt="SmartEPT by Ametecs" style="width:210px;max-width:90%;height:auto;display:block"></div>
+    <div class="lock" style="justify-content:center"><img id="brand-logo" src="/img/smartept-logo-h-light.png" alt="SmartEPT by Ametecs" style="width:210px;max-width:90%;height:auto;display:block"></div>
+    <div id="tenant-brand" style="display:none;text-align:center;margin:6px 0 12px;font-weight:700;color:#0E7C8F"></div>
     <label>Work email</label><input id="email" type="email" value="admin@ametecs.io">
     <label>Password</label><input id="password" type="password" value="password">
     <button class="primary" id="btn-login">Sign in</button>
@@ -1752,6 +1753,12 @@
 @verbatim
 <script>
 const API = '/api';
+// Per-client branded console: the first path segment (e.g. /abcdindia) is the
+// tenant slug. Empty on /admin. Drives the branded, tenant-locked login.
+const TENANT_SLUG = (function () {
+  const seg = (location.pathname.split('/').filter(Boolean)[0] || '').toLowerCase();
+  return (seg && seg !== 'admin') ? seg : '';
+})();
 let TOKEN = null, ME = null, CURRENT = null, poll = null;
 
 const $ = (s) => document.querySelector(s);
@@ -2072,7 +2079,7 @@ function applyPermissionNav() {
 $('#btn-login').onclick = async () => {
   $('#login-err').textContent = '';
   try {
-    const res = await api('/auth/login', { method: 'POST', body: JSON.stringify({ email: $('#email').value, password: $('#password').value }) });
+    const res = await api('/auth/login', { method: 'POST', body: JSON.stringify({ email: $('#email').value, password: $('#password').value, tenant_slug: TENANT_SLUG }) });
     TOKEN = res.token; ME = res.user;
     sessionStorage.setItem('ept_token', TOKEN); // survive refresh
     enterApp();
@@ -2084,6 +2091,26 @@ $('#signout').onclick = async () => {
   TOKEN = null; ME = null; sessionStorage.removeItem('ept_token');
   clearInterval(poll); $('#app').classList.add('hide'); $('#login').classList.remove('hide');
 };
+// Per-client branding: on a /<slug> URL, show the client's name on the login card.
+(async () => {
+  if (!TENANT_SLUG) return;
+  try {
+    const b = await fetch(API + '/tenant-branding/' + encodeURIComponent(TENANT_SLUG), { headers: { Accept: 'application/json' } });
+    if (!b.ok) return;
+    const info = await b.json();
+    const el = $('#tenant-brand');
+    if (el && info.name) {
+      el.textContent = info.name + ' — Employee Productivity';
+      el.style.display = 'block';
+      document.title = info.name + ' · SmartEPT';
+    }
+    if (info.logo_url) { const lg = $('#brand-logo'); if (lg) lg.src = info.logo_url; }
+    // Clear the demo-prefilled email on a real client login page.
+    const em = $('#email'); if (em) em.value = '';
+    const pw = $('#password'); if (pw) pw.value = '';
+  } catch (e) { /* branding is best-effort; login still works */ }
+})();
+
 // Restore session on refresh — or sign in via a cloud SSO ticket (EPT-27).
 (async () => {
   // A signed ?sso= ticket from SmartEPT Central signs the tenant admin straight in.

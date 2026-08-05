@@ -47,7 +47,13 @@ return [
             'url' => env('DB_URL'),
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '3306'),
-            'database' => env('DB_DATABASE') ?: 'smartept',
+            // HARD LOCK: the product's DB is ALWAYS 'smartept'. A rogue environment
+            // variable (e.g. DB_DATABASE=smartept_central leaking from Central) must
+            // NEVER point this app at the Central database — that made companies/agent
+            // queries hit the wrong DB (4-Aug). Ignore any value that is the Central DB.
+            'database' => (env('DB_DATABASE') && env('DB_DATABASE') !== 'smartept_central')
+                ? env('DB_DATABASE')
+                : 'smartept',
             'username' => env('DB_USERNAME', 'root'),
             'password' => env('DB_PASSWORD', ''),
             'unix_socket' => env('DB_SOCKET', ''),

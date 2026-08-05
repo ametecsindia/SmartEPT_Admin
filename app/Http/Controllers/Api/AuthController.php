@@ -15,8 +15,11 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'email'    => ['required', 'email'],
-            'password' => ['required', 'string'],
+            'email'       => ['required', 'email'],
+            'password'    => ['required', 'string'],
+            // Sent by the branded per-client login (admin.smartept.com/<slug>). When
+            // present, the account must belong to that workspace. Absent on /admin.
+            'tenant_slug' => ['nullable', 'string', 'max:40'],
         ]);
 
         $user = User::where('email', $data['email'])->first();
@@ -24,6 +27,13 @@ class AuthController extends Controller
         if (! $user || ! Hash::check($data['password'], $user->password)) {
             throw ValidationException::withMessages([
                 'email' => ['These credentials do not match our records.'],
+            ]);
+        }
+
+        // Branded-URL lock: a login opened at /<slug> only accepts that company's people.
+        if (! empty($data['tenant_slug']) && optional($user->company)->slug !== $data['tenant_slug']) {
+            throw ValidationException::withMessages([
+                'email' => ['This workspace belongs to a different organisation. Please use your own workspace link.'],
             ]);
         }
 

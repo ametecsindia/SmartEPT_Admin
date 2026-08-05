@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\TamperController;
 use App\Http\Controllers\Api\BreakReportController;
 use App\Http\Controllers\Api\OpsController;
 use App\Http\Controllers\Api\StorageConfigController;
+use App\Http\Controllers\Api\TenantBrandingController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\OrgController;
@@ -62,6 +63,8 @@ Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttl
 Route::post('provision', [ProvisionController::class, 'provision'])->middleware('throttle:30,1');
 Route::post('provision/status', [ProvisionController::class, 'setStatus'])->middleware('throttle:60,1'); // Central suspend/enable push
 Route::post('auth/sso', [AuthController::class, 'sso'])->middleware('throttle:10,1');
+// Public branding for the per-client login page (admin.smartept.com/<slug>): name + logo only.
+Route::get('tenant-branding/{slug}', [TenantBrandingController::class, 'show'])->middleware('throttle:60,1');
 
 // ---- Authenticated (any valid token) ----
 Route::middleware(['auth:sanctum', 'company.active'])->group(function () {
@@ -113,8 +116,12 @@ Route::middleware(['auth:sanctum', 'company.active'])->group(function () {
     Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN')->group(function () {
         Route::get('ops/storage-usage', [OpsController::class, 'storageUsage']);
         Route::get('ops/storage-config', [StorageConfigController::class, 'show']);
-        Route::put('ops/storage-config', [StorageConfigController::class, 'save']);
-        Route::post('ops/storage-config/test', [StorageConfigController::class, 'test']);
+        // Cloud Storage (GCS) bucket = SHARED infrastructure across all cloud tenants,
+        // so only a Super Admin may change or test it. Company Admins can view only.
+        Route::middleware('role:SUPER_ADMIN')->group(function () {
+            Route::put('ops/storage-config', [StorageConfigController::class, 'save']);
+            Route::post('ops/storage-config/test', [StorageConfigController::class, 'test']);
+        });
         Route::put('ops/storage-local', [StorageConfigController::class, 'saveLocal']);
         Route::post('ops/storage-local/test', [StorageConfigController::class, 'testLocal']);
         Route::get('ops/backups', [OpsController::class, 'backups']);

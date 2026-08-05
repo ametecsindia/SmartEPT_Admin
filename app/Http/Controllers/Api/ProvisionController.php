@@ -34,6 +34,7 @@ class ProvisionController extends Controller
             'admin_name'         => ['nullable', 'string', 'max:255'],
             'timezone'           => ['nullable', 'string', 'max:64'],
             'device_limit'       => ['nullable', 'integer', 'min:1'],
+            'slug'               => ['nullable', 'string', 'max:40'],
         ]);
 
         // 1) Company — idempotent on external_tenant_id.
@@ -42,11 +43,19 @@ class ProvisionController extends Controller
             $company = Company::create([
                 'name'               => $data['company_name'],
                 'code'               => $this->uniqueCode($data['company_name'], $data['external_tenant_id']),
+                'slug'               => $this->uniqueSlug($data['slug'] ?? $data['company_name']),
                 'external_tenant_id' => $data['external_tenant_id'],
                 'timezone'           => $data['timezone'] ?: 'Asia/Kolkata',
                 'deployment_model'   => 'AMETECS_SAAS',
                 'status'             => 'ACTIVE',
             ]);
+        } else {
+            // Existing company — keep its slug in sync with Central (idempotent).
+            $want = ! empty($data['slug']) ? $data['slug'] : ($company->slug ?: $company->name);
+            $newSlug = $this->uniqueSlug($want, $company->id);
+            if ($company->slug !== $newSlug) {
+                $company->forceFill(['slug' => $newSlug])->save();
+            }
         }
 
         // 2) COMPANY_ADMIN login — reuse by email, else create with a temp password.
@@ -77,7 +86,9 @@ class ProvisionController extends Controller
         return response()->json([
             'ok'            => true,
             'company_id'    => $company->id,
-            'console_url'   => url('/admin'),
+            'slug'          => $company->slug,
+            // Branded per-client console URL (falls back to /admin if no slug).
+            'console_url'   => url($company->slug ? '/' . $company->slug : '/admin'),
             'admin_email'   => $user->email,
             'temp_password' => $tempPassword,   // null when the admin already existed
         ], 201);
@@ -124,5 +135,30 @@ class ProvisionController extends Controller
         }
 
         return $code;
+    }
+
+    /**
+     * A clean, unique, lowercase URL slug for the branded console path
+     * (admin.smartept.com/<slug>). Derived from Central's suggestion or the
+     * company name; a numeric suffix is added if the slug is already taken.
+     */
+    private function uniqueSlug(string $seed, ?int $ignoreId = null): string
+    {
+        $base = trim(Str::slug($seed, '-'), '-');
+        // Keep it path-safe and within the 40-char column; ensure it starts alnum.
+        $base = substr($base, 0, 38) ?: 'client';
+        if (! preg_match('/^[a-z0-9]/', $base)) {
+            $base = 'c' . $base;
+        }
+
+        $slug = $base;
+        $i = 1;
+        while (Company::where('slug', $slug)
+            ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
+            ->exists()) {
+            $slug = substr($base, 0, 34) . '-' . $i++;
+        }
+
+        return $slug;
     }
 }
