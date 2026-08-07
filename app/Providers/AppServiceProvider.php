@@ -80,9 +80,14 @@ class AppServiceProvider extends ServiceProvider
 
             \Illuminate\Support\Facades\Storage::extend('gcs', function ($app, $config) {
                 $client = new \Google\Cloud\Storage\StorageClient(['keyFile' => $config['key_file']]);
+                // Uniform bucket-level access (Google's default) forbids per-object ACLs.
+                // Use the ubla visibility handler so uploads never attempt an ACL call —
+                // without this, every write silently fails and storage_key is saved as "0".
+                // This handler is also correct for fine-grained buckets, so it's used always.
                 $adapter = new \League\Flysystem\GoogleCloudStorage\GoogleCloudStorageAdapter(
                     $client->bucket($config['bucket']),
-                    $config['prefix'] ?? ''
+                    $config['prefix'] ?? '',
+                    new \League\Flysystem\GoogleCloudStorage\UniformBucketLevelAccessVisibility()
                 );
 
                 return new \Illuminate\Filesystem\FilesystemAdapter(

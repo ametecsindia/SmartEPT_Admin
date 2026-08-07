@@ -39,13 +39,21 @@ class StorageService
         $dir = sprintf('smartept/%d/%s/%s', $companyId, strtolower($type), now()->format('Y-m-d'));
         $name = Str::uuid()->toString() . '.' . $ext;
 
-        $path = $file->storeAs($dir, $name, ['disk' => $this->disk()]);
+        $disk = $this->disk();
+        $path = $file->storeAs($dir, $name, ['disk' => $disk]);
+
+        // storeAs() returns false when the write fails (e.g. a GCS bucket permission
+        // or uniform-access ACL rejection). Fail loudly so the agent retries and we
+        // NEVER persist a broken row with storage_key "0" pointing at nothing.
+        if ($path === false) {
+            throw new \RuntimeException("Failed to store {$type} to disk [{$disk}] — check the storage/bucket configuration.");
+        }
 
         return StorageFile::create([
             'company_id'     => $companyId,
             'employee_id'    => $employeeId,
             'file_type'      => $type,
-            'storage_driver' => $this->disk(),
+            'storage_driver' => $disk,
             'bucket'         => null,
             'storage_key'    => $path,
             'mime_type'      => $file->getClientMimeType(),
