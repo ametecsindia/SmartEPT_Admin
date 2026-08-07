@@ -325,6 +325,52 @@ class OpsController extends Controller
         return response()->json(['ok' => true, 'dry_run' => $dry, 'lines' => $lines]);
     }
 
+    /**
+     * GET /api/ops/storage-quota — the client's hard storage cap + current usage.
+     * Any admin can see it; only a Super Admin can change it (buy more space).
+     */
+    public function storageQuota(Request $request): JsonResponse
+    {
+        $cid = $request->user()->company_id ?: Company::query()->value('id');
+        $c = Company::findOrFail($cid);
+        $used = (int) StorageFile::where('company_id', $cid)->sum('size_bytes');
+        $files = (int) StorageFile::where('company_id', $cid)->count();
+        $quotaMb = $c->storage_quota_mb;
+        $quotaBytes = $quotaMb ? (int) $quotaMb * 1048576 : null;
+
+        return response()->json(['data' => [
+            'quota_mb'    => $quotaMb ? (int) $quotaMb : null,
+            'unlimited'   => ! $quotaMb,
+            'used_bytes'  => $used,
+            'used_human'  => $this->human($used),
+            'quota_human' => $quotaBytes ? $this->human($quotaBytes) : null,
+            'files'       => $files,
+            'percent'     => $quotaBytes ? min(100, (int) round($used / max(1, $quotaBytes) * 100)) : null,
+            'over'        => $quotaBytes ? ($used > $quotaBytes) : false,
+            'can_edit'    => (bool) optional($request->user())->isSuperAdmin(),
+            'auto_trim'   => true, // oldest evidence is trimmed automatically when full
+        ]]);
+    }
+
+    /**
+     * PUT /api/ops/storage-quota — set the client's storage cap in MB (Super Admin only,
+     * route-gated). Blank / 0 = unlimited. This is the "buy more space" lever: raise the
+     * number after the client pays for extra storage.
+     */
+    public function updateStorageQuota(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'quota_mb' => ['nullable', 'integer', 'min:0', 'max:104857600'], // up to 100 TB
+        ]);
+        $cid = $request->user()->company_id ?: Company::query()->value('id');
+        $c = Company::findOrFail($cid);
+        $c->storage_quota_mb = ($data['quota_mb'] ?? 0) ?: null;
+        $c->save();
+        $this->audit($request, 'UPDATE', Company::class, $c->id, ['storage_quota_mb' => $c->storage_quota_mb]);
+
+        return response()->json(['ok' => true]);
+    }
+
     /** GET /api/gate/policy — Gate-to-PC (USP) company setting. */
     public function gatePolicy(Request $request): JsonResponse
     {

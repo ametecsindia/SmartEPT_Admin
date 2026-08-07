@@ -35,6 +35,10 @@ class ProvisionController extends Controller
             'timezone'           => ['nullable', 'string', 'max:64'],
             'device_limit'       => ['nullable', 'integer', 'min:1'],
             'slug'               => ['nullable', 'string', 'max:40'],
+            // Central owns the storage allocation: seats x per-user free storage (+ any
+            // purchased top-up), in MB. Pushed on create and re-pushed on seat/plan/
+            // storage changes. 0/absent = leave as-is; explicit 0 elsewhere = unlimited.
+            'storage_quota_mb'   => ['nullable', 'integer', 'min:0'],
         ]);
 
         // 1) Company — idempotent on external_tenant_id.
@@ -48,6 +52,7 @@ class ProvisionController extends Controller
                 'timezone'           => $data['timezone'] ?: 'Asia/Kolkata',
                 'deployment_model'   => 'AMETECS_SAAS',
                 'status'             => 'ACTIVE',
+                'storage_quota_mb'   => array_key_exists('storage_quota_mb', $data) ? ($data['storage_quota_mb'] ?: null) : null,
             ]);
         } else {
             // Existing company — keep its slug in sync with Central (idempotent).
@@ -55,6 +60,10 @@ class ProvisionController extends Controller
             $newSlug = $this->uniqueSlug($want, $company->id);
             if ($company->slug !== $newSlug) {
                 $company->forceFill(['slug' => $newSlug])->save();
+            }
+            // Re-push storage allocation from Central (seat change / storage top-up).
+            if (array_key_exists('storage_quota_mb', $data)) {
+                $company->forceFill(['storage_quota_mb' => $data['storage_quota_mb'] ?: null])->save();
             }
         }
 

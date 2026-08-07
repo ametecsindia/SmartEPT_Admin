@@ -1091,6 +1091,17 @@
           <span class="mut" id="loc-msg"></span>
         </div>
       </div>
+      <div class="card" id="quota-card">
+        <h3>Storage quota <span class="hint">hard cap for this client — oldest evidence is auto-deleted when full</span></h3>
+        <div id="quota-meter" class="mut" style="margin-bottom:8px">…</div>
+        <div style="height:10px;background:#EAEFF1;border-radius:6px;overflow:hidden;margin-bottom:12px"><div id="quota-bar" style="height:100%;width:0;background:#0F9FB6;transition:width .3s"></div></div>
+        <div id="quota-edit" style="display:none">
+          <label>Storage limit (GB) <span class="hint">blank or 0 = unlimited</span></label>
+          <input id="quota-gb" type="number" min="0" step="1" placeholder="e.g. 50" style="max-width:200px">
+          <div class="row" style="margin-top:12px"><button class="btn solid" id="quota-save">Save limit</button><span class="mut" id="quota-msg"></span></div>
+        </div>
+        <div id="quota-buy" class="mut" style="display:none;font-size:12px">Need more space? Contact Ametecs to raise this client's limit.</div>
+      </div>
       <div class="card" id="gcs-card">
         <h3>Cloud Storage (Google Cloud) <span class="hint">keep screenshots &amp; evidence in your own GCS bucket — no server setup</span></h3>
         <div id="gcs-status" class="mut" style="margin-bottom:10px">…</div>
@@ -5501,6 +5512,7 @@ async function loadOps() {
   loadAudit();
   loadRetention();
   loadStorageConfig();
+  loadStorageQuota();
   try {
     const s = await api('/ops/storage-usage');
     $('#ops-storage').innerHTML = (s.data || []).length
@@ -5591,6 +5603,35 @@ async function loadStorageConfig() {
     $('#loc-status').innerHTML = 'When Cloud Storage is off, new evidence is stored ' + (c.local_path ? 'in <b>' + esc(c.local_path) + '</b>' : 'on this server (default app storage)') + '.';
   } catch (e) { $('#gcs-status').textContent = e.message; }
 }
+async function loadStorageQuota() {
+  try {
+    const q = (await api('/ops/storage-quota')).data;
+    const pct = q.percent == null ? 0 : q.percent;
+    const bar = $('#quota-bar');
+    bar.style.width = Math.min(100, pct) + '%';
+    bar.style.background = q.over ? '#DC2626' : (pct >= 80 ? '#D97706' : '#0F9FB6');
+    $('#quota-meter').innerHTML = q.unlimited
+      ? 'Using <b>' + esc(q.used_human) + '</b> across ' + q.files + ' files · <b>Unlimited</b> (no cap set)'
+      : 'Using <b>' + esc(q.used_human) + '</b> of <b>' + esc(q.quota_human) + '</b> (' + pct + '%) · ' + q.files + ' files'
+        + (q.over ? ' · <span style="color:#DC2626">over limit — oldest evidence is auto-trimmed</span>' : '');
+    if (q.can_edit) {
+      $('#quota-edit').style.display = ''; $('#quota-buy').style.display = 'none';
+      $('#quota-gb').value = q.quota_mb ? +(q.quota_mb / 1024).toFixed(2) : '';
+    } else {
+      $('#quota-edit').style.display = 'none';
+      $('#quota-buy').style.display = q.unlimited ? 'none' : '';
+    }
+  } catch (e) { $('#quota-meter').textContent = e.message; }
+}
+$('#quota-save').onclick = async () => {
+  const msg = $('#quota-msg'); msg.style.color = ''; msg.textContent = 'Saving…';
+  const gb = parseFloat($('#quota-gb').value);
+  const quota_mb = (!gb || gb <= 0) ? 0 : Math.round(gb * 1024);
+  try {
+    await api('/ops/storage-quota', { method: 'PUT', body: JSON.stringify({ quota_mb }) });
+    msg.textContent = ''; toast('Storage limit saved'); loadStorageQuota();
+  } catch (e) { msg.style.color = '#B91C1C'; msg.textContent = e.message; }
+};
 $('#gcs-test').onclick = async () => {
   const msg = $('#gcs-msg'); msg.style.color = ''; msg.textContent = 'Testing…';
   try {

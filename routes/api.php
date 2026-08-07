@@ -115,6 +115,9 @@ Route::middleware(['auth:sanctum', 'company.active'])->group(function () {
         ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,AUDITOR');
     Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN')->group(function () {
         Route::get('ops/storage-usage', [OpsController::class, 'storageUsage']);
+        // Per-client storage quota: any admin sees usage; only Super Admin sets it (buy more space).
+        Route::get('ops/storage-quota', [OpsController::class, 'storageQuota']);
+        Route::middleware('role:SUPER_ADMIN')->put('ops/storage-quota', [OpsController::class, 'updateStorageQuota']);
         Route::get('ops/storage-config', [StorageConfigController::class, 'show']);
         // Cloud Storage (GCS) bucket = SHARED infrastructure across all cloud tenants,
         // so only a Super Admin may change or test it. Company Admins can view only.
