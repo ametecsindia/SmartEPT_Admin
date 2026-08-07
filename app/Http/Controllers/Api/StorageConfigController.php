@@ -25,15 +25,24 @@ class StorageConfigController extends Controller
     /** GET /api/ops/storage-config — current settings (the key itself is never returned). */
     public function show(): JsonResponse
     {
-        return response()->json([
-            'enabled'       => Setting::get('gcs_enabled') === '1',
-            'bucket'        => Setting::get('gcs_bucket'),
-            'project_id'    => Setting::get('gcs_project_id'),
-            'has_key'       => (bool) Setting::get('gcs_key_json'),
-            'sdk_installed' => $this->sdkInstalled(),
-            'active_disk'   => app(StorageService::class)->disk(),
-            'local_path'    => Setting::get('storage_local_path') ?: '',
-        ]);
+        // The GCS bucket is shared infrastructure — only a Super Admin may see it.
+        // Company Admins still get the local/on-prem storage bits (which they manage).
+        $out = [
+            'active_disk' => app(StorageService::class)->disk(),
+            'local_path'  => Setting::get('storage_local_path') ?: '',
+        ];
+
+        if (optional(auth()->user())->isSuperAdmin()) {
+            $out += [
+                'enabled'       => Setting::get('gcs_enabled') === '1',
+                'bucket'        => Setting::get('gcs_bucket'),
+                'project_id'    => Setting::get('gcs_project_id'),
+                'has_key'       => (bool) Setting::get('gcs_key_json'),
+                'sdk_installed' => $this->sdkInstalled(),
+            ];
+        }
+
+        return response()->json($out);
     }
 
     /** PUT /api/ops/storage-config — save. Key JSON is replaced only when a new one is sent. */

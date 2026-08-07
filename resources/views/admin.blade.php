@@ -1091,7 +1091,7 @@
           <span class="mut" id="loc-msg"></span>
         </div>
       </div>
-      <div class="card">
+      <div class="card" id="gcs-card">
         <h3>Cloud Storage (Google Cloud) <span class="hint">keep screenshots &amp; evidence in your own GCS bucket — no server setup</span></h3>
         <div id="gcs-status" class="mut" style="margin-bottom:10px">…</div>
         <div class="fgrid" style="grid-template-columns:1fr 1fr">
@@ -5573,15 +5573,20 @@ if ($('#dz-exec')) $('#dz-exec').onclick = async () => {
   } catch (e) { res.textContent = '\u2715 ' + e.message; }
 };
 async function loadStorageConfig() {
+  // Cloud Storage (GCS) bucket = shared infrastructure -> Super Admin only sees/edits it.
+  const isSuper = !!(ME && ME.role === 'SUPER_ADMIN');
+  if (!isSuper && $('#gcs-card')) $('#gcs-card').style.display = 'none';
   try {
     const c = await api('/ops/storage-config');
-    $('#gcs-bucket').value = c.bucket || '';
-    $('#gcs-project').value = c.project_id || '';
-    $('#gcs-enabled').checked = !!c.enabled;
-    if (c.has_key) $('#gcs-key').placeholder = 'A key is already saved — paste a new one only to replace it';
-    const bits = ['Active store: <b>' + esc(c.active_disk === 'gcs' ? 'Google Cloud Storage' : 'This server (local disk)') + '</b>'];
-    if (!c.sdk_installed) bits.push('<span style="color:#B45309">⚠ Cloud libraries not installed — IT runs <code>composer require google/cloud-storage league/flysystem-google-cloud-storage</code> once in the app folder to enable</span>');
-    $('#gcs-status').innerHTML = bits.join(' · ');
+    if (isSuper) {
+      $('#gcs-bucket').value = c.bucket || '';
+      $('#gcs-project').value = c.project_id || '';
+      $('#gcs-enabled').checked = !!c.enabled;
+      if (c.has_key) $('#gcs-key').placeholder = 'A key is already saved — paste a new one only to replace it';
+      const bits = ['Active store: <b>' + esc(c.active_disk === 'gcs' ? 'Google Cloud Storage' : 'This server (local disk)') + '</b>'];
+      if (!c.sdk_installed) bits.push('<span style="color:#B45309">⚠ Cloud libraries not installed — IT runs <code>composer require google/cloud-storage league/flysystem-google-cloud-storage</code> once in the app folder to enable</span>');
+      $('#gcs-status').innerHTML = bits.join(' · ');
+    }
     $('#loc-path').value = c.local_path || '';
     $('#loc-status').innerHTML = 'When Cloud Storage is off, new evidence is stored ' + (c.local_path ? 'in <b>' + esc(c.local_path) + '</b>' : 'on this server (default app storage)') + '.';
   } catch (e) { $('#gcs-status').textContent = e.message; }
