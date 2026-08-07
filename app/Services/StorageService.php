@@ -79,7 +79,11 @@ class StorageService
      */
     private function enforceQuota(int $companyId, int $incomingBytes): void
     {
-        $quotaMb = \App\Models\Company::whereKey($companyId)->value('storage_quota_mb');
+        try {
+            $quotaMb = \App\Models\Company::whereKey($companyId)->value('storage_quota_mb');
+        } catch (\Throwable $e) {
+            return; // storage_quota_mb migration not run yet — never let that block an upload
+        }
         if (! $quotaMb || $quotaMb <= 0) {
             return; // unlimited
         }
