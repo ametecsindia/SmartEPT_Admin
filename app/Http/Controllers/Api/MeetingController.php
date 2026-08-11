@@ -32,7 +32,15 @@ class MeetingController extends Controller
             ->when($request->to, fn ($q, $v) => $q->whereDate('start_at', '<=', $v))
             ->orderByDesc('start_at')
             ->limit(500)
-            ->get()
+            ->get();
+
+        // "# Present" = distinct employees who actually attended (have a meeting session),
+        // shown alongside the scheduled/invited count (participant_count).
+        $present = EmployeeMeetingSession::whereIn('meeting_id', $meetings->pluck('id'))
+            ->selectRaw('meeting_id, COUNT(DISTINCT employee_id) c')
+            ->groupBy('meeting_id')->pluck('c', 'meeting_id');
+
+        $meetings = $meetings
             ->map(fn ($m) => [
                 'id'                => $m->id,
                 'title'             => $m->title,
@@ -46,6 +54,7 @@ class MeetingController extends Controller
                 'venue'             => $m->venue,
                 'host_contact'      => $m->host_contact,
                 'participant_count' => $m->participants_count,
+                'present_count'     => (int) ($present[$m->id] ?? 0),
                 'notes'             => $m->notes,
                 'created_by'        => $m->creator?->name,
                 'organizer'         => $m->creator?->name,

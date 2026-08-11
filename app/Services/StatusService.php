@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Employee;
+use App\Models\Meeting;
 use App\Models\StatusTimeline;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -240,6 +241,52 @@ class StatusService
                 $this->closeSegment($s, $s->started_at->copy()->endOfDay());
                 $closed++;
             });
+
+        return $closed;
+    }
+
+    /**
+     * Self-heal: close any open MEETING segment whose meeting is already OVER — terminal
+     * status (Completed / Cancelled / Auto-closed / No-show), an actual_end_at stamped, or
+     * a missing meeting row. Called before the live board reads status so nobody lingers in
+     * "Meeting" once the meeting has ended (an overrunning, still-live meeting is left alone).
+     */
+    public function closeOrphanedMeetingSegments(array $employeeIds): int
+    {
+        if (empty($employeeIds)) {
+            return 0;
+        }
+
+        $segs = StatusTimeline::withoutGlobalScopes()
+            ->whereIn('employee_id', $employeeIds)
+            ->whereNull('ended_at')
+            ->where('state', 'MEETING')
+            ->get();
+        if ($segs->isEmpty()) {
+            return 0;
+        }
+
+        $meetings = Meeting::withoutGlobalScopes()
+            ->whereIn('id', $segs->pluck('meeting_id')->filter()->unique())
+            ->get()->keyBy('id');
+
+        $now = now();
+        $closed = 0;
+        foreach ($segs as $seg) {
+            $m = $seg->meeting_id ? $meetings->get($seg->meeting_id) : null;
+            $over = ! $m                                                            // orphaned segment
+                || $m->actual_end_at !== null                                      // actually ended
+                || in_array($m->status, Meeting::TERMINAL_STATUSES, true);         // terminal status
+            if (! $over) {
+                continue;                                                          // still-live meeting — leave it
+            }
+            $at = $m?->actual_end_at ?: $now;
+            if ($at->lessThan($seg->started_at)) {
+                $at = $seg->started_at;
+            }
+            $this->closeSegment($seg, $at);
+            $closed++;
+        }
 
         return $closed;
     }

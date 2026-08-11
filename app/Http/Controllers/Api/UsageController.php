@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Support\ScopesVisibleEmployees;
 use App\Support\ResolvesBusinessDay;
 use App\Models\Employee;
+use App\Models\EmployeeActivityEvent;
 use App\Models\EmployeeAppUsageLog;
+use App\Models\EmployeeAttendanceLog;
 use App\Models\EmployeeDevice;
 use App\Models\EmployeeComplianceEvent;
+use App\Models\EmployeeScreenshotLog;
 use App\Models\EmployeeWebsiteUsageLog;
 use App\Services\ComplianceEvaluator;
 use App\Services\PolicyResolver;
@@ -204,7 +207,19 @@ class UsageController extends Controller
             ->selectRaw('employee_id, COUNT(*) as c')
             ->groupBy('employee_id')->get()->keyBy('employee_id');
 
-        $ids = collect($apps->keys())->merge($sites->keys())->merge($compl->keys())->unique();
+        // An employee is "tracked today" even with app/website usage turned OFF — they may
+        // still have attendance, active/idle activity, or screenshots. Include those ids so
+        // anyone present on the Live Dashboard also appears here (with 0 app/site time),
+        // instead of only employees who happen to have usage rows.
+        $attIds = EmployeeAttendanceLog::where('company_id', $companyId)
+            ->whereDate('work_date', $date)->distinct()->pluck('employee_id');
+        $actIds = EmployeeActivityEvent::where('company_id', $companyId)
+            ->whereDate('started_at', $date)->distinct()->pluck('employee_id');   // EPT-20: LOCAL day
+        $shotIds = EmployeeScreenshotLog::where('company_id', $companyId)
+            ->whereDate('captured_at', $date)->distinct()->pluck('employee_id');  // EPT-20: LOCAL day
+
+        $ids = collect($apps->keys())->merge($sites->keys())->merge($compl->keys())
+            ->merge($attIds)->merge($actIds)->merge($shotIds)->unique();
 
         $visible = $this->visibleEmployeeIds($request->user());
         $employees = Employee::where('company_id', $companyId)

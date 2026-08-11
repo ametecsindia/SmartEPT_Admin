@@ -233,4 +233,100 @@ class PolicyResolver
 
         return $policy ? $policy->toArray() : null;
     }
+
+    /**
+     * DIAGNOSTIC (read-only): explain WHY each monitored capability is on/off for one
+     * employee — the effective value plus the policy and the precedence level (DEVICE /
+     * EMPLOYEE / TEAM / DEPARTMENT / BRANCH / COMPANY / EMPLOYEE_LINK) that decided it, and
+     * the resolved tracking mode + where it came from. Powers the employee "Policy" tab.
+     */
+    public function traceForEmployee(Employee $employee, ?EmployeeDevice $device = null): array
+    {
+        if (! $device) {
+            $device = EmployeeDevice::withoutGlobalScopes()
+                ->where('employee_id', $employee->id)
+                ->orderByDesc('last_heartbeat_at')->orderByDesc('id')->first();
+        }
+
+        $chain = $this->assignableChain($employee, $device);
+        $assignments = $this->assignmentsFor($employee->company_id, $chain);
+
+        // Final effective flags = exactly what the agent obeys (after tracking-mode folding).
+        $bundle = $this->bundleForEmployee($employee, $device);
+        $mon = $bundle['policies']['monitoring'] ?? [];
+        $shot = $bundle['policies']['screenshot'] ?? [];
+        $cam = $bundle['policies']['webcam'] ?? [];
+
+        $cap = fn ($on, $type) => [
+            'on'     => (bool) $on,
+            'policy' => $this->sourceFor($type, $chain, $assignments, $employee),
+        ];
+
+        return [
+            'device' => $device ? [
+                'id' => $device->id, 'name' => $device->computer_name, 'tracking_mode' => $device->tracking_mode,
+            ] : null,
+            'tracking_mode' => [
+                'value'  => $bundle['tracking_mode'] ?? 'FULL',
+                'source' => $this->trackingModeSource($employee, $device),
+            ],
+            'capabilities' => [
+                'tracking'      => $cap($mon['tracking_enabled'] ?? false, 'MONITORING'),
+                'app_usage'     => $cap($mon['app_usage_enabled'] ?? false, 'MONITORING'),
+                'website_usage' => $cap($mon['website_usage_enabled'] ?? false, 'MONITORING'),
+                'screenshots'   => $cap($shot['enabled'] ?? false, 'SCREENSHOT'),
+                'webcam'        => $cap($cam['presence_enabled'] ?? false, 'WEBCAM'),
+            ],
+        ];
+    }
+
+    /** The winning [level, policy_id, policy_name] for a type, mirroring resolveType() selection. */
+    private function sourceFor(string $type, array $chain, array $assignments, Employee $employee): array
+    {
+        foreach ($chain as [$level, $id]) {
+            if (isset($assignments[$type][$level][$id])) {
+                $pid = $assignments[$type][$level][$id];
+
+                return ['level' => $level, 'policy_id' => $pid, 'policy_name' => $this->policyName($type, $pid)];
+            }
+        }
+        if ($type === 'MONITORING' && $employee->monitoring_policy_id) {
+            return ['level' => 'EMPLOYEE_LINK', 'policy_id' => $employee->monitoring_policy_id,
+                'policy_name' => $this->policyName($type, $employee->monitoring_policy_id)];
+        }
+
+        return ['level' => 'NONE', 'policy_id' => null, 'policy_name' => null];
+    }
+
+    private function policyName(string $type, $id): ?string
+    {
+        $model = self::MODELS[$type] ?? null;
+        if (! $model || ! $id) {
+            return null;
+        }
+        $p = $model::withoutGlobalScopes()->find($id);
+
+        return $p->name ?? null;
+    }
+
+    /** Which precedence level set the effective tracking mode (mirrors effectiveTrackingMode). */
+    private function trackingModeSource(Employee $e, ?EmployeeDevice $device): string
+    {
+        $cands = [];
+        if ($device) { $cands[] = ['DEVICE', $device->tracking_mode]; }
+        $cands[] = ['EMPLOYEE', $e->tracking_mode];
+        if ($e->team_id)       { $cands[] = ['TEAM', optional(Team::withoutGlobalScopes()->find($e->team_id))->tracking_mode]; }
+        if ($e->department_id) { $cands[] = ['DEPARTMENT', optional(Department::withoutGlobalScopes()->find($e->department_id))->tracking_mode]; }
+        if ($e->branch_id)     { $cands[] = ['BRANCH', optional(Branch::withoutGlobalScopes()->find($e->branch_id))->tracking_mode]; }
+        $cands[] = ['COMPANY', optional(Company::find($e->company_id))->tracking_mode];
+
+        foreach ($cands as [$level, $m]) {
+            $m = strtoupper(trim((string) $m));
+            if (in_array($m, ['FULL', 'PRESENCE_ONLY', 'EXCLUDED'], true)) {
+                return $level . ' = ' . $m;
+            }
+        }
+
+        return 'DEFAULT = FULL';
+    }
 }

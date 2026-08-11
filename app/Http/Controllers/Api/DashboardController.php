@@ -65,6 +65,11 @@ class DashboardController extends Controller
             \Illuminate\Support\Carbon::parse($today)->startOfDay()
         );
 
+        // Also close any MEETING segment whose meeting has already ended (Completed / Cancelled /
+        // Auto-closed / actual_end stamped), so an employee never lingers in "Meeting" on the
+        // board after the meeting is over. A still-live (overrunning) meeting is left untouched.
+        app(StatusService::class)->closeOrphanedMeetingSegments($employees->pluck('id')->all());
+
         $openMap = app(StatusService::class)->openStatusMap($employees->pluck('id')->all());
         $now = now();
 

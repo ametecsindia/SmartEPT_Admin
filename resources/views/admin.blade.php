@@ -792,7 +792,7 @@
         <button class="btn solid" id="mtg-new" style="margin-left:auto">+ Schedule meeting</button>
       </div>
       <div class="card"><h3>Meetings</h3>
-        <table><thead><tr><th>Title</th><th>Date</th><th>Time</th><th>Organizer</th><th>Participants</th><th>Actual End</th><th>Status</th><th></th></tr></thead>
+        <table><thead><tr><th>Title</th><th>Date</th><th>Time</th><th>Organizer</th><th title="Invited / scheduled participants">Scheduled</th><th title="Participants who actually attended (joined) the meeting"># Present</th><th>Actual End</th><th>Status</th><th></th></tr></thead>
         <tbody id="mtg-rows"></tbody></table>
       </div>
     </div>
@@ -914,15 +914,25 @@
           <button class="btn" id="pr-rebuild" title="Rebuild missing day-summaries for this range &mdash; use if history is empty (nightly job / scheduler not run)">&#8635; Rebuild history</button>
           <input id="pr-q" placeholder="Search employee" autocomplete="off" style="min-width:0;width:160px">
           <span style="flex:1"></span>
+          <button class="btn solid" id="pr-xlsx" title="Download the Productivity Report as a real Excel .xlsx with the exact template columns and formats">⬇ Excel</button>
           <button class="btn" id="pr-csv">⇓ CSV</button>
-          <button class="btn solid" id="pr-pdf">⇓ PDF</button>
+          <button class="btn" id="pr-pdf">⇓ PDF</button>
         </div>
         <div style="overflow-x:auto">
         <table id="pr-table"><thead><tr>
-          <th>Date</th><th>Code</th><th>Employee</th><th>Dept</th>
-          <th>Logged in</th><th>Logged out</th><th>Present</th><th>Working</th><th>Idle</th>
-          <th>Breaks</th><th>Break time</th><th>Net working</th><th>Meeting</th><th>Time-outs</th><th>Non-prod.</th><th>Violations</th><th>Prod. %</th>
-        </tr></thead><tbody id="pr-rows"><tr><td colspan="17" class="mut">Pick a range and press Show.</td></tr></tbody></table>
+          <th>Date</th><th>Code</th><th>Employee</th><th>Dept</th><th title="Reporting Manager">Manager</th>
+          <th>Logged in</th><th>Logged out</th>
+          <th title="Actual Present Hrs (Logged out - Logged in)">Actual Present</th>
+          <th title="Working (hh:mm)">Working</th><th title="Idle (hh:mm)">Idle</th>
+          <th title="Number of Breaks">Breaks</th><th title="Break time Availed (hh:mm)">Break Availed</th>
+          <th title="Allotted break (hh:mm)">Allotted</th><th title="Meeting Time">Meeting</th>
+          <th title="Break Exceed Mins (Break Time - Allotted Time)">Break Exceed</th>
+          <th title="Productive Hrs (Working + Meeting)">Productive</th>
+          <th title="Non Productive Hrs (Idle + Break Exceed)">Non-Prod.</th>
+          <th title="Net Hrs (Actual Logged Hours - Allotted Break)">Net Hrs</th>
+          <th>Time-outs</th><th>Violations</th>
+          <th title="Productive% [ Productive Hrs / Net Hrs ]">Prod. %</th>
+        </tr></thead><tbody id="pr-rows"><tr><td colspan="21" class="mut">Pick a range and press Show.</td></tr></tbody></table>
         </div>
         <div class="mut" id="pr-note" style="margin-top:8px"></div>
       </div>
@@ -1571,6 +1581,7 @@
     <div class="tab" data-tab="apps">Apps</div>
     <div class="tab" data-tab="sites">Websites</div>
     <div class="tab" data-tab="compliance">Compliance</div>
+    <div class="tab" data-tab="policy" title="Why each monitored capability is on/off for this employee">Policy</div>
   </div>
   <div id="d-body"></div>
 </div>
@@ -2470,7 +2481,11 @@ function renderLiveRows() {
   } else {
     $('#live-filter').innerHTML = '';
   }
-  $('#live-rows').innerHTML = list.map((e) => {
+  // Show online staff first (Active / Idle / break / meeting), then Offline at the bottom.
+  // Stable within each group, so the server's ordering is otherwise preserved.
+  const ordered = list.slice().sort((a, b) =>
+    ((a.work_status === 'OFFLINE') ? 1 : 0) - ((b.work_status === 'OFFLINE') ? 1 : 0));
+  $('#live-rows').innerHTML = ordered.map((e) => {
     const ws = e.work_status || 'OFFLINE';
     const cls = WORK_TAG[ws] || 't-off';
     const lbl = WORK_LABEL[ws] || ws;
@@ -2482,7 +2497,9 @@ function renderLiveRows() {
     return '<tr class="clk" data-id="' + e.employee_id + '" data-name="' + esc(e.name) + '">'
       + '<td><span class="nm">' + esc(e.name) + '</span></td><td>' + esc(e.team || '—') + '</td>'
       + '<td><span class="tag ' + cls + '">' + esc(lbl) + '</span>' + extra + '</td>'
-      + '<td>' + secH(e.active_seconds) + '</td><td>' + secH(e.idle_seconds) + '</td><td>' + t(e.last_seen) + '</td></tr>';
+      + '<td>' + secH(e.active_seconds) + '</td><td>' + secH(e.idle_seconds) + '</td>'
+      // Offline: show DATE + time (they may have last been seen on an earlier day). Online: time only.
+      + '<td>' + (ws === 'OFFLINE' ? dt(e.last_seen) : t(e.last_seen)) + '</td></tr>';
   }).join('') || '<tr><td colspan="6" class="mut">' + (filtering ? 'No employees match this filter right now.' : 'No employees online yet.') + '</td></tr>';
 }
 let DASH_RANGE = null;
@@ -4672,6 +4689,7 @@ async function loadMeetings() {
       + '<td>' + (m.start_at ? dt(m.start_at) : '—') + (m.end_at ? ' – ' + new Date(m.end_at.replace(' ', 'T')).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '') + '</td>'
       + '<td>' + esc(m.organizer || '—') + '</td>'
       + '<td>' + (m.participant_count ?? 0) + '</td>'
+      + '<td>' + (m.present_count ?? 0) + '</td>'
       + '<td>' + (m.actual_end_at ? dt(m.actual_end_at) : '—') + '</td>'
       + '<td><span class="tag ' + (MTG_STATUS_TAG[m.status] || 't-off') + '">' + esc((m.status || '').replace('_', ' ')) + '</span></td>'
       + '<td style="text-align:right;white-space:nowrap">'
@@ -4684,9 +4702,9 @@ async function loadMeetings() {
              + (can('meeting.cancel') ? '<button class="btn danger" data-mtg-cancel="' + m.id + '">Cancel</button>' : ''))
           : '')
       + '</td></tr>').join('')
-      || '<tr><td colspan="8" class="mut">No meetings yet. Press "Schedule meeting" to create one.</td></tr>';
+      || '<tr><td colspan="9" class="mut">No meetings yet. Press "Schedule meeting" to create one.</td></tr>';
   } catch (e) {
-    $('#mtg-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="8" class="mut">' + esc(e.message) + '</td></tr>';
+    $('#mtg-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="9" class="mut">' + esc(e.message) + '</td></tr>';
   }
 }
 
@@ -4844,46 +4862,52 @@ function prSetRange(from, to) { $('#pr-from').value = from; $('#pr-to').value = 
 function isoDate(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 async function loadProductivity() {
   const from = $('#pr-from').value || today(), to = $('#pr-to').value || today();
-  $('#pr-rows').innerHTML = '<tr><td colspan="17" class="mut">Loading…</td></tr>';
+  $('#pr-rows').innerHTML = '<tr><td colspan="21" class="mut">Loading…</td></tr>';
   try {
     const r = await api('/reports/productivity?from=' + from + '&to=' + to);
     PROD_ROWS = r.data || [];
+    const pct = (v) => (v == null ? '—' : Number(v).toFixed(0) + '%');
     $('#pr-rows').innerHTML = PROD_ROWS.length ? PROD_ROWS.map((x) =>
       '<tr>' +
       '<td>' + esc(x.work_date) + (x.live ? ' <span class="tag t-info" style="font-size:8px">LIVE</span>' : '') + '</td>' +
       '<td>' + esc(x.employee_code || '—') + '</td>' +
       '<td><b>' + esc(x.name) + '</b></td>' +
       '<td class="mut">' + esc(x.department || '—') + '</td>' +
+      '<td class="mut">' + esc(x.reporting_manager || '—') + '</td>' +
       '<td>' + esc(x.first_in || '—') + '</td>' +
-      '<td>' + esc(x.last_out || '—') + '</td>' +
-      '<td data-sort="' + x.present_seconds + '">' + hms(x.present_seconds) + '</td>' +
+      '<td' + (x.live && x.last_out ? ' title="Live — current time is used as logout for today\'s productivity"' : '') + '>' + esc(x.last_out || '—') + (x.live && x.last_out ? ' <span class="mut" style="font-size:8px">now</span>' : '') + '</td>' +
+      '<td data-sort="' + x.present_seconds + '" title="Logged out − Logged in (today: current time)">' + hms(x.present_seconds) + '</td>' +
       '<td data-sort="' + x.work_seconds + '"><b>' + hms(x.work_seconds) + '</b></td>' +
       '<td data-sort="' + x.idle_seconds + '">' + hms(x.idle_seconds) + '</td>' +
       '<td data-sort="' + x.break_count + '">' + x.break_count + '</td>' +
       '<td data-sort="' + x.break_seconds + '">' + hms(x.break_seconds) + '</td>' +
-      '<td data-sort="' + (x.net_working_seconds||0) + '" title="Present minus allotted break (' + hms(x.allotted_break_seconds||0) + ')"><b>' + hms(x.net_working_seconds||0) + '</b></td>' +
+      '<td data-sort="' + (x.allotted_break_seconds||0) + '">' + hms(x.allotted_break_seconds||0) + '</td>' +
       '<td data-sort="' + (x.meeting_seconds || 0) + '">' + (x.meeting_seconds ? hms(x.meeting_seconds) : '—') + '</td>' +
+      '<td data-sort="' + (x.break_exceed_seconds||0) + '">' + (x.break_exceed_seconds ? hms(x.break_exceed_seconds) : '—') + '</td>' +
+      '<td data-sort="' + (x.productive_seconds||0) + '" title="Working + Meeting"><b>' + hms(x.productive_seconds||0) + '</b></td>' +
+      '<td data-sort="' + (x.non_productive_seconds||0) + '" title="Idle + Break Exceed">' + hms(x.non_productive_seconds||0) + '</td>' +
+      '<td data-sort="' + (x.net_working_seconds||0) + '" title="Actual Present − Allotted break (' + hms(x.allotted_break_seconds||0) + ')"><b>' + hms(x.net_working_seconds||0) + '</b></td>' +
       '<td data-sort="' + x.timeouts + '">' + x.timeouts + '</td>' +
-      '<td data-sort="' + x.non_productive_seconds + '">' + hms(x.non_productive_seconds) + '</td>' +
       '<td data-sort="' + x.violations + '">' + (x.violations ? '<span class="tag t-danger">' + x.violations + '</span>' : '0') + '</td>' +
-      '<td data-sort="' + x.productivity + '"><b>' + Number(x.productivity).toFixed(0) + '%</b></td></tr>'
-    ).join('') : '<tr><td colspan="17" class="mut">No activity in this range.</td></tr>';
-    $('#pr-note').textContent = PROD_ROWS.length + ' rows · ' + from + ' → ' + to + ' · Productivity = productive time ÷ net working (present − allotted break, pro-rated on early logout). Allotted break comes from the shift.';
+      '<td data-sort="' + (x.productivity==null?-1:x.productivity) + '"><b>' + pct(x.productivity) + '</b></td></tr>'
+    ).join('') : '<tr><td colspan="21" class="mut">No activity in this range.</td></tr>';
+    $('#pr-note').textContent = PROD_ROWS.length + ' rows · ' + from + ' → ' + to + ' · Actual Present = Logged out − Logged in (for today, the current time is used as logout so the % is live) · Productive = Working + Meeting · Non-Productive = Idle + Break Exceed · Net Hrs = Actual Present − Allotted break · Productive % = Productive ÷ Net Hrs. Allotted break = shift allowance, pro-rated on early logout. An extract of today uses the same current-time-as-logout values.';
     attachTableFilter($('#pr-q'), '#pr-rows');
-  } catch (e) { $('#pr-rows').innerHTML = '<tr><td colspan="16" class="mut">' + esc(e.message) + '</td></tr>'; }
+  } catch (e) { $('#pr-rows').innerHTML = '<tr><td colspan="21" class="mut">' + esc(e.message) + '</td></tr>'; }
 }
 // R4 item 6: extracted reports use hh:mm, not raw seconds/minutes.
 const hhmm = (sec) => { const m = Math.max(0, Math.round((sec || 0) / 60)); return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
 function prCSV() {
-  const head = ['Date','Code','Employee','Department','Team','Logged in','Logged out','Present (hh:mm)','Working (hh:mm)','Idle (hh:mm)','Breaks','Break time (hh:mm)','Allotted break (hh:mm)','Net working (hh:mm)','Time-outs','Non-productive (hh:mm)','Violations','Productivity%'];
-  const rows = PROD_ROWS.map((x) => [x.work_date,x.employee_code,x.name,x.department,x.team,x.first_in,x.last_out,hhmm(x.present_seconds),hhmm(x.work_seconds),hhmm(x.idle_seconds),x.break_count,hhmm(x.break_seconds),hhmm(x.allotted_break_seconds),hhmm(x.net_working_seconds),x.timeouts,hhmm(x.non_productive_seconds),x.violations,x.productivity]);
+  // Exact headers from the client's Productivity Excel template (RAW sheet), kept verbatim.
+  const head = ['Emp. ID','Employee','Department','Reporting Manager','Date','Logged in','Logged out','Actual Present Hrs (Logged out - Logged in)','Working (hh:mm)','Idle (hh:mm)','Number of Breaks','Break time Availed  (hh:mm)','Allotted break (hh:mm)','Meeting Time','Break Exceed Mins (Break Time - Allotted Time)','Productive Hrs (Working + Meeting)','Non Productive Hrs (Idle + Break Exceed)','Net Hrs (Actual Logged Hours-Allotted Break)','Productive% [ Productive Hrs/ Net Hrs]'];
+  const rows = PROD_ROWS.map((x) => [x.employee_code,x.name,x.department,x.reporting_manager,x.work_date,x.first_in,x.last_out,hhmm(x.present_seconds),hhmm(x.work_seconds),hhmm(x.idle_seconds),x.break_count,hhmm(x.break_seconds),hhmm(x.allotted_break_seconds),hhmm(x.meeting_seconds),hhmm(x.break_exceed_seconds),hhmm(x.productive_seconds),hhmm(x.non_productive_seconds),hhmm(x.net_working_seconds),(x.productivity==null?'':x.productivity+'%')]);
   const csv = [head, ...rows].map((r) => r.map((c) => '"' + String(c==null?'':c).replace(/"/g,'""') + '"').join(',')).join('\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
-  a.download = 'smartept-productivity-' + $('#pr-from').value + '_' + $('#pr-to').value + '.csv'; a.click(); URL.revokeObjectURL(a.href);
+  a.download = 'SmartEPT-Productivity-Report-' + $('#pr-from').value + '_' + $('#pr-to').value + '.csv'; a.click(); URL.revokeObjectURL(a.href);
 }
 function prPDF() {
   const from = $('#pr-from').value, to = $('#pr-to').value;
-  const rowsHtml = PROD_ROWS.map((x) => '<tr><td>' + esc(x.work_date) + '</td><td>' + esc(x.employee_code||'') + '</td><td>' + esc(x.name) + '</td><td>' + esc(x.department||'') + '</td><td>' + esc(x.first_in||'—') + '</td><td>' + esc(x.last_out||'—') + '</td><td>' + hhmm(x.present_seconds) + '</td><td>' + hhmm(x.work_seconds) + '</td><td>' + hhmm(x.idle_seconds) + '</td><td>' + x.break_count + '</td><td>' + hhmm(x.break_seconds) + '</td><td>' + x.timeouts + '</td><td>' + x.violations + '</td><td>' + Number(x.productivity).toFixed(0) + '%</td></tr>').join('');
+  const rowsHtml = PROD_ROWS.map((x) => '<tr><td>' + esc(x.work_date) + '</td><td>' + esc(x.employee_code||'') + '</td><td>' + esc(x.name) + '</td><td>' + esc(x.department||'') + '</td><td>' + esc(x.reporting_manager||'—') + '</td><td>' + esc(x.first_in||'—') + '</td><td>' + esc(x.last_out||'—') + '</td><td>' + hhmm(x.present_seconds) + '</td><td>' + hhmm(x.work_seconds) + '</td><td>' + hhmm(x.idle_seconds) + '</td><td>' + x.break_count + '</td><td>' + hhmm(x.break_seconds) + '</td><td>' + hhmm(x.allotted_break_seconds) + '</td><td>' + hhmm(x.meeting_seconds) + '</td><td>' + hhmm(x.break_exceed_seconds) + '</td><td>' + hhmm(x.productive_seconds) + '</td><td>' + hhmm(x.non_productive_seconds) + '</td><td>' + hhmm(x.net_working_seconds) + '</td><td>' + (x.productivity==null?'—':Number(x.productivity).toFixed(0)+'%') + '</td></tr>').join('');
   const co = ($('#company-name') ? $('#company-name').textContent : 'Company');
   const w = window.open('', '_blank');
   w.document.write('<html><head><title>SmartEPT Productivity ' + from + ' to ' + to + '</title><style>'
@@ -4895,8 +4919,8 @@ function prPDF() {
     + '@media print{.np{display:none}}</style></head><body>'
     + '<div class="hd"><div><h1>Productivity Report</h1><div class="sub">' + esc(co) + ' · ' + from + ' → ' + to + ' · SmartEPT by Ametecs</div></div>'
     + '<button class="np" onclick="window.print()" style="padding:8px 14px;background:#0E7C8F;color:#fff;border:none;border-radius:7px;cursor:pointer">Print / Save PDF</button></div>'
-    + '<table><thead><tr><th>Date</th><th>Code</th><th>Employee</th><th>Dept</th><th>In</th><th>Out</th><th>Present</th><th>Working</th><th>Idle</th><th>Breaks</th><th>Break time</th><th>Time-outs</th><th>Violations</th><th>Prod.%</th></tr></thead><tbody>'
-    + (rowsHtml || '<tr><td colspan="14">No data</td></tr>') + '</tbody></table>'
+    + '<table><thead><tr><th>Date</th><th>Code</th><th>Employee</th><th>Dept</th><th>Manager</th><th>In</th><th>Out</th><th>Actual Present</th><th>Working</th><th>Idle</th><th>Breaks</th><th>Break Availed</th><th>Allotted</th><th>Meeting</th><th>Break Exceed</th><th>Productive</th><th>Non-Prod.</th><th>Net Hrs</th><th>Prod.%</th></tr></thead><tbody>'
+    + (rowsHtml || '<tr><td colspan="19">No data</td></tr>') + '</tbody></table>'
     + '<p style="margin-top:14px;color:#878C99;font-size:10px">Generated ' + new Date().toLocaleString() + ' · SmartEPT — Employee Productivity Tracking & Intelligence</p>'
     + '</body></html>');
   w.document.close();
@@ -4911,6 +4935,8 @@ function initReports() {
   $('#pr-month').onclick = () => { const d = new Date(); prSetRange(isoDate(new Date(d.getFullYear(), d.getMonth(), 1)), today()); };
   $('#pr-csv').onclick = prCSV;
   $('#pr-pdf').onclick = prPDF;
+  $('#pr-xlsx').onclick = () => { const f = $('#pr-from').value || today(), t = $('#pr-to').value || today();
+    downloadCsv('/export/productivity-report?from=' + f + '&to=' + t, 'SmartEPT-Productivity-Report-' + f + '_' + t + '.xlsx'); };
   loadProductivity();
   // Section 3 & 14: break + meeting reports.
   if (!$('#br-from').value) { $('#br-from').value = today(); $('#br-to').value = today(); }
@@ -5070,6 +5096,27 @@ async function loadTab(tab) {
     } else if (tab === 'compliance') {
       const d = await api('/reports/employee/' + DID + '/compliance');
       body.innerHTML = tableFrom(d.data, ['started_at', 'event_type', 'severity', 'detected_value'], ['Time', 'Type', 'Severity', 'Detected'], false);
+    } else if (tab === 'policy') {
+      // Why-is-this-on/off: the effective monitoring policy resolved for this employee,
+      // with the winning policy + the precedence level that decided each capability.
+      const d = await api('/employees/' + DID + '/policy-trace');
+      const tr = d.data || {}; const c = tr.capabilities || {};
+      const chip = (o) => o ? '<span class="tag t-ok">ON</span>' : '<span class="tag t-off">OFF</span>';
+      const lvl = (p) => esc((p && p.level) || '—') + (p && p.policy_name ? ' · <span class="mut">' + esc(p.policy_name) + '</span>' : '');
+      const row = (label, cap) => '<tr><td>' + label + '</td><td>' + chip(cap && cap.on) + '</td><td>' + (cap ? lvl(cap.policy) : '—') + '</td></tr>';
+      const tm = tr.tracking_mode || {};
+      body.innerHTML =
+        '<div class="mut" style="margin-bottom:8px">Effective monitoring resolved for this employee'
+        + (tr.device ? ' · device: <b>' + esc(tr.device.name || ('#' + tr.device.id)) + '</b>' : ' · <b>no registered device</b>')
+        + ' · Tracking mode: <b>' + esc(tm.value || 'FULL') + '</b> (set at ' + esc(tm.source || '—') + ')</div>'
+        + '<table><thead><tr><th>Capability</th><th>State</th><th>Set at level · policy</th></tr></thead><tbody>'
+        + row('Tracking', c.tracking) + row('App usage', c.app_usage) + row('Website usage', c.website_usage)
+        + row('Screenshots', c.screenshots) + row('Webcam presence', c.webcam)
+        + '</tbody></table>'
+        + '<div class="mut" style="margin-top:8px">Precedence: <b>DEVICE ▸ EMPLOYEE ▸ TEAM ▸ DEPARTMENT ▸ BRANCH ▸ COMPANY</b> — the most specific level wins. '
+        + 'If a capability is OFF unexpectedly, the "Set at level" column shows which level/policy turned it off (e.g. an EMPLOYEE or DEVICE override beats the team). '
+        + 'A tracking mode of PRESENCE_ONLY forces App/Website/Screenshots/Webcam off; EXCLUDED forces everything off. '
+        + '“EMPLOYEE_LINK” = the direct monitoring policy set on the employee record.</div>';
     }
   } catch (e) { body.innerHTML = '<div class="mut">' + (isDenied(e) ? 'Your role cannot view this tab.' : esc(e.message)) + '</div>'; }
 }

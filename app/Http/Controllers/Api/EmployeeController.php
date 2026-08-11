@@ -14,6 +14,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\EmployeeArchiver;
 use App\Services\MailService;
+use App\Services\PolicyResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\JsonResponse;
@@ -332,9 +333,12 @@ class EmployeeController extends Controller
         abort_unless($employee, 404, 'The archived employee record could not be found.');
         abort_unless($employee->trashed(), 422, 'This employee is already active.');
 
-        $code  = $data['new_employee_code'] ?: $archive->original_employee_code;
+        // validate() omits absent nullable keys, so read them defensively (?? null) before
+        // ?: — otherwise a plain Restore (no new code typed) crashes with
+        // "Undefined array key new_employee_code".
+        $code  = ($data['new_employee_code'] ?? null) ?: $archive->original_employee_code;
         $email = ! empty($data['new_email']) ? $data['new_email'] : $employee->email;
-        $bio   = $data['new_biometric_id'] ?: $employee->biometric_id;
+        $bio   = ($data['new_biometric_id'] ?? null) ?: $employee->biometric_id;
 
         $conflict = fn ($field, $message, $options) => response()->json([
             'error' => ['field' => $field, 'message' => $message, 'options' => $options],
@@ -632,6 +636,19 @@ class EmployeeController extends Controller
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    /**
+     * GET /api/employees/{employee}/policy-trace — read-only diagnostic: WHY each monitored
+     * capability (tracking / app usage / website usage / screenshots / webcam) is on or off
+     * for this employee, showing the winning policy + the precedence level that set it, plus
+     * the effective tracking mode. Explains cases like "Tracking off despite a Full-Track team".
+     */
+    public function policyTrace(Request $request, Employee $employee, PolicyResolver $resolver): JsonResponse
+    {
+        abort_unless($employee->company_id === $request->user()->company_id, 403, 'Outside your tenant.');
+
+        return response()->json(['data' => $resolver->traceForEmployee($employee)]);
     }
 
 }

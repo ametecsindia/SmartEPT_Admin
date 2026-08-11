@@ -249,6 +249,7 @@ Route::middleware(['auth:sanctum', 'company.active'])->group(function () {
     Route::middleware('permission:export.data')->group(function () {
         Route::get('export/attendance', [ExportController::class, 'attendance']);
         Route::get('export/productivity', [ExportController::class, 'productivity']);
+        Route::get('export/productivity-report', [ProductivityController::class, 'exportExcel']); // .xlsx — exact client template columns + Excel formats
         Route::get('export/compliance', [ExportController::class, 'compliance']);
         Route::get('export/daily-summary', [ExportController::class, 'dailySummary']);
         Route::get('export/attendance-register', [MonthlyReportController::class, 'attendanceRegister']);
@@ -356,6 +357,8 @@ Route::middleware(['auth:sanctum', 'company.active'])->group(function () {
     });
     Route::get('employees/{employee}', [EmployeeController::class, 'show'])
         ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,HR_ADMIN,MANAGER,TEAM_LEADER,AUDITOR');
+    Route::get('employees/{employee}/policy-trace', [EmployeeController::class, 'policyTrace']) // read-only: why each capability is on/off
+        ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,HR_ADMIN');
     Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,HR_ADMIN')->group(function () {
         Route::post('employees', [EmployeeController::class, 'store']);
         Route::post('employees/bulk-import', [EmployeeController::class, 'bulkImport']); // 17-Jul SmartPRS-style bulk onboarding

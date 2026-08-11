@@ -21,6 +21,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * All-employee, day-wise PRODUCTIVITY report (Ejaz 17-Jul). One row per
@@ -37,7 +38,24 @@ class ProductivityController extends Controller
 {
     use ScopesVisibleEmployees;
     use ResolvesBusinessDay;
+
+    /** GET /api/reports/productivity — the day-wise productivity report (JSON). */
     public function report(Request $request): JsonResponse
+    {
+        [$fromStr, $toStr, $rows] = $this->buildReport($request);
+
+        return response()->json([
+            'from' => $fromStr, 'to' => $toStr,
+            'count' => count($rows), 'data' => $rows,
+        ]);
+    }
+
+    /**
+     * Build the day-wise productivity rows for a range. Shared by the JSON report() and the
+     * Excel export so the on-screen numbers and the .xlsx are guaranteed identical.
+     * Returns [fromDate, toDate, rows[]].
+     */
+    private function buildReport(Request $request): array
     {
         $companyId = $request->user()->company_id;
         $tz = $this->bizTz($request);
@@ -53,7 +71,7 @@ class ProductivityController extends Controller
         $employees = Employee::where('company_id', $companyId)
             ->when($empId, fn ($q) => $q->where('id', $empId))
             ->when($visible !== null, fn ($q) => $q->whereIn('id', $visible))
-            ->with(['department:id,name', 'team:id,name', 'shift:id,start_time,end_time,break_minutes_allowed'])
+            ->with(['department:id,name', 'team:id,name', 'reportingManager:id,name', 'shift:id,start_time,end_time,break_minutes_allowed'])
             ->get()->keyBy('id');
 
         // Break counts + timeouts, grouped employee|date, for the whole range.
@@ -138,8 +156,13 @@ class ProductivityController extends Controller
                 // tracked span (active + idle) so productivity reflects active-vs-total
                 // instead of dividing by an empty 'present' and showing a false 0%.
                 $present = max($present, $work + $idle);
+                // TODAY is still open: use the CURRENT time as the logout so Actual Present, Net Hrs
+                // and Productive % show a live, growing figure — and an extract of today reads the same
+                // (Ejaz, 11-Aug). Real check-out wins once the employee logs out; rows with no check-in
+                // keep a null logout and fall back to tracked present inside row().
+                $liveLogout = ($a && $a->check_in_at && ! $a->check_out_at) ? now() : $a?->check_out_at;
                 $rows[] = $this->row($emp, $today, [
-                    'first_in' => $a?->check_in_at, 'last_out' => $a?->check_out_at,
+                    'first_in' => $a?->check_in_at, 'last_out' => $liveLogout,
                     'present' => $present, 'work' => $work, 'idle' => $idle,
                     'break_secs' => (int) ($bk?->secs ?? 0), 'break_count' => (int) ($bk?->cnt ?? 0),
                     'timeouts' => ($timeouts[$emp->id . '|' . $today]->cnt ?? 0),
@@ -153,10 +176,124 @@ class ProductivityController extends Controller
         // Sort: newest date first, then employee name.
         usort($rows, fn ($a, $b) => [$b['work_date'], $a['name']] <=> [$a['work_date'], $b['name']]);
 
-        return response()->json([
-            'from' => $from->toDateString(), 'to' => $to->toDateString(),
-            'count' => count($rows), 'data' => $rows,
+        return [$from->toDateString(), $to->toDateString(), $rows];
+    }
+
+    /**
+     * GET /api/export/productivity-report — the SAME day-wise productivity report as a real .xlsx,
+     * with the client's exact template column headers and Excel-safe cell formats:
+     *   durations as [h]:mm, clock times as h:mm, Productive% as a 0% percentage, Date as a date —
+     * so nothing is coerced into a wrong type. Needs phpoffice/phpspreadsheet (composer).
+     */
+    public function exportExcel(Request $request): StreamedResponse
+    {
+        if (! class_exists(\PhpOffice\PhpSpreadsheet\Spreadsheet::class)) {
+            abort(503, 'Excel export needs the PhpSpreadsheet library. In the app folder run:  composer require phpoffice/phpspreadsheet');
+        }
+
+        [$fromStr, $toStr, $rows] = $this->buildReport($request);
+        $this->audit($request, 'EXPORT', null, null, [
+            'report' => 'productivity', 'format' => 'xlsx', 'from' => $fromStr, 'to' => $toStr, 'rows' => count($rows),
         ]);
+
+        // EXACT headers from the client's Productivity Excel template (RAW sheet) — kept verbatim,
+        // including the source sheet's double-spaces, so the export lines up 1:1 with their sheet.
+        $headers = [
+            'Emp. ID', 'Employee', 'Department', 'Reporting Manager', 'Date',
+            'Logged in', 'Logged out', 'Actual Present Hrs (Logged out - Logged in)',
+            'Working (hh:mm)', 'Idle (hh:mm)', 'Number of Breaks', 'Break time Availed  (hh:mm)',
+            'Allotted break (hh:mm)', 'Meeting Time', 'Break Exceed Mins (Break Time - Allotted Time)',
+            'Productive Hrs (Working + Meeting)', 'Non Productive Hrs (Idle + Break Exceed)',
+            'Net Hrs (Actual Logged Hours-Allotted Break)', 'Productive% [ Productive Hrs/ Net Hrs]',
+        ];
+
+        $ss = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $ss->getActiveSheet();
+        $sheet->setTitle('Productivity');
+
+        foreach ($headers as $i => $h) {
+            $sheet->setCellValue($this->col($i + 1) . '1', $h);
+        }
+        $sheet->getStyle('A1:S1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:S1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->getStartColor()->setRGB('E3F4F7');
+        $sheet->getStyle('A1:S1')->getAlignment()->setWrapText(true);
+
+        $DUR = '[h]:mm';   // duration — Excel-compatible, valid past 24h, never a date
+        $CLK = 'h:mm';     // clock time for login/logout
+
+        $r = 2;
+        foreach ($rows as $x) {
+            $sheet->setCellValueExplicit('A' . $r, (string) ($x['employee_code'] ?? ''), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $sheet->setCellValue('B' . $r, $x['name'] ?? '');
+            $sheet->setCellValue('C' . $r, $x['department'] ?? '');
+            $sheet->setCellValue('D' . $r, $x['reporting_manager'] ?? '');
+            if (! empty($x['work_date'])) {
+                $sheet->setCellValue('E' . $r, \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel(strtotime($x['work_date'] . ' 00:00:00')));
+                $this->fmt($sheet, 5, $r, 'mm-dd-yy');
+            }
+            $this->putTime($sheet, 6, $r, $x['first_in'] ?? null, $CLK);
+            $this->putTime($sheet, 7, $r, $x['last_out'] ?? null, $CLK);
+            $this->putDur($sheet, 8,  $r, $x['present_seconds'] ?? 0, $DUR);        // Actual Present Hrs
+            $this->putDur($sheet, 9,  $r, $x['work_seconds'] ?? 0, $DUR);           // Working
+            $this->putDur($sheet, 10, $r, $x['idle_seconds'] ?? 0, $DUR);           // Idle
+            $sheet->setCellValue('K' . $r, (int) ($x['break_count'] ?? 0));         // Number of Breaks
+            $this->fmt($sheet, 11, $r, '0');
+            $this->putDur($sheet, 12, $r, $x['break_seconds'] ?? 0, $DUR);          // Break time Availed
+            $this->putDur($sheet, 13, $r, $x['allotted_break_seconds'] ?? 0, $DUR); // Allotted break
+            $this->putDur($sheet, 14, $r, $x['meeting_seconds'] ?? 0, $DUR);        // Meeting Time
+            $this->putDur($sheet, 15, $r, $x['break_exceed_seconds'] ?? 0, $DUR);   // Break Exceed
+            $this->putDur($sheet, 16, $r, $x['productive_seconds'] ?? 0, $DUR);     // Productive Hrs
+            $this->putDur($sheet, 17, $r, $x['non_productive_seconds'] ?? 0, $DUR); // Non Productive Hrs
+            $this->putDur($sheet, 18, $r, $x['net_working_seconds'] ?? 0, $DUR);    // Net Hrs
+            if ($x['productivity'] !== null) {                                       // Productive% (real 0% cell)
+                $sheet->setCellValue('S' . $r, round(((float) $x['productivity']) / 100, 4));
+                $this->fmt($sheet, 19, $r, '0%');
+            }
+            $r++;
+        }
+
+        foreach (range(1, 19) as $c) {
+            $sheet->getColumnDimension($this->col($c))->setAutoSize(true);
+        }
+        $sheet->freezePane('A2');
+
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($ss);
+        $fname = 'SmartEPT-Productivity-Report-' . $fromStr . '_' . $toStr . '.xlsx';
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $fname, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+    }
+
+    /** 1-based column index → column letter (A, B, …, S). */
+    private function col(int $index): string
+    {
+        return \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($index);
+    }
+
+    /** Apply a number format to one cell (col is 1-based). */
+    private function fmt($sheet, int $col, int $row, string $code): void
+    {
+        $sheet->getStyle($this->col($col) . $row)->getNumberFormat()->setFormatCode($code);
+    }
+
+    /** Write a clock time (H:i) as an Excel time value; blank when null. */
+    private function putTime($sheet, int $col, int $row, $hi, string $fmt): void
+    {
+        if (! $hi) {
+            return;
+        }
+        [$h, $m] = array_pad(explode(':', (string) $hi), 2, '0');
+        $sheet->setCellValue($this->col($col) . $row, ((int) $h * 3600 + (int) $m * 60) / 86400);
+        $this->fmt($sheet, $col, $row, $fmt);
+    }
+
+    /** Write a duration (seconds) as an Excel day-fraction with a duration format; never a date. */
+    private function putDur($sheet, int $col, int $row, $seconds, string $fmt): void
+    {
+        $sheet->setCellValue($this->col($col) . $row, ((int) $seconds) / 86400);
+        $this->fmt($sheet, $col, $row, $fmt);
     }
 
     /** Part A: the transparent-formula productivity report (auditable), served ALONGSIDE report(). */
@@ -499,13 +636,39 @@ class ProductivityController extends Controller
                 : 'Nothing to rebuild — those days are already summarised, or have no attendance yet.']);
     }
 
+    /**
+     * Build one productivity row using the client's Productivity Excel model (verbatim):
+     *   Actual Present Hrs = Logged out − Logged in   (fallback: tracked present when no logout)
+     *   Break Exceed       = MAX(0, Break Availed − Allotted break)
+     *   Productive Hrs     = Working + Meeting
+     *   Non-Productive Hrs = Idle + Break Exceed
+     *   Net Hrs            = Actual Present − Allotted break
+     *   Productive %       = Productive Hrs ÷ Net Hrs        (blank when Net ≤ 0)
+     * Allotted break stays the shift allowance pro-rated to present (Ejaz, 11-Aug decision).
+     */
     private function row(Employee $emp, string $date, array $m): array
     {
-        $present = (int) $m['present'];
-        $productive = (int) $m['work'] + (int) ($m['meeting'] ?? 0);
-        $allotted = ScoringService::allottedBreakSeconds($emp->shift, $present);
-        $working = ScoringService::netWorkingSeconds($present, $allotted);
-        $productivity = round(min(100, $productive / max(1, $working) * 100), 1);
+        $trackedPresent = (int) $m['present'];
+        $firstIn = $m['first_in'];
+        $lastOut = $m['last_out'];
+
+        // Actual Present = logout − login; when logout is missing (today / open shift) fall back
+        // to the tracked present span so the row still shows a sensible figure.
+        $actualPresent = ($firstIn && $lastOut)
+            ? max(0, (int) Carbon::parse($lastOut)->diffInSeconds(Carbon::parse($firstIn), true))
+            : $trackedPresent;
+
+        $work = (int) $m['work'];
+        $idle = (int) $m['idle'];
+        $meeting = (int) ($m['meeting'] ?? 0);
+        $breakSecs = (int) $m['break_secs'];
+
+        $allotted = ScoringService::allottedBreakSeconds($emp->shift, $actualPresent);
+        $breakExceed = max(0, $breakSecs - $allotted);
+        $productive = $work + $meeting;
+        $nonProductive = $idle + $breakExceed;
+        $netHrs = max(0, $actualPresent - $allotted);
+        $productivity = $netHrs > 0 ? round($productive / $netHrs * 100, 1) : null; // null => N/A (shown as —)
 
         return [
             'work_date' => $date,
@@ -513,22 +676,25 @@ class ProductivityController extends Controller
             'name' => trim($emp->first_name . ' ' . $emp->last_name),
             'department' => $emp->department?->name,
             'team' => $emp->team?->name,
-            'first_in' => $m['first_in'] ? Carbon::parse($m['first_in'])->format('H:i') : null,
-            'last_out' => $m['last_out'] ? Carbon::parse($m['last_out'])->format('H:i') : null,
-            'present_seconds' => (int) $m['present'],
-            'work_seconds' => (int) $m['work'],
-            'idle_seconds' => (int) $m['idle'],
-            'break_seconds' => (int) $m['break_secs'],
+            'reporting_manager' => $emp->reportingManager?->name,
+            'first_in' => $firstIn ? Carbon::parse($firstIn)->format('H:i') : null,
+            'last_out' => $lastOut ? Carbon::parse($lastOut)->format('H:i') : null,
+            // present_seconds now carries Actual Present Hrs (logout − login); tracked span kept too.
+            'present_seconds' => $actualPresent,
+            'tracked_present_seconds' => $trackedPresent,
+            'work_seconds' => $work,
+            'idle_seconds' => $idle,
+            'break_seconds' => $breakSecs,
             'break_count' => (int) $m['break_count'],
-            'timeouts' => (int) $m['timeouts'],
-            'non_productive_seconds' => (int) $m['non_productive'],
-            'violations' => (int) $m['violations'],
-            // Section 14: Meeting time is productive, kept separate from breaks. The
-            // productive figure adds meeting time to tracked active time.
-            'meeting_seconds' => (int) ($m['meeting'] ?? 0),
-            'productive_seconds' => $productive,
             'allotted_break_seconds' => $allotted,
-            'net_working_seconds' => $working,
+            'break_exceed_seconds' => $breakExceed,
+            // Section 14: Meeting time is productive, kept separate from breaks.
+            'meeting_seconds' => $meeting,
+            'productive_seconds' => $productive,
+            'non_productive_seconds' => $nonProductive,
+            'timeouts' => (int) $m['timeouts'],
+            'net_working_seconds' => $netHrs,
+            'violations' => (int) $m['violations'],
             'productivity' => $productivity,
             'live' => (bool) $m['live'],
         ];

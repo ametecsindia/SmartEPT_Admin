@@ -34,13 +34,17 @@ class Meeting extends Model
      * [start_at - reminder_minutes, start_at) i.e. the meeting is approaching but has
      * not yet started. Once it starts, currentJoinableFor() takes over (the Join button).
      */
+    /** Statuses in which a meeting is over and can never be joined again. */
+    public const TERMINAL_STATUSES = ['CANCELLED', 'COMPLETED', 'AUTO_CLOSED', 'NO_SHOW'];
+
     public static function reminderDueFor(Employee $employee): ?self
     {
         $now = now();
 
         return static::withoutGlobalScopes()
             ->where('company_id', $employee->company_id)
-            ->where('status', '!=', 'CANCELLED')
+            ->whereNotIn('status', self::TERMINAL_STATUSES)
+            ->whereNull('actual_end_at')
             ->whereNotNull('reminder_minutes')
             ->where('start_at', '>', $now)
             ->whereRaw('DATE_SUB(start_at, INTERVAL reminder_minutes MINUTE) <= ?', [$now])
@@ -53,9 +57,14 @@ class Meeting extends Model
     {
         $now = now();
 
+        // A meeting is joinable ONLY while it is genuinely live: not in any terminal
+        // status, never actually ended, and NOW inside the scheduled window. Once it is
+        // Completed / Cancelled / Auto-closed (or actual_end_at is stamped), it drops out
+        // here, so the agent's Join button clears on the very next heartbeat.
         return static::withoutGlobalScopes()
             ->where('company_id', $employee->company_id)
-            ->where('status', '!=', 'CANCELLED')
+            ->whereNotIn('status', self::TERMINAL_STATUSES)
+            ->whereNull('actual_end_at')
             ->where('start_at', '<=', $now)
             ->where('end_at', '>=', $now)
             ->whereHas('participants', fn ($q) => $q->where('employee_id', $employee->id))
