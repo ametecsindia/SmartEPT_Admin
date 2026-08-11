@@ -385,6 +385,19 @@
     <label>Password</label><input id="password" type="password" value="password">
     <button class="primary" id="btn-login">Sign in</button>
     <div class="err" id="login-err"></div>
+    <a href="#" id="fp-link" style="display:block;text-align:center;margin-top:10px;font-size:12.5px;color:#0E7C8F;font-weight:700;text-decoration:none">Forgot password?</a>
+    <div id="fp-box" style="display:none;margin-top:10px;border-top:1px solid #E5EAEC;padding-top:10px">
+      <div id="fp-step1">
+        <p style="font-size:12px;color:#5A6B70;margin:0 0 8px">We'll email a 6-digit code to the address above.</p>
+        <button class="primary" id="fp-send">Email me a reset code</button>
+      </div>
+      <div id="fp-step2" style="display:none">
+        <label>6-digit code (check your email)</label><input id="fp-otp" inputmode="numeric" maxlength="6" placeholder="123456">
+        <label>New password (min 8 characters)</label><input id="fp-pass" type="password">
+        <button class="primary" id="fp-reset">Set new password</button>
+      </div>
+      <div id="fp-msg" style="font-size:12.5px;margin-top:8px"></div>
+    </div>
   </div>
 </div>
 
@@ -1111,6 +1124,51 @@
           <div class="row" style="margin-top:12px"><button class="btn solid" id="quota-save">Save limit</button><span class="mut" id="quota-msg"></span></div>
         </div>
         <div id="quota-buy" class="mut" style="display:none;font-size:12px">Need more space? Contact Ametecs to raise this client's limit.</div>
+      </div>
+      <div class="card" id="mail-card">
+        <h3>Email / SMTP <span class="hint">password-reset codes &amp; alerts — your company's own relay, else the global default</span></h3>
+        <div id="mailc-wrap" style="display:none">
+          <h4 style="margin:4px 0 8px;font-size:13px">My company's email (SMTP) <span class="hint">used for YOUR people's reset codes &amp; alerts — blank host = use the global default below</span></h4>
+          <div class="fgrid" style="grid-template-columns:2fr 1fr 1fr">
+            <div><label>SMTP host</label><input id="mc-host" placeholder="e.g. smtp.gmail.com"></div>
+            <div><label>Port</label><input id="mc-port" type="number" placeholder="587"></div>
+            <div><label>Encryption</label><select id="mc-enc"><option value="tls">TLS</option><option value="ssl">SSL</option><option value="none">None</option></select></div>
+          </div>
+          <div class="fgrid" style="grid-template-columns:1fr 1fr">
+            <div><label>Username</label><input id="mc-user" autocomplete="off"></div>
+            <div><label>Password <span class="hint">blank = keep saved</span></label><input id="mc-pass" type="password" autocomplete="new-password"></div>
+          </div>
+          <div class="fgrid" style="grid-template-columns:1fr 1fr">
+            <div><label>From address</label><input id="mc-froma" type="email" placeholder="alerts@yourcompany.com"></div>
+            <div><label>From name</label><input id="mc-fromn" placeholder="Your Company HR"></div>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn" id="mc-test">Send test email</button>
+            <button class="btn solid" id="mc-save">Save company SMTP</button>
+            <span class="mut" id="mc-msg"></span>
+          </div>
+        </div>
+        <div id="mailg-wrap" style="display:none;margin-top:14px">
+          <h4 style="margin:4px 0 8px;font-size:13px">Global default relay <span class="hint">Super Admin — used when a company has no SMTP of its own</span></h4>
+          <div class="fgrid" style="grid-template-columns:2fr 1fr 1fr">
+            <div><label>SMTP host</label><input id="mg-host" placeholder="e.g. smtp.gmail.com"></div>
+            <div><label>Port</label><input id="mg-port" type="number" placeholder="587"></div>
+            <div><label>Encryption</label><select id="mg-enc"><option value="tls">TLS</option><option value="ssl">SSL</option><option value="none">None</option></select></div>
+          </div>
+          <div class="fgrid" style="grid-template-columns:1fr 1fr">
+            <div><label>Username</label><input id="mg-user" autocomplete="off"></div>
+            <div><label>Password <span class="hint">blank = keep saved</span></label><input id="mg-pass" type="password" autocomplete="new-password"></div>
+          </div>
+          <div class="fgrid" style="grid-template-columns:1fr 1fr">
+            <div><label>From address</label><input id="mg-froma" type="email" placeholder="noreply@smartept.com"></div>
+            <div><label>From name</label><input id="mg-fromn" placeholder="SmartEPT"></div>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn" id="mg-test">Send test email</button>
+            <button class="btn solid" id="mg-save">Save global SMTP</button>
+            <span class="mut" id="mg-msg"></span>
+          </div>
+        </div>
       </div>
       <div class="card" id="gcs-card">
         <h3>Cloud Storage (Google Cloud) <span class="hint">keep screenshots &amp; evidence in your own GCS bucket — no server setup</span></h3>
@@ -2108,6 +2166,32 @@ $('#btn-login').onclick = async () => {
   } catch (e) { $('#login-err').textContent = e.message; }
 };
 $('#password').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#btn-login').click(); });
+// ---- Forgot password (email OTP, 11-Aug-2026) — code arrives via the company's SMTP, else the global relay ----
+$('#fp-link').onclick = (e) => {
+  e.preventDefault();
+  const b = $('#fp-box');
+  b.style.display = b.style.display === 'none' ? 'block' : 'none';
+  $('#fp-msg').textContent = '';
+};
+$('#fp-send').onclick = async () => {
+  const m = $('#fp-msg'); m.style.color = '#5A6B70'; m.textContent = 'Sending…';
+  try {
+    const r = await api('/auth/forgot/request-otp', { method: 'POST',
+      body: JSON.stringify({ email: $('#email').value.trim(), tenant_slug: TENANT_SLUG }) });
+    $('#fp-step2').style.display = 'block';
+    m.style.color = '#0A8F5B'; m.textContent = r.message || 'Code sent — check your email.';
+  } catch (e2) { m.style.color = '#D02748'; m.textContent = e2.message; }
+};
+$('#fp-reset').onclick = async () => {
+  const m = $('#fp-msg'); m.style.color = '#5A6B70'; m.textContent = 'Checking…';
+  try {
+    const r = await api('/auth/forgot/reset', { method: 'POST',
+      body: JSON.stringify({ email: $('#email').value.trim(), otp: $('#fp-otp').value.trim(), password: $('#fp-pass').value }) });
+    m.style.color = '#0A8F5B'; m.textContent = r.message || 'Password changed — sign in above.';
+    $('#fp-step2').style.display = 'none'; $('#fp-otp').value = ''; $('#fp-pass').value = '';
+    $('#password').value = ''; $('#password').focus();
+  } catch (e2) { m.style.color = '#D02748'; m.textContent = e2.message; }
+};
 $('#signout').onclick = async () => {
   try { await api('/auth/logout', { method: 'POST' }); } catch (e) { /* token may already be dead */ }
   TOKEN = null; ME = null; sessionStorage.removeItem('ept_token');
@@ -5560,6 +5644,7 @@ async function loadOps() {
   loadRetention();
   loadStorageConfig();
   loadStorageQuota();
+  loadMailConfig();
   try {
     const s = await api('/ops/storage-usage');
     $('#ops-storage').innerHTML = (s.data || []).length
@@ -5630,6 +5715,57 @@ if ($('#dz-exec')) $('#dz-exec').onclick = async () => {
     if ($('#dz-all')) $('#dz-all').checked = false;
     loadDzSummary();
   } catch (e) { res.textContent = '\u2715 ' + e.message; }
+};
+// ---- Email / SMTP settings (client-wise with global fallback, 11-Aug-2026) ----
+async function loadMailConfig() {
+  const canSee = !!(ME && (ME.role === 'SUPER_ADMIN' || ME.role === 'COMPANY_ADMIN'));
+  if (!canSee) { if ($('#mail-card')) $('#mail-card').style.display = 'none'; return; }
+  try {
+    const c = await api('/ops/mail-config');
+    if (c.company) {
+      $('#mailc-wrap').style.display = 'block';
+      $('#mc-host').value = c.company.host || ''; $('#mc-port').value = c.company.port || '';
+      $('#mc-user').value = c.company.username || ''; $('#mc-enc').value = c.company.encryption || 'tls';
+      $('#mc-froma').value = c.company.from_address || ''; $('#mc-fromn').value = c.company.from_name || '';
+      $('#mc-pass').placeholder = c.company.has_password ? 'saved — type only to replace' : '';
+    }
+    if (c.global) {
+      $('#mailg-wrap').style.display = 'block';
+      $('#mg-host').value = c.global.host || ''; $('#mg-port').value = c.global.port || '';
+      $('#mg-user').value = c.global.username || ''; $('#mg-enc').value = c.global.encryption || 'tls';
+      $('#mg-froma').value = c.global.from_address || ''; $('#mg-fromn').value = c.global.from_name || '';
+      $('#mg-pass').placeholder = c.global.has_password ? 'saved — type only to replace' : '';
+    }
+    if (!c.company && !c.global && $('#mail-card')) $('#mail-card').style.display = 'none';
+  } catch (e) { if ($('#mail-card')) $('#mail-card').style.display = 'none'; }
+}
+function mailPayload(p) {
+  return JSON.stringify({
+    host: $(p + '-host').value.trim() || null, port: parseInt($(p + '-port').value, 10) || null,
+    username: $(p + '-user').value.trim() || null, password: $(p + '-pass').value || null,
+    encryption: $(p + '-enc').value, from_address: $(p + '-froma').value.trim() || null,
+    from_name: $(p + '-fromn').value.trim() || null,
+  });
+}
+if ($('#mc-save')) $('#mc-save').onclick = async () => {
+  const m = $('#mc-msg'); m.textContent = 'Saving…';
+  try { await api('/ops/mail-config/company', { method: 'PUT', body: mailPayload('#mc') }); m.textContent = '✓ Saved'; $('#mc-pass').value = ''; }
+  catch (e) { m.textContent = '✕ ' + e.message; }
+};
+if ($('#mg-save')) $('#mg-save').onclick = async () => {
+  const m = $('#mg-msg'); m.textContent = 'Saving…';
+  try { await api('/ops/mail-config', { method: 'PUT', body: mailPayload('#mg') }); m.textContent = '✓ Saved'; $('#mg-pass').value = ''; }
+  catch (e) { m.textContent = '✕ ' + e.message; }
+};
+if ($('#mc-test')) $('#mc-test').onclick = async () => {
+  const m = $('#mc-msg'); m.textContent = 'Sending test…';
+  try { const r = await api('/ops/mail-config/test', { method: 'POST', body: JSON.stringify({ scope: 'company' }) }); m.textContent = '✓ ' + r.message; }
+  catch (e) { m.textContent = '✕ ' + e.message; }
+};
+if ($('#mg-test')) $('#mg-test').onclick = async () => {
+  const m = $('#mg-msg'); m.textContent = 'Sending test…';
+  try { const r = await api('/ops/mail-config/test', { method: 'POST', body: JSON.stringify({ scope: 'global' }) }); m.textContent = '✓ ' + r.message; }
+  catch (e) { m.textContent = '✕ ' + e.message; }
 };
 async function loadStorageConfig() {
   // Cloud Storage (GCS) bucket = shared infrastructure -> Super Admin only sees/edits it.

@@ -84,10 +84,12 @@ class DatabaseSeeder extends Seeder
         }
 
         // 3) One user per admin role.
+        // NOTE (11-Aug-2026): User casts password => 'hashed', so pass the PLAIN
+        // value — Hash::make() here double-hashed it and NO seeded login worked.
         $mk = fn (string $name, string $email, string $roleSlug, ?int $companyId = null) => User::updateOrCreate(
             ['email' => $email],
             [
-                'name' => $name, 'password' => Hash::make('password'),
+                'name' => $name, 'password' => 'password',
                 'company_id' => $companyId, 'branch_id' => $companyId ? $branch->id : null,
                 'role_id' => $roles[$roleSlug], 'status' => 'ACTIVE',
             ]

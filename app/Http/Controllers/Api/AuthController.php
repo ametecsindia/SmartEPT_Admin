@@ -206,4 +206,88 @@ class AuthController extends Controller
             'must_change_password' => (bool) $user->must_change_password,
         ];
     }
+
+    // ---------- Forgot password (email OTP) — Ejaz, 11-Aug-2026 ----------
+
+    /**
+     * POST /api/auth/forgot/request-otp {email, tenant_slug?}
+     * Always answers with the same neutral message (no account enumeration).
+     * The 6-digit code goes out via the user's COMPANY SMTP, falling back to
+     * the global Settings SMTP, then .env (MailService resolution).
+     */
+    public function forgotRequestOtp(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email'       => ['required', 'email'],
+            'tenant_slug' => ['nullable', 'string', 'max:40'],
+        ]);
+
+        $user = \App\Models\User::where('email', $data['email'])->first();
+
+        // Branded-URL lock, same as login: only that workspace's people.
+        if ($user && ! empty($data['tenant_slug']) && optional($user->company)->slug !== $data['tenant_slug']) {
+            $user = null;
+        }
+
+        if ($user && $user->status !== 'DISABLED') {
+            $otp = (string) random_int(100000, 999999);
+            \App\Models\PasswordOtp::where('email', $user->email)->delete();
+            \App\Models\PasswordOtp::create([
+                'email'      => $user->email,
+                'otp_hash'   => Hash::make($otp),
+                'expires_at' => now()->addMinutes(10),
+            ]);
+
+            \App\Services\MailService::send(
+                $user->email,
+                'SmartEPT — your password reset code',
+                "Hello {$user->name},\n\n"
+                . "Your SmartEPT password reset code is: {$otp}\n\n"
+                . "It is valid for 10 minutes. If you did not request this, you can ignore this email — your password stays unchanged.\n\n"
+                . '— SmartEPT',
+                'PASSWORD_RESET_OTP',
+                $user->company_id
+            );
+
+            $this->audit($request, 'PASSWORD_RESET_REQUESTED', \App\Models\User::class, $user->id, null, $user);
+        }
+
+        return response()->json(['ok' => true,
+            'message' => 'If that email has a SmartEPT account, a 6-digit reset code is on its way. It is valid for 10 minutes.']);
+    }
+
+    /** POST /api/auth/forgot/reset {email, otp, password} — verify the code, set the new password. */
+    public function forgotReset(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email'    => ['required', 'email'],
+            'otp'      => ['required', 'digits:6'],
+            'password' => ['required', 'string', 'min:8', 'max:190'],
+        ]);
+
+        $row = \App\Models\PasswordOtp::where('email', $data['email'])->latest('id')->first();
+
+        if (! $row || $row->expires_at->isPast() || $row->attempts >= 5) {
+            return response()->json(['message' => 'That code has expired — request a new one.'], 422);
+        }
+
+        if (! Hash::check($data['otp'], $row->otp_hash)) {
+            $row->increment('attempts');
+
+            return response()->json(['message' => 'That code is not correct.'], 422);
+        }
+
+        $user = \App\Models\User::where('email', $data['email'])->first();
+        if (! $user || $user->status === 'DISABLED') {
+            return response()->json(['message' => 'This account cannot be reset — contact your administrator.'], 422);
+        }
+
+        // 'hashed' cast hashes exactly once — never pre-hash here.
+        $user->forceFill(['password' => $data['password'], 'must_change_password' => false])->save();
+        \App\Models\PasswordOtp::where('email', $user->email)->delete();
+
+        $this->audit($request, 'PASSWORD_RESET_COMPLETED', \App\Models\User::class, $user->id, null, $user);
+
+        return response()->json(['ok' => true, 'message' => 'Password changed — sign in with your new password.']);
+    }
 }

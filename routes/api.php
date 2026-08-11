@@ -59,6 +59,9 @@ Route::get('ping', fn () => response()->json([
     'server_time' => now()->toIso8601String(),
 ]));
 Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+// Forgot password (email OTP, 11-Aug-2026) — tight throttle: codes are 6 digits.
+Route::post('auth/forgot/request-otp', [AuthController::class, 'forgotRequestOtp'])->middleware('throttle:5,1');
+Route::post('auth/forgot/reset', [AuthController::class, 'forgotReset'])->middleware('throttle:10,1');
 // Cloud multi-tenancy (EPT-27): secret-signed provisioning + signed-ticket SSO from Central.
 Route::post('provision', [ProvisionController::class, 'provision'])->middleware('throttle:30,1');
 Route::post('provision/status', [ProvisionController::class, 'setStatus'])->middleware('throttle:60,1'); // Central suspend/enable push
@@ -118,6 +121,11 @@ Route::middleware(['auth:sanctum', 'company.active'])->group(function () {
         // Per-client storage quota: any admin sees usage; only Super Admin sets it (buy more space).
         Route::get('ops/storage-quota', [OpsController::class, 'storageQuota']);
         Route::middleware('role:SUPER_ADMIN')->put('ops/storage-quota', [OpsController::class, 'updateStorageQuota']);
+        // Email / SMTP (11-Aug-2026): global relay = Super only; company relay = its admin.
+        Route::get('ops/mail-config', [\App\Http\Controllers\Api\MailConfigController::class, 'show']);
+        Route::middleware('role:SUPER_ADMIN')->put('ops/mail-config', [\App\Http\Controllers\Api\MailConfigController::class, 'saveGlobal']);
+        Route::put('ops/mail-config/company', [\App\Http\Controllers\Api\MailConfigController::class, 'saveCompany']);
+        Route::post('ops/mail-config/test', [\App\Http\Controllers\Api\MailConfigController::class, 'test']);
         Route::get('ops/storage-config', [StorageConfigController::class, 'show']);
         // Cloud Storage (GCS) bucket = SHARED infrastructure across all cloud tenants,
         // so only a Super Admin may change or test it. Company Admins can view only.

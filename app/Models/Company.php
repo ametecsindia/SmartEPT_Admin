@@ -13,6 +13,7 @@ class Company extends Model
 
     protected $casts = [
         'storage_settings'        => 'array',
+        'mail_settings'           => 'array',
         'data_retention_days'     => 'integer',
         'agent_exit_lock_enabled' => 'boolean',
         'agent_exit_password'     => 'encrypted',
