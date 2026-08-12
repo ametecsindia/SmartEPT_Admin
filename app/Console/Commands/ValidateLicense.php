@@ -8,31 +8,47 @@ use Illuminate\Console\Command;
 
 /**
  * R2-1: daily phone-home. Scheduled at 01:00; safe to run any time.
+ * Per-tenant licensing (12-Aug-2026): validates the install-level licence AND
+ * every cloud tenant's own row, so all bundles stay fresh even on quiet nights.
  */
 class ValidateLicense extends Command
 {
     protected $signature = 'smartept:validate-license';
 
-    protected $description = 'Validate this installation\'s licence key against SmartEPT Central and refresh the cached entitlement bundle.';
+    protected $description = 'Validate every licence key (install-level + per-tenant) against SmartEPT Central and refresh the cached entitlement bundles.';
 
     public function handle(LicenseClient $client): int
     {
-        $license = InstallationLicense::current();
+        $rows = InstallationLicense::query()
+            ->orderByRaw('company_id IS NOT NULL')->orderBy('id')->get();
 
-        if (! $license->configured()) {
+        if ($rows->isEmpty() || $rows->every(fn ($l) => ! $l->configured())) {
             $this->warn('No licence key configured — set one on the Licence screen (running unlicensed).');
 
             return self::SUCCESS;
         }
 
-        $license = $client->validate($license);
+        $allOk = true;
 
-        $this->info('Status: ' . $license->status . ($license->operational() ? ' (operational)' : ' (BLOCKED)'));
+        foreach ($rows as $license) {
+            if (! $license->configured()) {
+                continue;
+            }
 
-        if ($license->last_error) {
-            $this->warn('Last error: ' . $license->last_error);
+            $license = $client->validate($license);
+
+            $label = $license->company_id
+                ? 'Tenant #' . $license->company_id . ' (' . ($license->company?->name ?? '?') . ')'
+                : 'Install';
+            $this->info($label . ': ' . $license->status . ($license->operational() ? ' (operational)' : ' (BLOCKED)'));
+
+            if ($license->last_error) {
+                $this->warn('  Last error: ' . $license->last_error);
+            }
+
+            $allOk = $allOk && $license->operational();
         }
 
-        return $license->operational() ? self::SUCCESS : self::FAILURE;
+        return $allOk ? self::SUCCESS : self::FAILURE;
     }
 }

@@ -114,7 +114,7 @@ class DeviceController extends Controller
 
             if ($isNewDevice) {
                 $seat = app(\App\Services\LicenseClient::class)
-                    ->activateDevice($data['device_uuid'], $data['computer_name'] ?? null);
+                    ->activateDevice($data['device_uuid'], $data['computer_name'] ?? null, $employee->company_id);
 
                 if (! $seat['ok']) {
                     return response()->json([
@@ -308,7 +308,7 @@ class DeviceController extends Controller
         $device->employee?->user?->tokens()
             ->where('name', 'device:' . $device->device_uuid)->delete();
 
-        app(\App\Services\LicenseClient::class)->deactivateDevice($device->device_uuid);
+        app(\App\Services\LicenseClient::class)->deactivateDevice($device->device_uuid, $device->company_id);
 
         $device->update([
             'unbound_at' => now(),
@@ -330,7 +330,7 @@ class DeviceController extends Controller
     public function rebind(Request $request, EmployeeDevice $device): JsonResponse
     {
         $seat = app(\App\Services\LicenseClient::class)
-            ->activateDevice($device->device_uuid, $device->computer_name);
+            ->activateDevice($device->device_uuid, $device->computer_name, $device->company_id);
 
         if (! $seat['ok']) {
             return response()->json([

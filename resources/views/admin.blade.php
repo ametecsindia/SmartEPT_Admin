@@ -406,6 +406,9 @@
   <div class="side">
     <div class="lock" style="justify-content:center;padding-top:2px"><img src="/img/smartept-logo-h-dark.png" alt="SmartEPT by Ametecs" style="width:170px;max-width:94%;height:auto;display:block"></div>
     <div class="navwrap">
+    <!-- HOST (12-Aug-2026): the operator's cross-tenant view — Super Admin only, hidden for everyone else. -->
+    <div class="navgrp" id="navgrp-host" style="display:none">HOST</div>
+    <div class="nav" data-view="tenants" id="nav-tenants" style="display:none"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V9.5l5-3.2V21M10 21V3.8l9 3.4V21"/><path d="M13.5 10h.01M16.5 10h.01M13.5 13.5h.01M16.5 13.5h.01M13.5 17h.01M16.5 17h.01"/></svg></span> Tenants</div>
     <div class="navgrp">MONITOR</div>
     <div class="nav active" data-view="dashboard"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/></svg></span> Live Dashboard</div>
     <div class="nav" data-view="attendance"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.4V12l3.2 1.9"/></svg></span> Attendance</div>
@@ -1019,6 +1022,19 @@
         <h3 id="ms-title">Monthly summary <span class="hint">payable days = present + 0.5 × half-day + paid leave</span></h3>
         <table><thead><tr><th>Code</th><th>Employee</th><th>Working days</th><th>P</th><th>A</th><th>H</th><th>L</th><th>Payable days</th><th>Avg productivity</th></tr></thead>
         <tbody id="ms-rows"></tbody></table>
+      </div>
+    </div>
+
+    <!-- TENANTS (12-Aug-2026): host/operator view — Super Admin only -->
+    <div class="view" id="v-tenants">
+      <div class="kpis" id="tn-kpis" style="margin-bottom:14px"></div>
+      <div class="card">
+        <h3>Tenant companies <span class="hint">licence, seats, storage &amp; activity per tenant — commercial records (orders, invoices, plans) live in SmartEPT Central</span></h3>
+        <table>
+          <thead><tr><th>Tenant</th><th>Status</th><th>Licence</th><th>Seats</th><th>Users</th><th>Employees</th><th>Storage</th><th>Last agent activity</th><th></th></tr></thead>
+          <tbody id="tn-rows"><tr><td colspan="9" class="mut">Loading…</td></tr></tbody>
+        </table>
+        <div class="mut" id="tn-note" style="margin-top:10px"></div>
       </div>
     </div>
 
@@ -1961,6 +1977,10 @@ function enterApp() {
   applyPermissionNav();
   applyEmployeeChrome();
   applyCardAccess();
+  // HOST section (Tenants) — the operator's cross-tenant view, Super Admin only.
+  var isHost = !!(ME && ME.role === 'SUPER_ADMIN');
+  var hn = document.getElementById('nav-tenants'); if (hn) hn.style.display = isHost ? '' : 'none';
+  var hg = document.getElementById('navgrp-host'); if (hg) hg.style.display = isHost ? '' : 'none';
   show('dashboard');
   // Temp-password logins must set their own password before doing anything else.
   if (ME.must_change_password) openForcedPwd();
@@ -2258,6 +2278,7 @@ $('#signout').onclick = async () => {
 
 // ---- nav ----
 const TITLES = {
+  tenants: ['Tenants', 'Every company on this install — licence, seats, storage & activity'],
   dashboard: ['Live Dashboard', 'Real-time workforce status'],
   attendance: ['Attendance', 'Daily sheet, regularization & holiday calendar'],
   screenshots: ['Screenshots', 'Policy-driven screen captures — every view is audit-logged'],
@@ -2287,6 +2308,7 @@ function show(v) {
   $('#v-' + v).classList.add('active');
   $('#page-title').textContent = TITLES[v][0]; $('#page-sub').textContent = TITLES[v][1];
   clearInterval(poll);
+  if (v === 'tenants') loadTenants();
   if (v === 'dashboard') { initDashOrgFilter(); loadDashboard(); poll = setInterval(loadDashboard, 15000); }
   if (v === 'attendance') initAttendance();
   if (v === 'screenshots') initScreenshots();
@@ -2315,7 +2337,8 @@ function refreshView() {
   const b = document.getElementById('btn-refresh');
   if (b) { b.classList.add('spin'); setTimeout(() => b.classList.remove('spin'), 700); }
   const v = CURRENT;
-  if (v === 'dashboard') loadDashboard();
+  if (v === 'tenants') loadTenants();
+  else if (v === 'dashboard') loadDashboard();
   else if (v === 'attendance') initAttendance();
   else if (v === 'screenshots') loadScreenshots();
   else if (v === 'webcam') loadWebcam();
@@ -5589,6 +5612,11 @@ async function loadLicense() {
   const box = $('#lic-status');
   try {
     const d = await api('/license');
+    // Per-tenant licensing (12-Aug-2026): a cloud tenant's admin manages THEIR
+    // OWN licence here; the offline .lic card is node-locked to the server, an
+    // install-level concept, so it hides for company-scoped licences.
+    const offCard = $('#lic-file') && $('#lic-file').closest('.card');
+    if (offCard) offCard.style.display = d.scope === 'company' ? 'none' : '';
     if ($('#lic-fp')) $('#lic-fp').value = d.machine_fingerprint || '';
     const pill = (txt, color) => `<span style="display:inline-block;padding:3px 10px;border-radius:999px;font-weight:700;font-size:12px;background:${color}22;color:${color}">${txt}</span>`;
     const STATUS_COLORS = { active: '#16A34A', expired: '#D97706', unconfigured: '#6B7B90' };
@@ -5610,8 +5638,11 @@ async function loadLicense() {
       ['Last check', d.last_checked_at || 'never'],
       ['Source', d.source === 'file' ? 'Offline licence file (this PC)' : (d.central_url ? 'SmartEPT Central (online)' : '—')],
     ];
+    if (d.scope === 'company') rows.unshift(['Scope', 'This licence belongs to <b>' + esc(d.scope_company || d.company || 'your company') + '</b> — issued and managed by SmartEPT Central']);
     box.innerHTML = '<table>' + rows.map(([k, v]) => `<tr><th style="text-align:left;white-space:nowrap;padding:6px 18px 6px 0">${k}</th><td>${v}</td></tr>`).join('') + '</table>'
-      + (d.last_error ? `<div class="mut" style="color:#DC2626;margin-top:8px">Last error: ${d.last_error}</div>` : '');
+      + (d.last_error ? `<div class="mut" style="color:#DC2626;margin-top:8px">Last error: ${d.last_error}</div>` : '')
+      + (d.scope === 'installation' && ME && ME.role === 'SUPER_ADMIN'
+        ? '<div class="mut" style="margin-top:8px">Cloud tenants on this install carry their <b>own</b> licences — see the <b>Tenants</b> screen.</div>' : '');
   } catch (e) { box.innerHTML = `<span style="color:#DC2626">${e.message}</span>`; }
 }
 $('#lic-save').onclick = async () => {
@@ -5651,6 +5682,77 @@ $('#lic-check').onclick = async () => {
     loadLicense();
   } catch (e) { $('#lic-msg').textContent = e.message; }
 };
+
+// ---- Tenants (12-Aug-2026): host/operator cross-tenant view — Super Admin only ----
+function tnHuman(mb) {
+  if (mb == null) return '—';
+  if (mb >= 1024) return (mb / 1024).toFixed(mb >= 10240 ? 0 : 1) + ' GB';
+  return mb + ' MB';
+}
+function tnLicPill(l) {
+  const P = (t, c) => '<span style="display:inline-block;padding:2px 9px;border-radius:999px;font-weight:700;font-size:11px;background:' + c + '22;color:' + c + '">' + t + '</span>';
+  if (l.scope === 'install') return P('INSTALL', '#6B7B90') + ' <span class="hint">shared install licence</span>';
+  if (!l.configured) {
+    const d = l.evaluation_days_left;
+    return d > 0 ? P('EVALUATION', '#D97706') + ' <span class="hint">' + d + 'd left</span>' : P('NO LICENCE', '#DC2626');
+  }
+  const col = l.operational ? (l.status === 'active' ? '#16A34A' : '#D97706') : '#DC2626';
+  return P((l.status || '?').toUpperCase().replace(/_/g, ' '), col)
+    + (l.plan ? ' <span class="hint">' + esc(l.plan) + (l.kind ? ' · ' + esc(l.kind) : '') + (l.expires_at ? ' · exp ' + l.expires_at : '') + '</span>' : '');
+}
+async function loadTenants() {
+  const rows = $('#tn-rows');
+  try {
+    const d = await api('/tenants');
+    const data = d.data || [];
+    const cloud = data.filter((t) => t.is_cloud_tenant);
+    const totMb = data.reduce((a, t) => a + (t.storage_used_mb || 0), 0);
+    const totDev = data.reduce((a, t) => a + (t.devices_bound || 0), 0);
+    const licOk = cloud.filter((t) => t.licence && t.licence.operational).length;
+    $('#tn-kpis').innerHTML = [
+      ['Cloud tenants', cloud.length],
+      ['Other companies', data.length - cloud.length],
+      ['Licences OK', licOk + ' / ' + cloud.length],
+      ['Devices bound', totDev],
+      ['Evidence storage', tnHuman(totMb)],
+    ].map(([l, v]) => '<div class="kpi"><div class="kside"><div class="l">' + esc(String(l)) + '</div></div><div class="kmain"><div class="v" style="font-size:20px">' + esc(String(v)) + '</div></div></div>').join('');
+    rows.innerHTML = data.length ? data.map((t) => {
+      const bar = t.storage_quota_mb
+        ? '<div style="height:5px;border-radius:99px;background:#E2E8F0;margin-top:4px;max-width:130px"><div style="height:5px;border-radius:99px;max-width:100%;width:' + Math.min(100, t.storage_pct || 0) + '%;background:' + ((t.storage_pct || 0) >= 90 ? '#DC2626' : (t.storage_pct || 0) >= 70 ? '#D97706' : '#16A34A') + '"></div></div>'
+        : '';
+      const seats = t.licence && t.licence.device_limit != null
+        ? t.devices_bound + ' / ' + t.licence.device_limit
+        : String(t.devices_bound || 0);
+      const seatWarn = t.licence && t.licence.device_limit != null && t.devices_bound >= t.licence.device_limit;
+      return '<tr>'
+        + '<td><b>' + esc(t.name) + '</b>' + (t.slug ? ' <a href="/' + esc(t.slug) + '" target="_blank" class="hint" title="Open branded console">/' + esc(t.slug) + ' ↗</a>' : '')
+        + '<div class="hint">' + esc(t.deployment_model || '—') + (t.provisioned ? ' · provisioned by Central' : '') + (t.retention_days ? ' · retention ' + t.retention_days + 'd' : '') + '</div></td>'
+        + '<td>' + (t.status === 'ACTIVE' ? '<span style="color:#16A34A;font-weight:700">ACTIVE</span>' : '<span style="color:#DC2626;font-weight:700">' + esc(t.status || '—') + '</span>') + '</td>'
+        + '<td>' + tnLicPill(t.licence || {}) + (t.licence && t.licence.last_error ? '<div class="hint" style="color:#DC2626">' + esc(t.licence.last_error) + '</div>' : '') + '</td>'
+        + '<td' + (seatWarn ? ' style="color:#D97706;font-weight:700"' : '') + '>' + seats + '</td>'
+        + '<td>' + (t.users || 0) + '</td>'
+        + '<td>' + (t.employees || 0) + '</td>'
+        + '<td><b>' + tnHuman(t.storage_used_mb) + '</b>' + (t.storage_quota_mb ? ' <span class="hint">of ' + tnHuman(t.storage_quota_mb) + (t.storage_pct != null ? ' (' + t.storage_pct + '%)' : '') + '</span>' : ' <span class="hint">no quota</span>') + bar
+        + '<div class="hint">' + (t.storage_files || 0) + ' files</div></td>'
+        + '<td>' + (t.last_agent_seen ? esc(t.last_agent_seen) : '<span class="hint">never</span>') + '</td>'
+        + '<td>' + (t.is_cloud_tenant ? '<button class="btn" data-tn-validate="' + t.id + '">Validate</button>' : '') + '</td>'
+        + '</tr>';
+    }).join('') : '<tr><td colspan="9" class="mut">No companies yet.</td></tr>';
+    const il = d.install_licence || {};
+    $('#tn-note').innerHTML = 'Install-level licence: <b>' + esc((il.status || 'unconfigured').toUpperCase()) + '</b>'
+      + (il.company ? ' (' + esc(il.company) + ')' : '')
+      + ' — governs non-cloud companies on this server. Storage figures refresh every ' + (d.storage_cached_minutes || 10) + ' minutes.'
+      + ' Billing, orders &amp; plans are managed in SmartEPT Central.';
+    rows.querySelectorAll('[data-tn-validate]').forEach((b) => b.onclick = async () => {
+      b.disabled = true; b.textContent = 'Checking…';
+      try {
+        const r = await api('/tenants/' + b.getAttribute('data-tn-validate') + '/license/validate', { method: 'POST' });
+        b.textContent = (r.data && r.data.status === 'active') ? '✓ Active' : (r.data && r.data.status ? r.data.status : 'Done');
+        setTimeout(loadTenants, 900);
+      } catch (e2) { b.disabled = false; b.textContent = 'Validate'; $('#tn-note').innerHTML = '<span style="color:#DC2626">' + esc(e2.message) + '</span>'; }
+    });
+  } catch (e) { rows.innerHTML = '<tr><td colspan="9" style="color:#DC2626">' + esc(e.message) + '</td></tr>'; }
+}
 
 // ---- audit & ops (R2-4) ----
 async function loadOps() {
@@ -5980,6 +6082,7 @@ $('#ops-backup-now').onclick = async () => {
 
 // ---- ⓘ help ----
 const HELP = {
+  tenants: ['Tenants', '<h5>What</h5>The host\'s (operator\'s) view of every company on this server. Cloud tenants (AMETECS-SaaS) each carry their <b>own</b> licence — status, plan, seats and expiry — plus live device counts, user/employee counts, evidence-storage use against quota, and when their agents last reported.<h5>Why</h5>On a shared cloud install, one tenant\'s licence must never affect another\'s, and the operator needs one screen to spot a tenant running out of seats or storage before it becomes a support call. Commercial records — orders, invoices, plans, payments — deliberately live in SmartEPT Central only, so there is exactly one source of truth.<h5>How</h5>Rows are sorted cloud-tenants-first. Click a tenant\'s /slug to open their branded console. "Validate" forces that tenant\'s licence to re-check with Central right now (after a renewal or seat upgrade). Storage figures are cached for 10 minutes; the bar turns amber at 70% and red at 90% of quota.'],
   dashboard: ['Live Dashboard', '<h5>What</h5>A real-time picture of the whole company: who is active, idle, on break or offline, plus today\'s violation and screenshot counts and the health of every agent below.<h5>Why</h5>One glance tells you whether the floor is working and whether the monitoring agents themselves are alive and syncing.<h5>How</h5>The table refreshes every 15 seconds automatically. Click any employee row to open their full day — timeline, apps, websites and compliance — in the side drawer.'],
   attendance: ['Attendance', '<h5>What</h5>The day\'s attendance sheet — status per employee (Present, Absent, Half-day, On leave) with check-in/out, late minutes and the source of each verdict — plus the company holiday calendar.<h5>Why</h5>This sheet feeds payroll, so it must be complete and correctable: a downed biometric reader or a forgotten leave application should not cost anyone a day\'s pay.<h5>How</h5>Pick a date and optionally a status filter. Edit any row to regularize it, or use "+ Add missed day" for a date with no record — both require a written reason that is stored on the record and audit-logged, and the row\'s source becomes MANUAL. Maintain holidays below: no late/absent marking happens on them and they appear as HD in the monthly register.'],
   screenshots: ['Screenshots', '<h5>What</h5>The screen captures the desktop agent uploaded for one employee on one day, with the app in focus and the reason each capture fired (interval, random or violation).<h5>Why</h5>Screenshots are the evidence layer: they turn a "13 minutes on YouTube" number into something you can verify before acting.<h5>How</h5>Pick an employee and a date, then click a tile for the full-size image. Captures only exist where the assigned screenshot policy enables them, and every image you open here is recorded in the audit log.'],

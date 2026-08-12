@@ -8,7 +8,13 @@ use Closure;
 use Illuminate\Http\Request;
 
 /**
- * R2-1: gate agent traffic on the installation licence.
+ * R2-1: gate agent traffic on the licence.
+ *
+ * Per-tenant licensing (12-Aug-2026): the licence that gates a request is the
+ * one governing the requesting user's company — a cloud tenant (AMETECS_SAAS)
+ * is judged ONLY on its own licence row, so one tenant's expiry can never
+ * block another tenant on the shared install. Everyone else keeps the
+ * install-level licence, exactly as before.
  *
  * - No key configured → pass (unlicensed/dev install, flagged on the Licence screen).
  * - Cached verdict is refreshed at most daily (lock-guarded, never hammers Central).
@@ -23,7 +29,7 @@ class EnsureLicensed
 
     public function handle(Request $request, Closure $next)
     {
-        $license = InstallationLicense::current();
+        $license = InstallationLicense::governing($request->user()?->company);
 
         if ($license->configured()) {
             $license = $this->client->ensureFresh($license);

@@ -6,8 +6,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
 /**
- * The one licence record for this SmartEPT installation (single row).
- * The cached `bundle` is the entitlement payload issued by SmartEPT Central.
+ * A licence record cached from SmartEPT Central.
+ *
+ * Two scopes (12-Aug-2026, per-tenant licensing on the shared cloud install):
+ *   - company_id NULL  → the ONE install-level licence (client-hosted servers,
+ *     and the fallback for non-SaaS companies on any install). Unchanged behaviour.
+ *   - company_id set   → a cloud tenant's OWN licence on the shared install
+ *     (companies with deployment_model = AMETECS_SAAS). One row per tenant,
+ *     its own key, seats, expiry and daily phone-home.
  */
 class InstallationLicense extends Model
 {
@@ -20,7 +26,7 @@ class InstallationLicense extends Model
 
     protected $table = 'installation_licenses';
 
-    protected $fillable = ['license_key', 'status', 'bundle', 'last_checked_at', 'unreachable_since', 'last_error'];
+    protected $fillable = ['company_id', 'license_key', 'status', 'bundle', 'last_checked_at', 'unreachable_since', 'last_error'];
 
     protected $casts = [
         'bundle' => 'array',
@@ -28,10 +34,34 @@ class InstallationLicense extends Model
         'unreachable_since' => 'datetime',
     ];
 
-    /** Singleton accessor — creates the empty row on first use. */
+    /** Install-level singleton (company_id NULL) — creates the empty row on first use. */
     public static function current(): self
     {
-        return static::query()->first() ?? static::query()->create([]);
+        return static::query()->whereNull('company_id')->orderBy('id')->first()
+            ?? static::query()->create([]);
+    }
+
+    /** A cloud tenant's own licence row — created empty on first use (evaluation clock starts). */
+    public static function forCompany(int $companyId): self
+    {
+        return static::query()->firstOrCreate(['company_id' => $companyId]);
+    }
+
+    /**
+     * The licence that governs a company: AMETECS_SAAS tenants carry their OWN
+     * licence; every other deployment (and no-company contexts) uses the
+     * install-level row — exactly the pre-existing behaviour.
+     */
+    public static function governing(?Company $company): self
+    {
+        return ($company && $company->deployment_model === 'AMETECS_SAAS')
+            ? static::forCompany($company->id)
+            : static::current();
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function configured(): bool
@@ -74,7 +104,7 @@ class InstallationLicense extends Model
         return $expires === null || now()->lte($expires->copy()->addDays($this->graceDays()));
     }
 
-    /** When the no-key evaluation window closes (7 days from first boot). */
+    /** When the no-key evaluation window closes (7 days from first boot / tenant creation). */
     public function evaluationEndsAt(): Carbon
     {
         return ($this->created_at ?? now())->copy()->addDays(self::EVALUATION_DAYS)->endOfDay();

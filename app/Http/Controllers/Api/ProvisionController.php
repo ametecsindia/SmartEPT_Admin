@@ -42,6 +42,10 @@ class ProvisionController extends Controller
             // Central announces its own URL so licence validation configures itself —
             // no .env edit on the product, ever (Ejaz, 12-Aug-2026).
             'central_url'        => ['nullable', 'url', 'max:190'],
+            // Per-tenant licensing (12-Aug-2026): Central hands the tenant's licence
+            // key over at provisioning, so the tenant is licensed the moment their
+            // console exists — no key ever pasted by hand on a cloud tenant.
+            'licence_key'        => ['nullable', 'string', 'max:64'],
         ]);
 
         if (! empty($data['central_url'])) {
@@ -93,10 +97,32 @@ class ProvisionController extends Controller
             ]);
         }
 
+        // 3) The tenant's OWN licence row — created/updated with the key Central
+        //    sent, then validated immediately (best-effort; the daily revalidate
+        //    and the Licence screen's "Validate now" both recover a miss).
+        if (! empty($data['licence_key'])) {
+            $licence = \App\Models\InstallationLicense::forCompany($company->id);
+            if ($licence->license_key !== trim($data['licence_key'])) {
+                $licence->forceFill([
+                    'license_key' => trim($data['licence_key']),
+                    'status' => 'unconfigured',
+                    'bundle' => null,
+                    'last_error' => null,
+                    'unreachable_since' => null,
+                ])->save();
+            }
+            try {
+                app(\App\Services\LicenseClient::class)->validate($licence);
+            } catch (\Throwable $e) {
+                Log::warning('Provision: licence validate deferred', ['company_id' => $company->id, 'error' => $e->getMessage()]);
+            }
+        }
+
         Log::info('Cloud tenant provisioned', [
             'external_tenant_id' => $data['external_tenant_id'],
             'company_id'         => $company->id,
             'new_admin'          => (bool) $tempPassword,
+            'licence_key_set'    => ! empty($data['licence_key']),
         ]);
 
         return response()->json([

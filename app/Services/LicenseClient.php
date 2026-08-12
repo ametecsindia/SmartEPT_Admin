@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Company;
 use App\Models\InstallationLicense;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -15,6 +16,10 @@ use Illuminate\Support\Facades\Log;
  *
  * Availability first: if Central is unreachable the last cached verdict stands
  * (the entitlement bundle carries expiry + grace, enforced locally).
+ *
+ * Per-tenant licensing (12-Aug-2026): on the shared cloud install each
+ * AMETECS_SAAS company phones home with its OWN key (its own licence row);
+ * everything else still uses the single install-level row.
  */
 class LicenseClient
 {
@@ -61,17 +66,32 @@ class LicenseClient
         return hash('sha256', config('app.key') . '|' . gethostname());
     }
 
-    /** Validate the stored key against Central and cache the entitlement bundle. */
-    /** EPT-27: total evidence storage this installation is using, in GB (reported to Central on each phone-home). */
-    private function currentStorageGb(): float
+    /** The licence row governing a company id (device flows carry the id, not the model). */
+    public function licenseForCompanyId(?int $companyId): InstallationLicense
+    {
+        $company = $companyId ? Company::find($companyId) : null;
+
+        return InstallationLicense::governing($company);
+    }
+
+    /**
+     * EPT-27: evidence storage reported to Central on each phone-home, in GB.
+     * A tenant's own licence row reports ONLY that tenant's files; the
+     * install-level row reports the whole box. Always unscoped — the daily
+     * revalidate can fire under any authenticated user's global scope.
+     */
+    private function currentStorageGb(?int $companyId = null): float
     {
         try {
-            return round((int) \App\Models\StorageFile::sum('size_bytes') / (1024 ** 3), 3);
+            return round((int) \App\Models\StorageFile::withoutGlobalScopes()
+                ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+                ->sum('size_bytes') / (1024 ** 3), 3);
         } catch (\Throwable $e) {
             return 0.0;
         }
     }
 
+    /** Validate the stored key against Central and cache the entitlement bundle. */
     public function validate(?InstallationLicense $license = null): InstallationLicense
     {
         $license ??= InstallationLicense::current();
@@ -94,7 +114,7 @@ class LicenseClient
             $resp = $this->http()->post($this->baseUrl() . '/api/v1/license/validate', [
                 'key' => $license->license_key,
                 'fingerprint' => $this->fingerprint(),
-                'storage_gb' => $this->currentStorageGb(),
+                'storage_gb' => $this->currentStorageGb($license->company_id),
             ]);
         } catch (\Throwable $e) {
             $license->forceFill([
@@ -118,11 +138,14 @@ class LicenseClient
                 'last_error' => null,
             ])->save();
             // EPT-27: honour Central's storage governance — pause new screenshots at 100%.
+            // Per-tenant rows keep governance per company; the install row keeps the
+            // original install-wide switch (client-hosted, one company anyway).
             try {
                 $st = $json['storage'] ?? null;
-                \App\Models\Setting::put('storage_paused', ($st && ! empty($st['pause_screenshots'])) ? '1' : '0');
+                $suffix = $license->company_id ? ':' . $license->company_id : '';
+                \App\Models\Setting::put('storage_paused' . $suffix, ($st && ! empty($st['pause_screenshots'])) ? '1' : '0');
                 if (is_array($st)) {
-                    \App\Models\Setting::put('storage_status', json_encode($st));
+                    \App\Models\Setting::put('storage_status' . $suffix, json_encode($st));
                 }
             } catch (\Throwable $e) {
                 // never let governance break the phone-home
@@ -145,6 +168,7 @@ class LicenseClient
     /**
      * Revalidate at most once a day, guarded by a short cache lock so a burst of
      * agent traffic never hammers Central (or stalls on it when it is down).
+     * The lock is per licence row — one tenant's revalidate never starves another's.
      */
     public function ensureFresh(InstallationLicense $license): InstallationLicense
     {
@@ -154,7 +178,7 @@ class LicenseClient
 
         $stale = $license->last_checked_at === null || $license->last_checked_at->lt(now()->subDay());
 
-        if ($stale && Cache::add('license:revalidate-lock', 1, 600)) {
+        if ($stale && Cache::add('license:revalidate-lock:' . $license->id, 1, 600)) {
             return $this->validate($license);
         }
 
@@ -162,12 +186,13 @@ class LicenseClient
     }
 
     /**
-     * Claim a device seat on Central. Returns ['ok' => bool, 'reason' => ?string].
+     * Claim a device seat on Central against the licence governing the device's
+     * company. Returns ['ok' => bool, 'reason' => ?string].
      * Unreachable Central → ok (offline-tolerant; the daily validate reconciles).
      */
-    public function activateDevice(string $deviceUid, ?string $hostname = null): array
+    public function activateDevice(string $deviceUid, ?string $hostname = null, ?int $companyId = null): array
     {
-        $license = InstallationLicense::current();
+        $license = $this->licenseForCompanyId($companyId);
 
         if (! $license->configured() || ! $this->baseUrl()) {
             return ['ok' => true, 'reason' => null];
@@ -191,9 +216,9 @@ class LicenseClient
     }
 
     /** Release a device seat on Central (offboarding / unbind). Best-effort. */
-    public function deactivateDevice(string $deviceUid): bool
+    public function deactivateDevice(string $deviceUid, ?int $companyId = null): bool
     {
-        $license = InstallationLicense::current();
+        $license = $this->licenseForCompanyId($companyId);
 
         if (! $license->configured() || ! $this->baseUrl()) {
             return true;

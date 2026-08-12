@@ -52,7 +52,13 @@ class ScreenshotController extends Controller
         $shot = $bundle['policies']['screenshot'] ?? null;
         abort_if(! $shot || empty($shot['enabled']), 403, 'Screenshot capture is not enabled by policy.');
         // EPT-27: storage quota full — pause NEW screenshots (activity tracking continues).
-        abort_if(\App\Models\Setting::get('storage_paused') === '1', 409, 'Storage is full — new screenshots are paused until space is freed. Activity tracking continues.');
+        // Per-tenant licensing (12-Aug-2026): a cloud tenant's own quota pauses only
+        // that tenant (storage_paused:<company_id>); the bare key stays install-wide.
+        abort_if(
+            \App\Models\Setting::get('storage_paused') === '1'
+            || \App\Models\Setting::get('storage_paused:' . $employee->company_id) === '1',
+            409, 'Storage is full — new screenshots are paused until space is freed. Activity tracking continues.'
+        );
 
         $file = $storage->storeUpload(
             $request->file('image'),

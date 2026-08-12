@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\MeetingController;
 use App\Http\Controllers\Api\AgentMeetingController;
 use App\Http\Controllers\Api\AgentOverrideController;
 use App\Http\Controllers\Api\TamperController;
+use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\BreakReportController;
 use App\Http\Controllers\Api\OpsController;
 use App\Http\Controllers\Api\StorageConfigController;
@@ -311,6 +312,14 @@ Route::middleware(['auth:sanctum', 'company.active'])->group(function () {
     // ---- QA Phase 2 (A3): emergency biometric-gate override (admin, audited, never automatic) ----
     Route::post('agent-override/gate', [AgentOverrideController::class, 'gate'])
         ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,HR_ADMIN');
+
+    // ---- Tenants (12-Aug-2026): host/operator view of every company on this
+    // install — storage vs quota, devices vs seats, per-tenant licence health.
+    // Central stays the source of truth for the commercial side. Super only.
+    Route::middleware('role:SUPER_ADMIN')->group(function () {
+        Route::get('tenants', [TenantController::class, 'index']);
+        Route::post('tenants/{company}/license/validate', [TenantController::class, 'validateLicense']);
+    });
 
     // ---- Companies (tenant provisioning + profile) ----
     Route::get('companies', [CompanyController::class, 'index'])

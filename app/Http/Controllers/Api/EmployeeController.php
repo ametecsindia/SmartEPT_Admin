@@ -138,7 +138,7 @@ class EmployeeController extends Controller
         $client = app(\App\Services\LicenseClient::class);
 
         foreach ($employee->devices as $device) {
-            $client->deactivateDevice($device->device_uuid);
+            $client->deactivateDevice($device->device_uuid, $device->company_id);
             $device->update([
                 'unbound_at' => now(),
                 'current_status' => 'OFFLINE',
