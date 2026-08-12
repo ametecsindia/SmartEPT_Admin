@@ -60,7 +60,10 @@ class ProvisionController extends Controller
                 'code'               => $this->uniqueCode($data['company_name'], $data['external_tenant_id']),
                 'slug'               => $this->uniqueSlug($data['slug'] ?? $data['company_name']),
                 'external_tenant_id' => $data['external_tenant_id'],
-                'timezone'           => $data['timezone'] ?: 'Asia/Kolkata',
+                // ?? first: a nullable validated field is ABSENT from $data when not
+                // sent at all — bare $data['timezone'] crashed with "Undefined array
+                // key" (found by PerTenantLicenseTest, 12-Aug).
+                'timezone'           => ($data['timezone'] ?? null) ?: 'Asia/Kolkata',
                 'deployment_model'   => 'AMETECS_SAAS',
                 'status'             => 'ACTIVE',
                 'storage_quota_mb'   => array_key_exists('storage_quota_mb', $data) ? ($data['storage_quota_mb'] ?: null) : null,
@@ -87,7 +90,7 @@ class ProvisionController extends Controller
 
             $tempPassword = Str::password(12);
             $user = User::create([
-                'name'                 => $data['admin_name'] ?: ($data['company_name'] . ' Admin'),
+                'name'                 => ($data['admin_name'] ?? null) ?: ($data['company_name'] . ' Admin'),
                 'email'                => $data['admin_email'],
                 'password'             => $tempPassword,          // hashed by the model cast
                 'company_id'           => $company->id,
