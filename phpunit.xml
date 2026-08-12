@@ -23,9 +23,13 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
         <!-- CRITICAL: tests must NEVER touch the real MySQL database.
-             In-memory SQLite is created fresh per run and vanishes after. -->
-        <env name="DB_CONNECTION" value="sqlite"/>
-        <env name="DB_DATABASE" value=":memory:"/>
+             In-memory SQLite is created fresh per run and vanishes after.
+             force="true": a machine-level DB_CONNECTION env var (seen on Ejaz's
+             PC 12-Aug — PHPUnit env does NOT override OS vars by default) was
+             silently winning, giving "mysql + :memory:" and failing every test. -->
+        <env name="DB_CONNECTION" value="sqlite" force="true"/>
+        <env name="DB_DATABASE" value=":memory:" force="true"/>
+        <env name="DB_URL" value="" force="true"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
