@@ -58,7 +58,13 @@ class DeviceController extends Controller
         // R2-1 seat enforcement: a brand-new device claims a licence seat on Central.
         // Re-registration of a known device never re-claims. Central down → allowed
         // (offline-tolerant); the daily validate reconciles seats.
-        $existing = EmployeeDevice::where('device_uuid', $data['device_uuid'])->first();
+        // UNSCOPED lookup (Ejaz, 12-Aug-2026): device_uuid is globally unique, but the
+        // BelongsToCompany scope hid rows registered under ANOTHER company — the insert
+        // then hit the unique index (1062 → HTTP 500) whenever a PC that once signed in
+        // for one company signed in for a different one. A physical PC is looked up
+        // globally; registration below re-points it to the current employee's company.
+        $existing = EmployeeDevice::withoutGlobalScopes()
+            ->where('device_uuid', $data['device_uuid'])->first();
 
         // R2-3: a device an admin unbound may not silently re-register.
         if ($existing && $existing->unbound_at) {
@@ -123,7 +129,19 @@ class DeviceController extends Controller
                 }
             }
 
-            $device = EmployeeDevice::updateOrCreate(
+            // Device moved between companies (test PC / reassigned laptop) — record it
+            // before the row is re-pointed so the transfer is auditable.
+            if ($existing && $existing->company_id !== $employee->company_id) {
+                $this->audit($request, 'DEVICE_COMPANY_REASSIGNED', EmployeeDevice::class, $existing->id, [
+                    'device_uuid'     => $data['device_uuid'],
+                    'from_company_id' => $existing->company_id,
+                    'to_company_id'   => $employee->company_id,
+                ]);
+            }
+
+            // Unscoped for the same reason as the lookup above: the row may currently
+            // belong to another company; updateOrCreate must SEE it to update, not insert.
+            $device = EmployeeDevice::withoutGlobalScopes()->updateOrCreate(
                 ['device_uuid' => $data['device_uuid']],
                 array_merge($data, [
                     'company_id'      => $employee->company_id,
