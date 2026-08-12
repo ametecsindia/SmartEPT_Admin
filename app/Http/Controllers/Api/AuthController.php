@@ -230,6 +230,16 @@ class AuthController extends Controller
         }
 
         if ($user && $user->status !== 'DISABLED') {
+            // Resend cooldown (Ejaz, 12-Aug-2026): one code per 60s per account.
+            // Silent skip (same neutral reply) so account existence never leaks;
+            // the login card's countdown keeps honest users from hitting this.
+            $recent = \App\Models\PasswordOtp::where('email', $user->email)
+                ->where('created_at', '>', now()->subSeconds(60))->exists();
+            if ($recent) {
+                return response()->json(['ok' => true,
+                    'message' => 'If that email has a SmartEPT account, a 6-digit reset code is on its way. It is valid for 10 minutes.']);
+            }
+
             $otp = (string) random_int(100000, 999999);
             \App\Models\PasswordOtp::where('email', $user->email)->delete();
             \App\Models\PasswordOtp::create([

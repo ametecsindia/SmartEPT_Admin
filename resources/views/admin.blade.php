@@ -2173,6 +2173,19 @@ $('#fp-link').onclick = (e) => {
   b.style.display = b.style.display === 'none' ? 'block' : 'none';
   $('#fp-msg').textContent = '';
 };
+// After the first send the button becomes an explicit "Resend code" with a 60s
+// countdown (matches the server-side per-account cooldown) — Ejaz, 12-Aug-2026.
+let fpTimer = null;
+function fpCooldown() {
+  const b = $('#fp-send'); let left = 60;
+  b.disabled = true; b.style.opacity = '.55'; b.textContent = 'Resend code (60s)';
+  clearInterval(fpTimer);
+  fpTimer = setInterval(() => {
+    left -= 1;
+    if (left <= 0) { clearInterval(fpTimer); b.disabled = false; b.style.opacity = ''; b.textContent = 'Resend code'; }
+    else b.textContent = 'Resend code (' + left + 's)';
+  }, 1000);
+}
 $('#fp-send').onclick = async () => {
   const m = $('#fp-msg'); m.style.color = '#5A6B70'; m.textContent = 'Sending…';
   try {
@@ -2180,6 +2193,7 @@ $('#fp-send').onclick = async () => {
       body: JSON.stringify({ email: $('#email').value.trim(), tenant_slug: TENANT_SLUG }) });
     $('#fp-step2').style.display = 'block';
     m.style.color = '#0A8F5B'; m.textContent = r.message || 'Code sent — check your email.';
+    fpCooldown();
   } catch (e2) { m.style.color = '#D02748'; m.textContent = e2.message; }
 };
 $('#fp-reset').onclick = async () => {

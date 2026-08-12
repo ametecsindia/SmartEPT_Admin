@@ -76,7 +76,9 @@ class LicenseController extends Controller
     public function revalidate(Request $request): JsonResponse
     {
         $license = $this->file->apply();
-        if ($license->status !== 'active' && $this->client->baseUrl()) {
+        if ($license->status !== 'active') {
+            // validate() also handles the no-Central-URL case by recording a
+            // clear last_error, so let it run either way (Ejaz, 12-Aug-2026).
             $license = $this->client->validate($license);
         }
 

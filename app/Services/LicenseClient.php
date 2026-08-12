@@ -61,7 +61,17 @@ class LicenseClient
     {
         $license ??= InstallationLicense::current();
 
-        if (! $license->configured() || ! $this->baseUrl()) {
+        if (! $license->configured()) {
+            return $license;
+        }
+
+        // A key with nowhere to phone home is a server-config problem — say so
+        // instead of leaving the misleading bare "unconfigured" (Ejaz, 12-Aug-2026).
+        if (! $this->baseUrl()) {
+            $license->forceFill([
+                'last_error' => 'Central URL not configured on this server — set SMARTEPT_LICENSE_URL in .env (e.g. https://smartept.com), run php artisan config:clear, then validate again.',
+            ])->save();
+
             return $license;
         }
 
