@@ -16,7 +16,13 @@ return [
     |
     */
 
-    'default' => 'mysql',   // 19-Jul FIX: rogue env var overrode .env -> sqlite -> broke agent auth + screenshots
+    // 19-Jul FIX: rogue env var overrode .env -> sqlite -> broke agent auth +
+    // screenshots — so the RUNNING app is hard-locked to mysql and ignores
+    // DB_CONNECTION entirely. 12-Aug: that hard-lock also ignored phpunit's
+    // sqlite setting (tests ran "mysql + :memory:" and ALL failed in setUp
+    // since 19-Jul). Tests are the ONE legitimate sqlite user, so the lock now
+    // yields only under APP_ENV=testing (set by phpunit.xml, forced).
+    'default' => env('APP_ENV') === 'testing' ? 'sqlite' : 'mysql',
 
     /*
     |--------------------------------------------------------------------------
