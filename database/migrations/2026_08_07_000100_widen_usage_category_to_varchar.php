@@ -17,6 +17,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            return; // sqlite (tests) stores enums as TEXT already — raw MODIFY would crash it
+        }
+
         // ponytail: raw ALTER (no doctrine/dbal needed); MySQL/MariaDB only, which is what SmartEPT runs.
         DB::statement("ALTER TABLE `employee_website_usage_logs` MODIFY `category` VARCHAR(32) NOT NULL DEFAULT 'NEUTRAL'");
         DB::statement("ALTER TABLE `employee_app_usage_logs` MODIFY `category` VARCHAR(32) NOT NULL DEFAULT 'NEUTRAL'");
@@ -24,6 +28,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         // Best-effort revert to the original enums. Rows holding a custom
         // category (e.g. TRACKED) would be truncated by MySQL on the way back —
         // acceptable for a rollback of a widening change.
