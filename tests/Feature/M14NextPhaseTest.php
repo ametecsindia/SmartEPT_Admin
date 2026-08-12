@@ -68,12 +68,31 @@ class M14NextPhaseTest extends TestCase
 
     private function makeMeeting(bool $withPriya, $start, $end): int
     {
+        // meeting_mode + at least one participant are REQUIRED since the meetings
+        // rework (offline mode needs a venue; online would need a link). For the
+        // "not a participant" case the meeting needs SOMEONE else — never Priya.
+        $participants = $withPriya ? [$this->employee->id] : [$this->otherEmployeeId()];
+
         return $this->withToken($this->adminToken)->postJson('/api/meetings', [
             'title'           => 'Sprint sync',
             'start_at'        => $start->toDateTimeString(),
             'end_at'          => $end->toDateTimeString(),
-            'participant_ids' => $withPriya ? [$this->employee->id] : [],
+            'meeting_mode'    => 'offline',
+            'venue'           => 'Conference Room A',
+            'participant_ids' => $participants,
         ])->assertCreated()->json('data.id');
+    }
+
+    /** Any employee in the company who is NOT Priya (created on demand). */
+    private function otherEmployeeId(): int
+    {
+        return (int) (\App\Models\Employee::withoutGlobalScopes()
+            ->where('company_id', $this->companyId)
+            ->where('id', '!=', $this->employee->id)
+            ->value('id')
+            ?? $this->withToken($this->adminToken)->postJson('/api/employees', [
+                'employee_code' => 'M14-OTHER', 'first_name' => 'Other', 'last_name' => 'Person',
+            ])->assertCreated()->json('data.id'));
     }
 
     private function meetingEvent(int $meetingId, string $action): \Illuminate\Testing\TestResponse

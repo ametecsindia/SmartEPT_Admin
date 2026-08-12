@@ -123,8 +123,10 @@ class M11OffboardingTest extends TestCase
             'employee_code' => 'E-REUSE-1', 'first_name' => 'Gulab', 'last_name' => 'Test',
         ])->assertCreated();
 
+        // Delete = archive since the 24-Jul Employee Archive feature: the endpoint
+        // now answers 200 with the archive summary, not a bare 204.
         $this->withToken($admin)->deleteJson('/api/employees/' . $created->json('data.id'))
-            ->assertStatus(204);
+            ->assertOk()->assertJsonStructure(['data' => ['archive_id', 'archive_label']]);
 
         // Same employee ID for the replacement hire — must work (soft-deleted row freed it).
         $this->withToken($admin)->postJson('/api/employees', [

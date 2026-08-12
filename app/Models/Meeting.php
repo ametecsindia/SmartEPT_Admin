@@ -41,13 +41,19 @@ class Meeting extends Model
     {
         $now = now();
 
+        // "start_at minus reminder_minutes has passed" — DATE_SUB is MySQL-only
+        // syntax; it 500'd every agent register/heartbeat under sqlite (tests).
+        $reminderDue = \Illuminate\Support\Facades\DB::getDriverName() === 'sqlite'
+            ? "datetime(start_at, '-' || reminder_minutes || ' minutes') <= ?"
+            : 'DATE_SUB(start_at, INTERVAL reminder_minutes MINUTE) <= ?';
+
         return static::withoutGlobalScopes()
             ->where('company_id', $employee->company_id)
             ->whereNotIn('status', self::TERMINAL_STATUSES)
             ->whereNull('actual_end_at')
             ->whereNotNull('reminder_minutes')
             ->where('start_at', '>', $now)
-            ->whereRaw('DATE_SUB(start_at, INTERVAL reminder_minutes MINUTE) <= ?', [$now])
+            ->whereRaw($reminderDue, [$now->toDateTimeString()])
             ->whereHas('participants', fn ($q) => $q->where('employee_id', $employee->id))
             ->orderBy('start_at')
             ->first();

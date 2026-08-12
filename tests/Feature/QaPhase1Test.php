@@ -69,6 +69,9 @@ class QaPhase1Test extends TestCase
             'title'           => 'QA sync',
             'start_at'        => $start->toDateTimeString(),
             'end_at'          => $end->toDateTimeString(),
+            // Required since the meetings rework; offline needs a venue, not a link.
+            'meeting_mode'    => 'offline',
+            'venue'           => 'QA Room',
             'participant_ids' => [$this->employee->id],
         ])->assertCreated()->json('data.id');
     }

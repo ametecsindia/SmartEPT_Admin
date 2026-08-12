@@ -140,6 +140,14 @@ class M9LicenseTest extends TestCase
             ], 409),
         ]);
 
+        // The single-session guard (newer feature) would otherwise answer first:
+        // an ACTIVE session on DEV-1 blocks a second device with SINGLE_SESSION_ACTIVE
+        // before the seat check runs. Log DEV-1's session out so the SEAT path is
+        // what this test actually exercises.
+        \App\Models\EmployeeDevice::withoutGlobalScopes()
+            ->where('device_uuid', 'LIC-SEAT-DEV-1')
+            ->update(['session_status' => 'LOGGED_OUT', 'last_heartbeat_at' => now()->subHours(2)]);
+
         // Brand-new device → Central refuses the seat → 409 to the agent.
         $token = $this->login('priya.raman@ametecs.io');
         $this->withToken($token)->postJson('/api/agent/register-device', [
@@ -165,16 +173,21 @@ class M9LicenseTest extends TestCase
 
         Http::fake(['central.fake/*' => fn () => throw new ConnectionException('Central is down')]);
 
-        // Forced check fails to reach Central → status unchanged, still operational.
-        $admin = $this->login('admin@ametecs.io');
-        $res = $this->withToken($admin)->postJson('/api/license/validate')->assertOk();
-        $this->assertSame('active', $res->json('status'));
-        $this->assertTrue($res->json('operational'));
-        $this->assertStringContainsString('unreachable', $res->json('last_error'));
+        // Offline-first (EPT-29, 5-Aug): "Validate now" does NOT phone home while the
+        // cached verdict is active — so the unreachable path is exercised the way it
+        // really happens: the DAILY revalidate. Make the verdict stale; the next agent
+        // heartbeat triggers the refresh, Central is down, the cached verdict stands.
+        InstallationLicense::current()->forceFill(['last_checked_at' => now()->subDays(2)])->save();
 
         $this->withToken($deviceToken)->postJson('/api/agent/heartbeat', [
             'device_uuid' => 'LIC-TEST-DEVICE-1',
         ])->assertOk();
+
+        $admin = $this->login('admin@ametecs.io');
+        $res = $this->withToken($admin)->getJson('/api/license')->assertOk();
+        $this->assertSame('active', $res->json('status'));
+        $this->assertTrue($res->json('operational'));
+        $this->assertStringContainsString('unreachable', $res->json('last_error'));
     }
 
     public function test_unlicensed_install_runs_during_seven_day_evaluation(): void
