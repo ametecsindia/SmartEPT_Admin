@@ -39,7 +39,14 @@ class ProvisionController extends Controller
             // purchased top-up), in MB. Pushed on create and re-pushed on seat/plan/
             // storage changes. 0/absent = leave as-is; explicit 0 elsewhere = unlimited.
             'storage_quota_mb'   => ['nullable', 'integer', 'min:0'],
+            // Central announces its own URL so licence validation configures itself —
+            // no .env edit on the product, ever (Ejaz, 12-Aug-2026).
+            'central_url'        => ['nullable', 'url', 'max:190'],
         ]);
+
+        if (! empty($data['central_url'])) {
+            \App\Models\Setting::put('license_central_url', rtrim($data['central_url'], '/'));
+        }
 
         // 1) Company — idempotent on external_tenant_id.
         $company = Company::where('external_tenant_id', $data['external_tenant_id'])->first();

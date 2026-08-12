@@ -18,11 +18,26 @@ use Illuminate\Support\Facades\Log;
  */
 class LicenseClient
 {
+    /**
+     * SmartEPT Central's address, resolved automatically (Ejaz, 12-Aug-2026 —
+     * clients must never edit .env for this):
+     *   1. SMARTEPT_LICENSE_URL in .env (explicit override, e.g. Laragon dev),
+     *   2. the licence_central_url Setting pushed by Central at provisioning,
+     *   3. https://smartept.com — Central's permanent home, the default.
+     */
     public function baseUrl(): ?string
     {
         $url = rtrim((string) config('smartept.license_url'), '/');
 
-        return $url !== '' ? $url : null;
+        if ($url === '') {
+            try {
+                $url = rtrim((string) \App\Models\Setting::get('license_central_url'), '/');
+            } catch (\Throwable $e) {
+                $url = ''; // settings table unavailable (mid-migration) — fall through
+            }
+        }
+
+        return $url !== '' ? $url : 'https://smartept.com';
     }
 
     /**
