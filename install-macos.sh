@@ -31,9 +31,21 @@ echo "[ok] PHP $PHPV with all required extensions"
 # --- environment + database (shared helper: MySQL, auto-creates the DB) ------
 php deployment/install-helper.php
 php artisan key:generate --force
-php artisan migrate --force --seed
+php artisan migrate --force
+# SmartPRS2 rule: CLIENT servers get roles only — never the demo seeder.
+php artisan db:seed --class='Database\Seeders\RolePermissionSeeder' --force
+php artisan storage:link >/dev/null 2>&1 || true
 chmod -R ug+rw storage bootstrap/cache 2>/dev/null || true
 echo "[ok] application installed"
+
+# --- provision the client workspace (SmartPRS2 client:provision, as-is) ------
+echo
+echo "Create your company's admin login (clean workspace — no demo data):"
+read -r -p "  Company name: " CP_COMPANY
+read -r -p "  Admin email:  " CP_EMAIL
+read -r -s -p "  Admin password (min 8 chars): " CP_PASS; echo
+php artisan smartept:client-provision --company="$CP_COMPANY" --email="$CP_EMAIL" --password="$CP_PASS" \
+  || { echo "[ERROR] Provisioning failed — fix the input above and re-run: php artisan smartept:client-provision ..."; exit 1; }
 
 # --- auto-start at login (launchd) -------------------------------------------
 PLIST="$HOME/Library/LaunchAgents/com.ametecs.smartept-admin.plist"
@@ -59,7 +71,7 @@ echo "[ok] launch agent installed — the console starts automatically at login"
 IP=$(ipconfig getifaddr en0 2>/dev/null || echo localhost)
 echo "============================================================"
 echo "  DONE. SmartEPT console:  http://$IP:8080/admin"
-echo "  1) Sign in: admin@ametecs.io / password  — CHANGE IT IMMEDIATELY."
+echo "  1) Sign in with the admin email + password you just chose."
 echo "  2) 7-day evaluation starts now, full features."
 echo "  3) To license: open http://$IP:8080/activate — copy the machine"
 echo "     fingerprint, send it to Ametecs, upload the .lic you receive."

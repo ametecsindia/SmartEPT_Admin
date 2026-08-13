@@ -59,13 +59,19 @@ echo [6/7] Linking storage ^& clearing caches...
 "%PHP%" artisan optimize:clear
 
 echo.
-echo [7/7] Creating the first admin login...
+echo [7/7] Creating your company's admin login (clean workspace - no demo data)...
 set "ADMIN_EMAIL="
 set /p ADMIN_EMAIL="   Admin email (e.g. admin@yourcompany.com): "
 if "%ADMIN_EMAIL%"=="" set "ADMIN_EMAIL=admin@smartept.local"
 set "ADMIN_COMPANY="
 set /p ADMIN_COMPANY="   Company name (e.g. Your Company Pvt Ltd): "
-"%PHP%" artisan smartept:make-admin "%ADMIN_EMAIL%" --company="%ADMIN_COMPANY%"
+set "ADMIN_PASS="
+set /p ADMIN_PASS="   Admin password (min 8 chars; blank = generate a temporary one): "
+if "%ADMIN_PASS%"=="" (
+  "%PHP%" artisan smartept:make-admin "%ADMIN_EMAIL%" --company="%ADMIN_COMPANY%"
+) else (
+  "%PHP%" artisan smartept:client-provision --company="%ADMIN_COMPANY%" --email="%ADMIN_EMAIL%" --password="%ADMIN_PASS%"
+)
 
 echo.
 echo ============================================================
@@ -75,8 +81,11 @@ echo   Open the console in a browser:
 echo       http://smartept.test/admin
 echo     (or  https://your-server-address/admin  in production)
 echo.
-echo   Sign in with the email + temporary password shown just above.
-echo   You'll be asked to set a new password on first login.
+echo   Sign in with the admin email + password from the step above.
+echo.
+echo   LICENSING: the 7-day evaluation is running. To license, open
+echo   /activate  -  copy the machine fingerprint, send it to Ametecs,
+echo   then upload the .lic file you receive. Instant, fully offline.
 echo.
 echo   If a page shows an error, run  cache.bat  then try again, and use
 echo   Help ^> Application log inside the console to copy details for support.
