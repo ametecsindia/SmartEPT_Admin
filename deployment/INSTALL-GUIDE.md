@@ -1,7 +1,37 @@
 # SmartEPT Admin Console — Install & Troubleshooting Guide
 
-For installing the SmartEPT **admin console** (the client's on-premise `/admin` panel) on a
-Windows server running **Laragon** (Apache/Nginx + PHP + MySQL/MariaDB).
+For installing the SmartEPT **admin console** (the client's on-premise `/admin` panel) on
+**Windows** (Laragon: Apache/Nginx + PHP + MySQL/MariaDB), **Linux** or **macOS**.
+
+---
+
+## Which installer do I run?
+
+| Your server | Run | Auto-start |
+|---|---|---|
+| Windows | double-click **`INSTALL.bat`** | run `START-SMARTEPT.bat` / add to Startup |
+| Linux (Ubuntu/Debian/RHEL) | `sudo bash install-linux.sh` | systemd service `smartept-admin` (installed for you) |
+| macOS | `bash install-macos.sh` | launchd agent (installed for you, starts at login) |
+
+All three do the same seven steps below, using the same shared helper — the only
+difference is the operating-system wrapper. Prerequisites on Linux/macOS: **PHP 8.2+**
+and **MySQL/MariaDB** running (the installer names the exact `apt`/`brew` commands if
+anything is missing). After install the console is at **`http://<server>:8080/admin`**.
+
+---
+
+## Licensing (all operating systems — SmartPRS2 standard)
+
+1. Installation starts a **7-day evaluation** automatically — full features, no key needed.
+2. To license: open **`http://<server>:8080/activate`** (no sign-in needed), copy the
+   **machine fingerprint** shown there and send it to Ametecs.
+3. Ametecs issues a **`.lic`** licence file for that fingerprint. Upload it on the same
+   `/activate` page — activation is **instant and fully offline** (no internet ever needed).
+4. The `.lic` is **node-locked**: it works only on the machine whose fingerprint it carries.
+   Server died or replaced? Ametecs "shifts" the licence and issues a new `.lic` — the old
+   machine stops validating, history keeps both.
+5. When the evaluation ends with no licence, monitoring blocks until a valid `.lic` is
+   uploaded — the console and `/activate` stay reachable.
 
 ---
 

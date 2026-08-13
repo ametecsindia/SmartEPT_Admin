@@ -9,7 +9,7 @@ set "SRC=%cd%"
 
 REM ---- config (version can be passed as the first argument, default 1.0) ----
 set "VER=%~1"
-if "%VER%"=="" set "VER=1.0"
+if "%VER%"=="" set "VER=1.1"
 set "NAME=SmartEPT-Admin-Server"
 set "STAGE=%TEMP%\%NAME%"
 set "OUTDIR=C:\laragon\www\smartept-central\storage\app\downloads"
@@ -30,7 +30,7 @@ robocopy "%SRC%" "%STAGE%" /E /NFL /NDL /NJH /NJS /NP /R:1 /W:1 ^
   /XD ".git" "node_modules" "_to_delete" "_cloudsync" ^
       "%SRC%\storage\logs" "%SRC%\storage\framework\cache" "%SRC%\storage\framework\sessions" ^
       "%SRC%\storage\framework\views" "%SRC%\storage\app\evidence" "%SRC%\storage\app\private" "%SRC%\storage\app\public" ^
-  /XF ".env" ".env.bak" ".env.backup" "*.fuse_hidden*" "individual" >nul
+  /XF ".env" ".env.bak" ".env.backup" "*.fuse_hidden*" "individual" "license.lic" ".machine_fp" >nul
 if %errorlevel% geq 8 ( echo [ERROR] Staging (robocopy) failed. & pause & exit /b 1 )
 
 REM keep the empty runtime folders so Laravel boots on the client
@@ -67,5 +67,13 @@ echo   logs, caches and scratch files.
 echo.
 echo   The Client Portal download now serves this new build - no
 echo   database change needed (same file path).
+echo.
+echo   Installers inside the ZIP: INSTALL.bat (Windows),
+echo   install-linux.sh (systemd), install-macos.sh (launchd).
+echo.
+echo   BEFORE WIDE DISTRIBUTION (SmartPRS2 standard): SourceGuardian-
+echo   encode app\Services\LicenseFile.php + app\Http\Middleware\
+echo   EnsureLicensed.php in the STAGED copy so the embedded public
+echo   key and licence checks cannot be edited on the client.
 echo ============================================================
 pause

@@ -61,6 +61,15 @@ if ($fresh) {
     echo "[env] fresh install: SESSION_DRIVER=file, CACHE_STORE=file\n";
 }
 
+// On-prem licence posture (SmartPRS2 standard, 13-Aug-2026): every client install
+// enforces the licence gate and enables the pre-login /activate page. Set once;
+// an admin can flip them later in .env if Ametecs instructs.
+if ($getv($env, 'SMARTEPT_ONPREM') === '') {
+    $setv($env, 'SMARTEPT_ONPREM', 'true');
+    $setv($env, 'SMARTEPT_LICENCE_ENFORCE', 'true');
+    echo "[env] on-prem licence mode enabled (7-day evaluation starts on first run)\n";
+}
+
 file_put_contents($envPath, $env);
 
 // Create the database if it isn't there yet.

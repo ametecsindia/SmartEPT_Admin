@@ -29,10 +29,22 @@ class EnsureLicensed
 
     public function handle(Request $request, Closure $next)
     {
-        $license = InstallationLicense::governing($request->user()?->company);
+        // SmartPRS2 rules (13-Aug-2026): (a) licence_enforce=false keeps demo /
+        // internal installs open; (b) FAIL-SOFT — an internal error inside the
+        // licence machinery must never take a client's monitoring down, so any
+        // throw lets the request through (real licence verdicts still block).
+        if (! filter_var(config('smartept.licence_enforce', true), FILTER_VALIDATE_BOOLEAN)) {
+            return $next($request);
+        }
 
-        if ($license->configured()) {
-            $license = $this->client->ensureFresh($license);
+        try {
+            $license = InstallationLicense::governing($request->user()?->company);
+
+            if ($license->configured()) {
+                $license = $this->client->ensureFresh($license);
+            }
+        } catch (\Throwable $e) {
+            return $next($request);
         }
 
         if (! $license->operational()) {

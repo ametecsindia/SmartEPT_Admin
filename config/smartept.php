@@ -27,6 +27,12 @@ return [
     'license_verify'    => filter_var(env('SMARTEPT_LICENSE_VERIFY', true), FILTER_VALIDATE_BOOLEAN),
     // EPT-29: offline node-locked licence file. Blank = license.lic in the app root.
     'license_file'      => env('SMARTEPT_LICENSE_FILE', ''),
+    // SmartPRS2 rule (13-Aug-2026): licence gate on/off. Client packages ship true;
+    // set SMARTEPT_LICENCE_ENFORCE=false on Ametecs' own demo/dev installs.
+    'licence_enforce'   => env('SMARTEPT_LICENCE_ENFORCE', true),
+    // True ONLY on client-hosted installs (the installer writes it): enables the
+    // pre-login /activate .lic upload. The Ametecs cloud console leaves it false.
+    'onprem'            => filter_var(env('SMARTEPT_ONPREM', false), FILTER_VALIDATE_BOOLEAN),
 
     // R2-2 ops alerts: minutes of heartbeat silence before a device is flagged
     // OFFLINE + admins emailed, and the violations-per-hour spike threshold.

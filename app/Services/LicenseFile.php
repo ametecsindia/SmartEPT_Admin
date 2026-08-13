@@ -49,7 +49,26 @@ PEM;
     /** Stable, hard-to-move machine fingerprint (SMBIOS/OS UUID, hashed). */
     public function machineFingerprint(): string
     {
-        return substr(hash('sha256', 'SMARTEPT|' . $this->rawMachineId()), 0, 40);
+        // SmartPRS2 pattern (13-Aug-2026): compute ONCE, persist to
+        // storage/app/.machine_fp. Spawning wmic/powershell per request is slow
+        // and can intermittently fail — which would make a valid licence look
+        // "wrong machine" and block a licensed client. The persisted file keeps
+        // the fingerprint fast and STABLE for the life of the install.
+        static $fp = null;
+        if ($fp !== null) {
+            return $fp;
+        }
+        $cacheFile = storage_path('app/.machine_fp');
+        if (is_readable($cacheFile)) {
+            $c = trim((string) @file_get_contents($cacheFile));
+            if (strlen($c) === 40 && ctype_xdigit($c)) {
+                return $fp = $c;
+            }
+        }
+        $fp = substr(hash('sha256', 'SMARTEPT|' . $this->rawMachineId()), 0, 40);
+        @file_put_contents($cacheFile, $fp);
+
+        return $fp;
     }
 
     private function rawMachineId(): string
@@ -120,9 +139,15 @@ PEM;
             return ['ok' => false, 'reason' => 'malformed'];
         }
 
-        // Node-lock: the file must be for THIS machine.
+        // Node-lock: the file MUST be for THIS machine. SmartPRS2 rule
+        // (13-Aug-2026): a .lic with NO fingerprint is a FLOATING licence that
+        // would run on any PC, breaking "one licence <-> one machine" — refuse
+        // it. Central always embeds the target machine's fingerprint.
         $fp = (string) ($p['fingerprint'] ?? '');
-        if ($fp !== '' && ! hash_equals($fp, $this->machineFingerprint())) {
+        if ($fp === '') {
+            return ['ok' => false, 'reason' => 'not_locked', 'payload' => $p];
+        }
+        if (! hash_equals($fp, $this->machineFingerprint())) {
             return ['ok' => false, 'reason' => 'wrong_machine', 'payload' => $p];
         }
 
