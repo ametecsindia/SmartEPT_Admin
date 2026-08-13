@@ -46,10 +46,30 @@ class ProvisionController extends Controller
             // key over at provisioning, so the tenant is licensed the moment their
             // console exists — no key ever pasted by hand on a cloud tenant.
             'licence_key'        => ['nullable', 'string', 'max:64'],
+            // CONSOLE MAIL AUTOPILOT (13-Aug-2026): Central hands over its SMTP
+            // so a fresh console can email OTPs/credentials with zero manual setup.
+            'mail'               => ['nullable', 'array'],
         ]);
 
         if (! empty($data['central_url'])) {
             \App\Models\Setting::put('license_central_url', rtrim($data['central_url'], '/'));
+        }
+
+        // Adopt Central's SMTP as this console's global relay — ONLY when no
+        // global SMTP is configured here yet, so a super's own Ops → Email/SMTP
+        // entry is never overwritten. Password stored encrypted, same as the
+        // Ops screen does (MailService decrypts either form).
+        if (! empty($data['mail']['host']) && ! \App\Models\Setting::get('mail_host')) {
+            $m = $data['mail'];
+            \App\Models\Setting::put('mail_host', (string) $m['host']);
+            \App\Models\Setting::put('mail_port', (string) ($m['port'] ?? 587));
+            \App\Models\Setting::put('mail_username', (string) ($m['username'] ?? ''));
+            \App\Models\Setting::put('mail_password', ($m['password'] ?? '') !== ''
+                ? \Illuminate\Support\Facades\Crypt::encryptString((string) $m['password']) : '');
+            \App\Models\Setting::put('mail_encryption', (string) ($m['encryption'] ?? 'tls'));
+            \App\Models\Setting::put('mail_from_address', (string) ($m['from_address'] ?? ''));
+            \App\Models\Setting::put('mail_from_name', (string) ($m['from_name'] ?? ''));
+            Log::info('Global SMTP inherited from Central at provisioning');
         }
 
         // 1) Company — idempotent on external_tenant_id.
