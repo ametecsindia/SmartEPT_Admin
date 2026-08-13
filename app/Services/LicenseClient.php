@@ -52,7 +52,13 @@ class LicenseClient
      */
     private function http()
     {
-        $req = Http::timeout(10)->acceptJson();
+        // 'strict' redirects (13-Aug-2026, Skill Dunya live http_405): live Central
+        // announces itself as http:// (APP_URL), the server 301s to https, and
+        // Guzzle's DEFAULT redirect mode converts the redirected POST into a GET —
+        // which Central's POST-only /api/validate answers with 405. strict=true
+        // keeps a POST a POST across redirects, so any http->https hop is harmless.
+        $req = Http::timeout(10)->acceptJson()
+            ->withOptions(['allow_redirects' => ['max' => 5, 'strict' => true]]);
         if (! config('smartept.license_verify', true)) {
             $req = $req->withoutVerifying();
         }
