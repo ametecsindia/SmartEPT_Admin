@@ -20,6 +20,71 @@ anything is missing). After install the console is at **`http://<server>:8080/ad
 
 ---
 
+## Production install on Windows Server with IIS
+
+Use this instead of `START-SMARTEPT.bat` when the client wants the console served by IIS
+(port 80/443, auto-start with Windows, no console window).
+
+**A. One-time server preparation**
+
+1. **IIS + CGI:** Server Manager → Add Roles and Features → *Web Server (IIS)* →
+   Application Development → tick **CGI**. (On Windows 10/11 Pro: Turn Windows features
+   on/off → Internet Information Services → Application Development Features → CGI.)
+2. **URL Rewrite module:** download and install from
+   `https://www.iis.net/downloads/microsoft/url-rewrite` (required — the package ships a
+   `public\web.config` that depends on it).
+3. **PHP 8.2+ NTS x64:** unzip from `windows.php.net/download` to `C:\PHP`, copy
+   `php.ini-production` → `php.ini`, set `extension_dir = "ext"` and enable:
+   `pdo_mysql, openssl, mbstring, curl, zip, gd, fileinfo`. Install the matching
+   *Visual C++ Redistributable* if PHP complains. Add `C:\PHP` to the system PATH.
+4. **MySQL 8 / MariaDB:** install and note the root (or dedicated) credentials.
+
+**B. Application install**
+
+5. Unzip `SmartEPT-Admin-Server-Setup-<ver>.zip` to **`C:\smartept`** (keep it OUT of
+   `C:\inetpub\wwwroot` — only the `public` subfolder is ever exposed).
+6. Open an **administrator** Command Prompt in `C:\smartept` and run **`INSTALL.bat`** —
+   it prepares `.env` (edit `DB_USERNAME`/`DB_PASSWORD` first if MySQL has a password),
+   creates the database, migrates, seeds roles only, and asks for your company, admin
+   email and password (clean workspace — no demo data).
+
+**C. IIS site**
+
+7. IIS Manager → **Handler Mappings** (server level) → *Add Module Mapping*:
+   Request path `*.php` · Module `FastCgiModule` · Executable `C:\PHP\php-cgi.exe` ·
+   Name `PHP-FastCGI` → OK → "create FastCGI application" → Yes.
+8. **Sites → Add Website:** name `SmartEPT`, physical path **`C:\smartept\public`**
+   (the `public` folder, never the app root), port 80 (add an HTTPS binding with the
+   company certificate if available). Application pool: **No Managed Code**.
+9. **Permissions:** grant `IIS_IUSRS` *Modify* on `C:\smartept\storage` and
+   `C:\smartept\bootstrap\cache`:
+   `icacls C:\smartept\storage /grant "IIS_IUSRS:(OI)(CI)M" /T` (same for bootstrap\cache).
+10. In `.env` set `APP_URL=http://<server-name-or-ip>` then run
+    `php artisan config:clear` and `php artisan storage:link`.
+
+**D. Background scheduler (required — attendance, reports, alerts)**
+
+11. Create a Task Scheduler job running **every minute** as SYSTEM:
+    ```
+    schtasks /Create /TN "SmartEPT Scheduler" /SC MINUTE /MO 1 /RU SYSTEM ^
+      /TR "C:\PHP\php.exe C:\smartept\artisan schedule:run"
+    ```
+
+**E. Verify + license**
+
+12. Browse `http://<server>/admin` → sign in with the admin created in step 6 →
+    Help → Troubleshooting → **System Health**: everything green.
+13. License via `http://<server>/activate` (fingerprint → Ametecs → upload `.lic`),
+    exactly as in the Licensing section below. Firewall: allow TCP 80/443 inbound so
+    employee PCs (agents) can reach the server.
+
+*Troubleshooting IIS:* HTTP 500.19 = URL Rewrite module missing (step 2). PHP page
+downloads instead of running = handler mapping missing (step 7). 500 with blank page =
+run step 9 permissions + check `storage\logs\laravel.log`. 403/404 on `/storage/...`
+images = `php artisan storage:link` not run (step 10).
+
+---
+
 ## Licensing (all operating systems — SmartPRS2 standard)
 
 1. Installation starts a **7-day evaluation** automatically — full features, no key needed.
