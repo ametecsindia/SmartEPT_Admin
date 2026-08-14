@@ -51,6 +51,16 @@ class AuthController extends Controller
             ], 403);
         }
 
+        // Ejaz, 14-Aug-2026 (finding 1.5): once the licence has expired AND the
+        // grace period has run out, the client cannot keep working. Only a
+        // Super/Company Admin may still sign in — someone has to be able to get
+        // in and enter a new key. Fail-soft inside licenceBlock().
+        if ($why = $this->licenceBlock($user)) {
+            return response()->json([
+                'error' => ['code' => 'LICENSE_BLOCKED', 'message' => $why],
+            ], 403);
+        }
+
         // Employee Self-Service: an EMPLOYEE-role login must be tied to an employee record,
         // else scoped queries have nothing to return. Deny with a clear, safe message.
         // Only affects the EMPLOYEE role — Admin/Manager/HR/etc. are never checked here.
@@ -98,6 +108,10 @@ class AuthController extends Controller
         if ($user->status === 'DISABLED') {
             return response()->json(['error' => ['code' => 'ACCOUNT_DISABLED', 'message' => 'This account is disabled.']], 403);
         }
+        // Finding 1.5 — an SSO link is not a way around a dead licence.
+        if ($why = $this->licenceBlock($user)) {
+            return response()->json(['error' => ['code' => 'LICENSE_BLOCKED', 'message' => $why]], 403);
+        }
 
         $user->forceFill(['last_login_at' => now()])->save();
         $this->audit($request, 'SSO_LOGIN', User::class, $user->id, null, $user);
@@ -109,6 +123,39 @@ class AuthController extends Controller
             'token' => $token,
             'user'  => $this->userPayload($user),
         ]);
+    }
+
+    /**
+     * Finding 1.5 — may this person sign in on the current licence?
+     * Returns NULL to allow, or the message to show. Admins are never blocked
+     * here (they are the rescue route), and any internal fault fails soft.
+     */
+    private function licenceBlock(User $user): ?string
+    {
+        try {
+            if (! filter_var(config('smartept.licence_enforce', true), FILTER_VALIDATE_BOOLEAN)) {
+                return null;
+            }
+            // Admins are the rescue route and are never blocked at sign-in. (On the
+            // shared cloud install SUPER_ADMIN is Ametecs' own operator account.)
+            if (in_array($user->roleSlug(), ['SUPER_ADMIN', 'COMPANY_ADMIN'], true)) {
+                return null;
+            }
+
+            $licence = \App\Models\InstallationLicense::governing($user->company);
+            if ($licence->configured()) {
+                $licence = app(\App\Services\LicenseClient::class)->ensureFresh($licence);
+            }
+            if ($licence->operational()) {
+                return null;
+            }
+
+            return $licence->configured()
+                ? 'Your organisation\'s SmartEPT licence is not active (' . $licence->status . '). Your Company Admin needs to renew it before you can sign in.'
+                : 'The 7-day evaluation period has ended. Your Company Admin needs to enter the SmartEPT licence key before anyone can sign in.';
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /** GET /api/auth/me */

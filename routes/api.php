@@ -71,7 +71,11 @@ Route::post('auth/sso', [AuthController::class, 'sso'])->middleware('throttle:10
 Route::get('tenant-branding/{slug}', [TenantBrandingController::class, 'show'])->middleware('throttle:60,1');
 
 // ---- Authenticated (any valid token) ----
-Route::middleware(['auth:sanctum', 'company.active'])->group(function () {
+// 'licensed' (Ejaz, 14-Aug-2026 — finding 1.5): the licence now gates the WHOLE
+// console, not just agent ingestion. Expiry + grace over = the app stops, with a
+// rescue hole for the Licence screen so an admin can always enter a new key.
+// See EnsureLicensed for the exact allow-list.
+Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(function () {
 
     Route::get('auth/me', [AuthController::class, 'me']);
     Route::post('auth/logout', [AuthController::class, 'logout']);
@@ -168,7 +172,8 @@ Route::middleware(['auth:sanctum', 'company.active'])->group(function () {
         Route::post('license/import', [LicenseController::class, 'import']);
     });
 
-    Route::prefix('agent')->middleware(['licensed', 'active-employee', 'throttle:600,1'])->group(function () {
+    // 'licensed' is inherited from the group above — no longer listed here.
+    Route::prefix('agent')->middleware(['active-employee', 'throttle:600,1'])->group(function () {
         // Bootstrap (no consent gate — these establish identity + consent).
         Route::post('register-device', [DeviceController::class, 'register']);
         Route::get('policy', [PolicyController::class, 'agentBundle']);

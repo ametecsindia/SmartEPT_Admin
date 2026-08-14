@@ -97,6 +97,21 @@ class LicenseClient
         }
     }
 
+    /**
+     * How many people/PCs this console actually has, for the daily report to
+     * Central. Fail-soft: a counting error must never stop the phone-home.
+     */
+    private function usageCounts(?int $companyId = null): array
+    {
+        try {
+            $c = app(LicenceSeats::class)->counts($companyId);
+
+            return ['users' => $c['users'], 'employees' => $c['employees'], 'devices' => $c['devices']];
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
     /** Validate the stored key against Central and cache the entitlement bundle. */
     public function validate(?InstallationLicense $license = null): InstallationLicense
     {
@@ -121,7 +136,11 @@ class LicenseClient
                 'key' => $license->license_key,
                 'fingerprint' => $this->fingerprint(),
                 'storage_gb' => $this->currentStorageGb($license->company_id),
-            ]);
+                // Seat telemetry (Ejaz, 14-Aug-2026 — finding 1.3). Counts only,
+                // no names: Central could previously only see PCs that called
+                // device/activate, so a live 14-person client read as "0/25".
+                // The HARD WALL still holds — this is licence metadata, nothing else.
+            ] + $this->usageCounts($license->company_id));
         } catch (\Throwable $e) {
             $license->forceFill([
                 'unreachable_since' => $license->unreachable_since ?: now(),

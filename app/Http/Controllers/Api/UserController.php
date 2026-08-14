@@ -101,6 +101,16 @@ class UserController extends Controller
 
         $role = $this->resolveRole($caller, $data['role']);
 
+        // Ejaz, 14-Aug-2026 (finding 1.4): one licensed seat = one monitored
+        // person. An EMPLOYEE login is a monitored person, so it needs a free
+        // seat. Admin / HR / Manager logins operate the system and stay free.
+        if ($role->slug === 'EMPLOYEE'
+            && ($why = app(\App\Services\LicenceSeats::class)->blockedReason($companyId, 'user'))) {
+            return response()->json([
+                'error' => ['code' => 'LICENSE_SEAT_LIMIT', 'message' => $why],
+            ], 409);
+        }
+
         // Strong 10-char temporary password (upper/lower/digits/symbols). It is
         // returned exactly once in this response — only the hash is stored.
         $temp = Str::password(10);

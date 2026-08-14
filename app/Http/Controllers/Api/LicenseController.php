@@ -150,6 +150,9 @@ class LicenseController extends Controller
             'features' => $license->bundle['features'] ?? [],
             'device_limit' => $license->deviceLimit(),
             'devices_registered' => $devices,
+            // Finding 1.3/1.4: what the seats are actually being spent on, and
+            // whether the client is already over what they bought.
+            'seats' => app(\App\Services\LicenceSeats::class)->counts($license->company_id),
             'expires_at' => optional($license->expiresAt())->toDateString(),
             'grace_days' => $license->graceDays(),
             'last_checked_at' => optional($license->last_checked_at)->toDateTimeString(),

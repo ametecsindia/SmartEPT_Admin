@@ -113,6 +113,16 @@ class DeviceController extends Controller
             }
 
             if ($isNewDevice) {
+                // Ejaz, 14-Aug-2026 (finding 1.4): check the cap HERE first. The
+                // Central call below deliberately fails open when Central is
+                // unreachable, which meant an offline server could bind PCs
+                // forever. This local count cannot be dodged that way.
+                if ($why = app(\App\Services\LicenceSeats::class)->blockedReason($employee->company_id, 'device')) {
+                    return response()->json([
+                        'error' => ['code' => 'LICENSE_SEAT_BLOCKED', 'reason' => 'device_limit_reached', 'message' => $why],
+                    ], 409);
+                }
+
                 $seat = app(\App\Services\LicenseClient::class)
                     ->activateDevice($data['device_uuid'], $data['computer_name'] ?? null, $employee->company_id);
 

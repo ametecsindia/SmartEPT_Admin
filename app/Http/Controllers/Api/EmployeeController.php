@@ -62,6 +62,15 @@ class EmployeeController extends Controller
     /** POST /api/employees */
     public function store(Request $request): JsonResponse
     {
+        // Ejaz, 14-Aug-2026 (finding 1.4): the licence covers a fixed number of
+        // people. Refuse the one that would go over — existing employees are
+        // never touched, the client simply cannot grow past what they bought.
+        if ($why = app(\App\Services\LicenceSeats::class)->blockedReason($request->user()?->company_id, 'employee')) {
+            return response()->json([
+                'error' => ['code' => 'LICENSE_SEAT_LIMIT', 'message' => $why],
+            ], 409);
+        }
+
         $data = $this->validated($request, true);
         $employee = Employee::create($data); // company_id auto-filled
         $this->audit($request, 'CREATE', Employee::class, $employee->id, $data);
@@ -463,6 +472,13 @@ class EmployeeController extends Controller
         $dryRun = $request->boolean('dry_run', false);
         $createLogin = $request->boolean('create_login', true);
 
+        // Seat budget for this import (finding 1.4). Rows past the licensed count
+        // fail individually with a clear reason instead of the whole file being
+        // rejected — the admin sees exactly how many got in.
+        $seats = app(\App\Services\LicenceSeats::class);
+        $seatLimit = $seats->enforced() ? $seats->limit($companyId) : null;
+        $seatsFree = $seatLimit ? max(0, $seatLimit - $seats->employeesUsed($companyId)) : null;
+
         $results = [];
         $created = 0; $failed = 0; $credentials = [];
         $seenCodes = [];
@@ -511,6 +527,11 @@ class EmployeeController extends Controller
                     ]);
                     if ($v->fails()) {
                         throw new \RuntimeException(implode(' ', $v->errors()->all()));
+                    }
+
+                    if ($seatsFree !== null && $created >= $seatsFree) {
+                        throw new \RuntimeException('Licence seat limit reached — your licence covers '
+                            . $seatLimit . ' users. Relieve someone you no longer track, or buy more users, then import the rest.');
                     }
 
                     if ($dryRun) {

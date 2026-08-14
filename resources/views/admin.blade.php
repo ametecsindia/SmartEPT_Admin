@@ -1932,10 +1932,45 @@ async function api(path, opts = {}) {
     const msg = e?.error?.message || e?.message
       || (e?.errors ? Object.values(e.errors).flat().join(' ') : '')
       || ('HTTP ' + r.status);
+    // Finding 1.5 (14-Aug-2026): the licence has stopped this console. Show the
+    // wall once, rather than letting every screen fail with its own error toast.
+    // TOKEN check: on the sign-in screen the inline error is enough — the wall is
+    // for someone already inside the console when the licence stops.
+    if (r.status === 403 && e?.error?.code === 'LICENSE_BLOCKED' && TOKEN) licenceWall(e.error);
     const err = new Error(msg); err.status = r.status; err.body = e; throw err;
   }
   return r.status === 204 ? null : r.json();
 }
+/**
+ * LICENCE WALL (Ejaz, 14-Aug-2026 — finding 1.5). Expiry + grace over, revoked,
+ * suspended or evaluation ended: the console stops here. An admin gets a button
+ * through to the Licence screen — that path stays open on purpose so the person
+ * who can fix it never gets locked out. Everyone else gets Sign out.
+ */
+let LIC_WALL_UP = false;
+function licenceWall(err) {
+  if (LIC_WALL_UP) return;
+  LIC_WALL_UP = true;
+  const canFix = !!(err && err.admin_can_fix);
+  const el = document.createElement('div');
+  el.id = 'lic-wall';
+  el.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(10,32,40,.94);display:flex;align-items:center;justify-content:center;padding:24px';
+  el.innerHTML = `<div style="max-width:560px;background:#fff;border-radius:14px;padding:28px 30px;box-shadow:0 20px 60px rgba(0,0,0,.35)">
+    <div style="font-size:13px;font-weight:800;letter-spacing:.08em;color:#DC2626">SMARTEPT IS LOCKED</div>
+    <h2 style="margin:8px 0 10px;font-size:21px;color:#0C3B49">Licence not active</h2>
+    <p style="margin:0 0 18px;line-height:1.55;color:#334">${esc((err && err.message) || 'This SmartEPT licence is no longer active.')}</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      ${canFix ? '<button class="btn solid" id="lic-wall-go">Open the Licence screen</button>' : ''}
+      <button class="btn" id="lic-wall-out">Sign out</button>
+    </div>
+    <p style="margin:16px 0 0;font-size:12px;color:#6B7B90">Need a key or a renewal? Contact Ametecs on WhatsApp 90000 98877 or your client portal.</p>
+  </div>`;
+  document.body.appendChild(el);
+  const go = el.querySelector('#lic-wall-go');
+  if (go) go.onclick = () => { el.remove(); LIC_WALL_UP = false; show('license'); };
+  el.querySelector('#lic-wall-out').onclick = () => { try { localStorage.clear(); } catch (e) {} location.reload(); };
+}
+
 async function apiBlob(path) {
   const r = await fetch(API + path, { headers: { Authorization: 'Bearer ' + TOKEN, 'Accept': '*/*' } });
   if (!r.ok) { const err = new Error('HTTP ' + r.status); err.status = r.status; throw err; }
@@ -5634,6 +5669,15 @@ async function loadLicense() {
       ['Company', d.company || '—'],
       ['Plan', (d.plan || '—') + (d.kind ? ' · ' + d.kind : '') + (d.deployment ? ' · ' + d.deployment.replace('_', '-') : '')],
       ['Device seats', d.device_limit != null ? `${d.devices_registered} registered / ${d.device_limit} licensed` : `${d.devices_registered} registered`],
+      // Finding 1.3/1.4 — the licensed count is now a rule, so show it being spent.
+      ['Users in use', (() => {
+        const s = d.seats || {}; const lim = s.limit;
+        if (lim == null) return `${s.employees != null ? s.employees : '—'} employees · ${s.users != null ? s.users : '—'} logins`;
+        const over = (s.employees || 0) > lim || (s.users || 0) > lim;
+        return `<b style="${over ? 'color:#DC2626' : ''}">${s.employees}</b> employees · <b style="${over ? 'color:#DC2626' : ''}">${s.users}</b> employee logins · <b>${s.devices}</b> PCs — out of <b>${lim}</b> licensed`
+          + (over ? '<div class="mut" style="color:#DC2626;font-weight:700">Over the licensed count — no new users, employees or PCs can be added until you buy more.</div>'
+                  : '<div class="mut">New users, employees and PCs are refused once all licensed seats are in use.</div>');
+      })()],
       ['Expires', d.expires_at ? `${d.expires_at} (+${d.grace_days} grace days)` : 'never (perpetual)'],
       ['Last check', d.last_checked_at || 'never'],
       ['Source', d.source === 'file' ? 'Offline licence file (this PC)' : (d.central_url ? 'SmartEPT Central (online)' : '—')],
