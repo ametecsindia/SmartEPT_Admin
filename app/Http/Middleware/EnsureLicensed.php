@@ -103,13 +103,17 @@ class EnsureLicensed
     private function isAllowedWhileBlocked(Request $request): bool
     {
         // The shared Ametecs cloud install: SUPER_ADMIN is OUR operator account,
-        // not a client. Every cloud tenant carries its OWN licence row there, so
-        // the install-level row is typically unconfigured — letting it lock the
-        // operator out of the tenant list would be a self-inflicted outage.
-        // On a client-hosted server (SMARTEPT_ONPREM=true) SUPER_ADMIN belongs to
-        // the CLIENT, so it gets only the rescue routes like any other admin.
+        // not a client. Every cloud tenant carries its OWN licence row there and
+        // the install-level row has no key of its own — locking the operator out
+        // of the tenant list would be a self-inflicted outage.
+        //
+        // The test is the INSTALL, not the env flag: a server that carries its own
+        // install-level licence key is a client server, so its SUPER_ADMIN is the
+        // client's own owner and gets only the rescue routes like any other admin.
+        // (SMARTEPT_ONPREM also forces that, but old installs may not have it set.)
         if ($request->user()?->roleSlug() === 'SUPER_ADMIN'
-            && ! filter_var(config('smartept.onprem', false), FILTER_VALIDATE_BOOLEAN)) {
+            && ! filter_var(config('smartept.onprem', false), FILTER_VALIDATE_BOOLEAN)
+            && ! InstallationLicense::current()->configured()) {
             return true;
         }
 

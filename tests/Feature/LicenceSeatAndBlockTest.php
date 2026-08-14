@@ -152,6 +152,68 @@ class LicenceSeatAndBlockTest extends TestCase
         }
     }
 
+    public function test_bulk_import_stops_at_the_licensed_seat_count(): void
+    {
+        $company = $this->company();
+        $this->licence($company, ['device_limit' => 2, 'expires_at' => now()->addYear()->toDateString()]);
+        $this->user($company, 'COMPANY_ADMIN', 'admin@seatco.test');
+        $token = $this->login('admin@seatco.test')->assertOk()->json('token');
+
+        $res = $this->withToken($token)->postJson('/api/employees/bulk-import', [
+            'create_login' => false,
+            'rows' => [
+                ['employee_code' => 'B1', 'first_name' => 'One'],
+                ['employee_code' => 'B2', 'first_name' => 'Two'],
+                ['employee_code' => 'B3', 'first_name' => 'Three'],
+                ['employee_code' => 'B4', 'first_name' => 'Four'],
+            ],
+        ])->assertOk();
+
+        $this->assertSame(2, $res->json('summary.created'));
+        $this->assertSame(2, $res->json('summary.failed'));
+        $this->assertStringContainsString('seat limit', strtolower((string) $res->json('results.2.error')));
+        $this->assertSame(2, Employee::withoutGlobalScopes()->where('company_id', $company->id)->count());
+    }
+
+    public function test_a_relieved_employee_cannot_be_reactivated_past_the_cap(): void
+    {
+        $company = $this->company();
+        $this->licence($company, ['device_limit' => 1, 'expires_at' => now()->addYear()->toDateString()]);
+        $this->user($company, 'COMPANY_ADMIN', 'admin@seatco.test');
+        $token = $this->login('admin@seatco.test')->assertOk()->json('token');
+
+        $this->addEmployee($token, 'E1')->assertCreated();
+        $relieved = Employee::create([
+            'company_id' => $company->id, 'employee_code' => 'E2', 'first_name' => 'Gone',
+            'employment_status' => 'RELIEVED',
+        ]);
+
+        $this->withToken($token)->putJson('/api/employees/' . $relieved->id, [
+            'employment_status' => 'ACTIVE',
+        ])->assertStatus(409)->assertJsonPath('error.code', 'LICENSE_SEAT_LIMIT');
+    }
+
+    public function test_an_admin_login_cannot_be_switched_to_employee_past_the_cap(): void
+    {
+        $company = $this->company();
+        $this->licence($company, ['device_limit' => 1, 'expires_at' => now()->addYear()->toDateString()]);
+        $this->user($company, 'COMPANY_ADMIN', 'admin@seatco.test');
+        $token = $this->login('admin@seatco.test')->assertOk()->json('token');
+
+        $this->withToken($token)->postJson('/api/users', [
+            'name' => 'Emp One', 'email' => 'emp1@seatco.test', 'role' => 'EMPLOYEE',
+        ])->assertCreated();
+
+        // Free role today…
+        $hr = $this->withToken($token)->postJson('/api/users', [
+            'name' => 'HR', 'email' => 'hr@seatco.test', 'role' => 'HR_ADMIN',
+        ])->assertCreated()->json('data.id');
+
+        // …must not become a seat-consuming EMPLOYEE tomorrow.
+        $this->withToken($token)->putJson('/api/users/' . $hr, ['role' => 'EMPLOYEE'])
+            ->assertStatus(409)->assertJsonPath('error.code', 'LICENSE_SEAT_LIMIT');
+    }
+
     // ---- 1.5 expiry + grace ----------------------------------------------
 
     private function deadLicence(Company $company): void

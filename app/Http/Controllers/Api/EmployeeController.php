@@ -119,6 +119,14 @@ class EmployeeController extends Controller
         $this->assertEmployeeVisible($request, $employee->id);
 
         $data = $this->validated($request, false, $employee);
+
+        // 14-Aug-2026: bringing a relieved employee back takes a seat, exactly
+        // like creating one — otherwise relieve-then-reactivate walks the cap.
+        if (($data['employment_status'] ?? null) === 'ACTIVE' && $employee->employment_status !== 'ACTIVE'
+            && ($why = app(\App\Services\LicenceSeats::class)->blockedReason($employee->company_id, 'employee'))) {
+            return response()->json(['error' => ['code' => 'LICENSE_SEAT_LIMIT', 'message' => $why]], 409);
+        }
+
         if (array_key_exists('reporting_manager_user_id', $data)
             && ! app(\App\Services\HierarchyService::class)->validateReportingManager($employee->id, $data['reporting_manager_user_id'])) {
             abort(422, 'That reporting manager would create a reporting loop.');
@@ -342,6 +350,11 @@ class EmployeeController extends Controller
         abort_unless($employee, 404, 'The archived employee record could not be found.');
         abort_unless($employee->trashed(), 422, 'This employee is already active.');
 
+        // 14-Aug-2026: a restore brings a person back onto the licence.
+        if ($why = app(\App\Services\LicenceSeats::class)->blockedReason($companyId, 'employee')) {
+            return response()->json(['error' => ['code' => 'LICENSE_SEAT_LIMIT', 'message' => $why]], 409);
+        }
+
         // validate() omits absent nullable keys, so read them defensively (?? null) before
         // ?: — otherwise a plain Restore (no new code typed) crashes with
         // "Undefined array key new_employee_code".
@@ -500,7 +513,7 @@ class EmployeeController extends Controller
             $seenCodes[$codeKey] = $line;
 
             try {
-                $row = DB::transaction(function () use ($r, $companyId, $dryRun, $createLogin, &$credentials) {
+                $row = DB::transaction(function () use ($r, $companyId, $dryRun, $createLogin, &$credentials, $seatLimit, $seatsFree, $created) {
                     // Resolve / create org units by name.
                     $attrs = [
                         'employee_code'  => trim($r['employee_code'] ?? ''),

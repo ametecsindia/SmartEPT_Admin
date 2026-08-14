@@ -166,6 +166,18 @@ class UserController extends Controller
             }
         }
 
+        // 14-Aug-2026: the seat cap has to hold on EDIT too, or it is trivially
+        // walked around — create the login as HR_ADMIN (free), then switch it to
+        // EMPLOYEE; or re-enable a disabled EMPLOYEE login. Both take a seat.
+        $becomesEmployee = (isset($data['role']) && $data['role'] === 'EMPLOYEE' && $user->roleSlug() !== 'EMPLOYEE')
+            || (($data['status'] ?? null) === 'ACTIVE' && $user->status !== 'ACTIVE'
+                && ($data['role'] ?? $user->roleSlug()) === 'EMPLOYEE');
+
+        if ($becomesEmployee
+            && ($why = app(\App\Services\LicenceSeats::class)->blockedReason($user->company_id, 'user'))) {
+            return response()->json(['error' => ['code' => 'LICENSE_SEAT_LIMIT', 'message' => $why]], 409);
+        }
+
         if (isset($data['role'])) {
             $data['role_id'] = $this->resolveRole($caller, $data['role'])->id;
             unset($data['role']);

@@ -212,8 +212,14 @@ class M9LicenseTest extends TestCase
             'device_uuid' => 'LIC-EVAL-DEV',
         ])->assertStatus(403)->assertJsonPath('error.reason', 'evaluation_expired');
 
-        // New device registration is blocked too.
-        $userToken = $this->login('priya.raman@ametecs.io');
+        // 14-Aug-2026: an ordinary employee can no longer even sign in once the
+        // licence is dead — the console stops, not just agent ingestion.
+        $this->postJson('/api/auth/login', ['email' => 'priya.raman@ametecs.io', 'password' => 'password'])
+            ->assertStatus(403)->assertJsonPath('error.code', 'LICENSE_BLOCKED');
+
+        // New device registration is blocked too — the Company Admin may sign in
+        // (they are the rescue route) but agent endpoints are still closed to them.
+        $userToken = $this->login('admin@ametecs.io');
         $this->withToken($userToken)->postJson('/api/agent/register-device', [
             'device_uuid' => 'LIC-EVAL-DEV-2',
         ])->assertStatus(403)->assertJsonPath('error.code', 'LICENSE_BLOCKED');

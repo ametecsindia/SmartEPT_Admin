@@ -339,6 +339,15 @@ class DeviceController extends Controller
      */
     public function rebind(Request $request, EmployeeDevice $device): JsonResponse
     {
+        // Local cap first (14-Aug-2026), for the same reason as register(): the
+        // Central call below deliberately fails open when Central is unreachable,
+        // so on its own it could be used to rebind PCs without limit.
+        if ($why = app(\App\Services\LicenceSeats::class)->blockedReason($device->company_id, 'device')) {
+            return response()->json([
+                'error' => ['code' => 'LICENSE_SEAT_BLOCKED', 'reason' => 'device_limit_reached', 'message' => $why],
+            ], 409);
+        }
+
         $seat = app(\App\Services\LicenseClient::class)
             ->activateDevice($device->device_uuid, $device->computer_name, $device->company_id);
 
