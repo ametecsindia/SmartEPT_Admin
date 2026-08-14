@@ -31,7 +31,7 @@ robocopy "%SRC%" "%STAGE%" /E /NFL /NDL /NJH /NJS /NP /R:1 /W:1 ^
       "%SRC%\storage\logs" "%SRC%\storage\framework\cache" "%SRC%\storage\framework\sessions" ^
       "%SRC%\storage\framework\views" "%SRC%\storage\app\evidence" "%SRC%\storage\app\private" "%SRC%\storage\app\public" ^
   /XF ".env" ".env.bak" ".env.backup" "*.fuse_hidden*" "individual" "license.lic" ".machine_fp" >nul
-if %errorlevel% geq 8 ( echo [ERROR] Staging (robocopy) failed. & pause & exit /b 1 )
+if %errorlevel% geq 8 ( echo [ERROR] Staging via robocopy failed. & pause & exit /b 1 )
 
 REM keep the empty runtime folders so Laravel boots on the client
 for %%d in ("storage\logs" "storage\framework\cache" "storage\framework\sessions" "storage\framework\views" "bootstrap\cache") do (
@@ -42,7 +42,7 @@ echo [2/3] Compressing to ZIP (this can take a minute)...
 if exist "%OUT%" del /f /q "%OUT%"
 where tar >nul 2>nul
 if %errorlevel%==0 (
-  REM Windows' built-in tar (bsdtar) handles long vendor paths reliably.
+  REM Windows built-in tar - bsdtar - handles long vendor paths reliably.
   pushd "%TEMP%"
   tar -a -c -f "%OUT%" "%NAME%"
   popd
