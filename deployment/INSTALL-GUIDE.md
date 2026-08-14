@@ -37,34 +37,42 @@ Use this instead of `START-SMARTEPT.bat` when the client wants the console serve
    `php.ini-production` → `php.ini`, set `extension_dir = "ext"` and enable:
    `pdo_mysql, openssl, mbstring, curl, zip, gd, fileinfo`. Install the matching
    *Visual C++ Redistributable* if PHP complains. Add `C:\PHP` to the system PATH.
-4. **MySQL 8 / MariaDB:** install and note the root (or dedicated) credentials.
+4. **Turn WebDAV OFF** (do not skip — this one bites every time). IIS enables WebDAV by
+   default and it grabs the `PUT` and `DELETE` verbs before PHP sees them, so the console
+   loads and creates records fine but **every Edit → Save and every Delete answers
+   HTTP 405**. The shipped `public\web.config` removes it per-site, which is enough on
+   most servers; if 405s persist, remove the feature itself:
+   Server Manager → Remove Roles and Features → Web Server (IIS) → Common HTTP Features →
+   untick **WebDAV Publishing** (Windows 10/11: Turn Windows features on/off → IIS →
+   World Wide Web Services → Common HTTP Features → WebDAV Publishing) → then `iisreset`.
+5. **MySQL 8 / MariaDB:** install and note the root (or dedicated) credentials.
 
 **B. Application install**
 
-5. Unzip `SmartEPT-Admin-Server-Setup-<ver>.zip` to **`C:\smartept`** (keep it OUT of
+6. Unzip `SmartEPT-Admin-Server-Setup-<ver>.zip` to **`C:\smartept`** (keep it OUT of
    `C:\inetpub\wwwroot` — only the `public` subfolder is ever exposed).
-6. Open an **administrator** Command Prompt in `C:\smartept` and run **`INSTALL.bat`** —
+7. Open an **administrator** Command Prompt in `C:\smartept` and run **`INSTALL.bat`** —
    it prepares `.env` (edit `DB_USERNAME`/`DB_PASSWORD` first if MySQL has a password),
    creates the database, migrates, seeds roles only, and asks for your company, admin
    email and password (clean workspace — no demo data).
 
 **C. IIS site**
 
-7. IIS Manager → **Handler Mappings** (server level) → *Add Module Mapping*:
+8. IIS Manager → **Handler Mappings** (server level) → *Add Module Mapping*:
    Request path `*.php` · Module `FastCgiModule` · Executable `C:\PHP\php-cgi.exe` ·
    Name `PHP-FastCGI` → OK → "create FastCGI application" → Yes.
-8. **Sites → Add Website:** name `SmartEPT`, physical path **`C:\smartept\public`**
+9. **Sites → Add Website:** name `SmartEPT`, physical path **`C:\smartept\public`**
    (the `public` folder, never the app root), port 80 (add an HTTPS binding with the
    company certificate if available). Application pool: **No Managed Code**.
-9. **Permissions:** grant `IIS_IUSRS` *Modify* on `C:\smartept\storage` and
+10. **Permissions:** grant `IIS_IUSRS` *Modify* on `C:\smartept\storage` and
    `C:\smartept\bootstrap\cache`:
    `icacls C:\smartept\storage /grant "IIS_IUSRS:(OI)(CI)M" /T` (same for bootstrap\cache).
-10. In `.env` set `APP_URL=http://<server-name-or-ip>` then run
+11. In `.env` set `APP_URL=http://<server-name-or-ip>` then run
     `php artisan config:clear` and `php artisan storage:link`.
 
 **D. Background scheduler (required — attendance, reports, alerts)**
 
-11. Create a Task Scheduler job running **every minute** as SYSTEM:
+12. Create a Task Scheduler job running **every minute** as SYSTEM:
     ```
     schtasks /Create /TN "SmartEPT Scheduler" /SC MINUTE /MO 1 /RU SYSTEM ^
       /TR "C:\PHP\php.exe C:\smartept\artisan schedule:run"
@@ -72,16 +80,25 @@ Use this instead of `START-SMARTEPT.bat` when the client wants the console serve
 
 **E. Verify + license**
 
-12. Browse `http://<server>/admin` → sign in with the admin created in step 6 →
+13. Browse `http://<server>/admin` → sign in with the admin created in step 7 →
     Help → Troubleshooting → **System Health**: everything green.
-13. License via `http://<server>/activate` (fingerprint → Ametecs → upload `.lic`),
+14. License via `http://<server>/activate` (fingerprint → Ametecs → upload `.lic`),
     exactly as in the Licensing section below. Firewall: allow TCP 80/443 inbound so
     employee PCs (agents) can reach the server.
 
-*Troubleshooting IIS:* HTTP 500.19 = URL Rewrite module missing (step 2). PHP page
-downloads instead of running = handler mapping missing (step 7). 500 with blank page =
-run step 9 permissions + check `storage\logs\laravel.log`. 403/404 on `/storage/...`
-images = `php artisan storage:link` not run (step 10).
+*Troubleshooting IIS:*
+- **HTTP 405 on every Edit/Save or Delete (but pages load and Create works)** = WebDAV is
+  still enabled — the single most common IIS problem. Confirm with
+  `curl.exe -i -X PUT http://<server>/api/org/branch/1`: a 405 with an `Allow:` header
+  listing GET/POST/OPTIONS is WebDAV answering, not SmartEPT. Fix per step 4, then
+  `iisreset`. A correct server answers `401 {"message":"Unauthenticated."}` to that curl.
+- HTTP 500.19 = URL Rewrite module missing (step 2).
+- PHP page downloads instead of running = handler mapping missing (step 8).
+- 500 with blank page = run step 10 permissions + check `storage\logs\laravel.log`.
+- 403/404 on `/storage/...` images = `php artisan storage:link` not run (step 11).
+- **Site physical path must be the `public` subfolder, never the app root** — if you can
+  download `http://<server>/.env`, the site is pointed at the wrong folder. Fix it before
+  the server goes live.
 
 ---
 
