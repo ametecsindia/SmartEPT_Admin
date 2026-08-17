@@ -1073,8 +1073,8 @@
       <div class="grid2">
         <div class="card">
           <h3>API keys <span class="row"><span class="hint">for external devices/apps to push in &amp; read out</span><button class="btn solid" id="key-add">+ New key</button></span></h3>
-          <table><thead><tr><th>Name</th><th>Key</th><th>Scopes</th><th>Last used</th><th>Status</th><th></th></tr></thead>
-          <tbody id="key-rows"><tr><td colspan="6" class="mut">Loading…</td></tr></tbody></table>
+          <table><thead><tr><th>Name</th><th>Key</th><th>Scopes</th><th>Expires</th><th>Allowed IPs</th><th>Last used</th><th>Status</th><th></th></tr></thead>
+          <tbody id="key-rows"><tr><td colspan="8" class="mut">Loading…</td></tr></tbody></table>
         </div>
         <div class="card">
           <h3>Outbound targets <span class="row"><span class="hint">SmartEPT pushes attendance here (SmartPRS etc.)</span><button class="btn solid" id="tgt-add">+ Add target</button></span></h3>
@@ -3408,11 +3408,13 @@ async function loadKeys() {
     $('#key-rows').innerHTML = (d.data || []).length ? d.data.map((k) =>
       '<tr><td><b>' + esc(k.name) + '</b></td><td><code>' + esc(k.prefix) + '…</code></td>'
       + '<td class="mut">' + esc((k.scopes || []).join(', ') || 'all') + '</td>'
+      + '<td class="mut">' + (k.expires_at ? (k.expired ? '<span class="tag t-off">expired ' + esc(k.expires_at) + '</span>' : esc(k.expires_at)) : 'never') + '</td>'
+      + '<td class="mut">' + ((k.allowed_ips && k.allowed_ips.length) ? esc(k.allowed_ips.join(', ')) : 'anywhere') + '</td>'
       + '<td class="mut">' + (k.last_used_at ? esc(k.last_used_at) : 'never') + '</td>'
-      + '<td>' + (k.active ? '<span class="tag t-ok">active</span>' : '<span class="tag t-off">revoked</span>') + '</td>'
+      + '<td>' + (!k.active ? '<span class="tag t-off">revoked</span>' : (k.expired ? '<span class="tag t-off">expired</span>' : '<span class="tag t-ok">active</span>')) + '</td>'
       + '<td>' + (k.active ? '<button class="btn danger" onclick="revokeKey(' + k.id + ')">Revoke</button>' : '') + '</td></tr>'
-    ).join('') : '<tr><td colspan="6" class="mut">No keys yet. Create one for SmartPRS or a gate device.</td></tr>';
-  } catch (e) { $('#key-rows').innerHTML = '<tr><td colspan="6" class="mut">' + esc(e.message) + '</td></tr>'; }
+    ).join('') : '<tr><td colspan="8" class="mut">No keys yet. Create one for SmartPRS or a gate device.</td></tr>';
+  } catch (e) { $('#key-rows').innerHTML = '<tr><td colspan="8" class="mut">' + esc(e.message) + '</td></tr>'; }
 }
 window.revokeKey = async (id) => {
   if (!confirm('Revoke this key? Any app using it stops working immediately.')) return;
@@ -3423,7 +3425,11 @@ $('#key-add').onclick = () => {
   $('#key-body').innerHTML = '<label>Key name</label><input id="key-name" placeholder="e.g. SmartPRS Production">'
     + '<label style="margin-top:10px">What can this key do?</label>'
     + '<div class="fbool"><input type="checkbox" id="key-ingest" checked> Push data IN (ingest attendance)</div>'
-    + '<div class="fbool"><input type="checkbox" id="key-read" checked> Read data OUT (attendance)</div>'
+    + '<div class="fbool"><input type="checkbox" id="key-read" checked> Read data OUT (attendance + employee list)</div>'
+    + '<label style="margin-top:12px">Expires on <span style="font-weight:400;color:var(--ink-3)">(blank = never — a leaked key then works forever)</span></label>'
+    + '<input type="date" id="key-expires">'
+    + '<label style="margin-top:10px">Allowed IP addresses <span style="font-weight:400;color:var(--ink-3)">(blank = any. Comma-separated; CIDR like 203.0.113.0/24 is fine)</span></label>'
+    + '<input id="key-ips" placeholder="e.g. 203.0.113.9, 10.0.0.0/24">'
     + '<div class="err" id="key-err"></div>';
   $('#key-foot').innerHTML = '<button class="btn" onclick="document.getElementById(\'key-ovl\').classList.remove(\'open\')">Cancel</button>'
     + '<button class="btn solid" id="key-create">Create key</button>';
@@ -3432,11 +3438,17 @@ $('#key-add').onclick = () => {
     const scopes = []; if ($('#key-ingest').checked) scopes.push('ingest'); if ($('#key-read').checked) scopes.push('read');
     if (!$('#key-name').value.trim()) { $('#key-err').textContent = 'Give the key a name.'; return; }
     try {
-      const r = await api('/integrations/keys', { method: 'POST', body: JSON.stringify({ name: $('#key-name').value.trim(), scopes }) });
+      const ips = $('#key-ips').value.split(',').map((x) => x.trim()).filter(Boolean);
+      const kbody = { name: $('#key-name').value.trim(), scopes };
+      if ($('#key-expires').value) kbody.expires_at = $('#key-expires').value;
+      if (ips.length) kbody.allowed_ips = ips;
+      const r = await api('/integrations/keys', { method: 'POST', body: JSON.stringify(kbody) });
       $('#key-body').innerHTML = '<div class="never" style="background:var(--ok-w);border-color:#B6E5CE">'
         + '<b style="color:var(--ok)">Key created — copy it now, it is shown only once:</b>'
         + '<div style="margin-top:8px;word-break:break-all;background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px;font-family:monospace;font-size:12px" id="key-secret">' + esc(r.secret) + '</div>'
-        + '<button class="btn acc" style="margin-top:8px" onclick="navigator.clipboard.writeText(document.getElementById(\'key-secret\').textContent);toast(\'Copied\')">Copy key</button></div>';
+        + '<button class="btn acc" style="margin-top:8px" onclick="navigator.clipboard.writeText(document.getElementById(\'key-secret\').textContent);toast(\'Copied\')">Copy key</button>'
+        + '<div style="margin-top:12px;font-size:12px">Point the bridge at this base URL:<br><code id="key-baseurl">' + esc(location.origin + '/api/v1') + '</code> '
+        + '<button class="btn" style="margin-left:6px" onclick="navigator.clipboard.writeText(document.getElementById(\'key-baseurl\').textContent);toast(\'Copied\')">Copy URL</button></div></div>';
       $('#key-foot').innerHTML = '<button class="btn solid" onclick="document.getElementById(\'key-ovl\').classList.remove(\'open\');loadKeys()">Done</button>';
     } catch (e) { $('#key-err').textContent = e.message; }
   };
@@ -3495,7 +3507,8 @@ window.delTarget = async (id) => { if (!confirm('Delete this target?')) return;
 function renderApiDocs() {
   const base = location.origin + '/api/v1';
   $('#api-docs').innerHTML =
-    '<h5 style="color:var(--accent-ink);margin:0 0 6px">Base URL</h5><code>' + esc(base) + '</code>'
+    '<h5 style="color:var(--accent-ink);margin:0 0 6px">Base URL</h5><code id="apidoc-base">' + esc(base) + '</code>'
+    + ' <button class="btn" style="margin-left:6px" onclick="navigator.clipboard.writeText(document.getElementById(\'apidoc-base\').textContent);toast(\'Copied\')">Copy</button>'
     + '<h5 style="color:var(--accent-ink);margin:14px 0 6px">Authentication</h5>'
     + 'Send your API key on every request:<br><code>Authorization: Bearer sk_live_xxxxxxxx</code> &nbsp;(or <code>X-Api-Key: sk_live_...</code>)'
     + '<h5 style="color:var(--accent-ink);margin:14px 0 6px">1 · Verify a key</h5>'
@@ -3503,9 +3516,26 @@ function renderApiDocs() {
     + '<h5 style="color:var(--accent-ink);margin:14px 0 6px">2 · Push punches IN (ingest scope)</h5>'
     + '<code>POST ' + esc(base) + '/attendance/punches</code>'
     + '<pre style="background:var(--card-2);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;font-size:11.5px;margin-top:6px">'
-    + esc(JSON.stringify({ punches: [{ employee_code: 'EMP001', punch_type: 'IN', punched_at: '2026-07-17T09:15:00+05:30', source: 'gate-1' }, { employee_code: 'EMP001', punch_type: 'OUT', punched_at: '2026-07-17T18:05:00+05:30' }] }, null, 2)) + '</pre>'
-    + 'Rule: earliest IN / latest OUT wins per day; unknown employee_codes are returned so you can fix them.'
-    + '<h5 style="color:var(--accent-ink);margin:14px 0 6px">3 · Read attendance OUT (read scope)</h5>'
+    + esc(JSON.stringify({ punches: [{ employee_code: 'EMP001', punch_type: 'IN', punched_at: '2026-08-16T09:15:00+05:30', external_id: '9f2c7b…', source: 'GATE-SN-7734', verification_mode: 'FACE', direction_confidence: 'HIGH' }, { employee_code: 'EMP001', punch_type: 'OUT', punched_at: '2026-08-16T18:05:00+05:30', external_id: 'a41d02…' }] }, null, 2)) + '</pre>'
+    + 'Required per punch: <code>employee_code</code>, <code>punch_type</code> (IN, OUT, BREAK_IN, BREAK_OUT) and <code>punched_at</code>. Up to 5,000 per request.'
+    + '<div style="margin-top:8px"><b>Optional fields — send them, they are all stored:</b></div>'
+    + '<ul style="margin:4px 0 0 18px">'
+    + '<li><code>external_id</code> — a deterministic fingerprint (e.g. SHA-256 of employee+time+device). Re-deliver as often as you like: the same value is rejected as a duplicate, never double-counted. <b>Use it.</b></li>'
+    + '<li><code>source</code> — your device serial, kept with the punch.</li>'
+    + '<li><code>device_id</code> — the SmartEPT biometric-device id, if the reader is registered here.</li>'
+    + '<li><code>verification_mode</code> — FINGERPRINT, FACE, CARD or PIN.</li>'
+    + '<li><code>direction_confidence</code> — HIGH, MEDIUM or NONE. Send NONE when the terminal cannot tell an entry from an exit.</li>'
+    + '<li><code>device_status_raw</code> — the reader\'s own status code, kept for diagnosis.</li></ul>'
+    + '<div style="margin-top:8px"><b>You get back, per punch:</b> <code>accepted</code>, <code>duplicate</code> or <code>unknown_employee</code> — plus <code>skipped_manual</code> for days HR has already closed (those are never overwritten), <code>unknown_employee_codes</code>, and the installation\'s <code>licence</code> verdict.</div>'
+    + '<pre style="background:var(--card-2);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;font-size:11.5px;margin-top:6px">'
+    + esc(JSON.stringify({ ok: true, received: 2, accepted: 1, duplicates: 1, attendance_rows_touched: 1, unknown_employee_codes: [], skipped_manual: [], punches: [{ index: 0, external_id: '9f2c…', status: 'accepted' }, { index: 1, external_id: '9f2c…', status: 'duplicate' }], licence: { state: 'active', since: '2027-03-31', message: 'Licence active.' } }, null, 2)) + '</pre>'
+    + 'Rule: earliest IN / latest OUT wins per day; a mid-day OUT is treated as a break, not the day\'s checkout.'
+    + '<h5 style="color:var(--accent-ink);margin:14px 0 6px">3 · Employee roster (read scope)</h5>'
+    + '<code>GET ' + esc(base) + '/employees</code> &nbsp;<span class="mut">(add <code>?include_inactive=1</code> to see relieved staff)</span><br>'
+    + 'Pull the codes and biometric ids straight from SmartEPT — no one has to map people by hand at install time.'
+    + '<pre style="background:var(--card-2);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;font-size:11.5px;margin-top:6px">'
+    + esc(JSON.stringify({ count: 1, data: [{ employee_code: 'EMP001', name: 'R. Kumar', biometric_id: '1043', status: 'ACTIVE' }] }, null, 2)) + '</pre>'
+    + '<h5 style="color:var(--accent-ink);margin:14px 0 6px">4 · Read attendance OUT (read scope)</h5>'
     + '<code>GET ' + esc(base) + '/attendance?date=2026-07-17&employee_code=EMP001</code><br>'
     + 'Returns per-employee first_in, last_out, worked_seconds, break_seconds, status.'
     + '<h5 style="color:var(--accent-ink);margin:14px 0 6px">Outbound (SmartEPT → your app)</h5>'

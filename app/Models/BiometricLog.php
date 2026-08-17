@@ -14,6 +14,7 @@ class BiometricLog extends Model
     protected $casts = [
         'punched_at' => 'datetime',
         'processed'  => 'boolean',
+        'metadata'   => 'array',
     ];
 
     public function employee() { return $this->belongsTo(Employee::class); }

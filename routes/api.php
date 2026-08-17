@@ -420,4 +420,8 @@ Route::prefix('v1')->middleware('throttle:120,1')->group(function () {
     Route::get('ping', [PublicApiController::class, 'ping'])->middleware('api-key');
     Route::post('attendance/punches', [PublicApiController::class, 'ingestPunches'])->middleware('api-key:ingest');
     Route::get('attendance', [PublicApiController::class, 'readAttendance'])->middleware('api-key:read');
+    // 16-Aug: roster discovery. Without it a bridge cannot learn employee codes or
+    // biometric ids on its own — the admin mapping endpoints need a session + a role,
+    // and 'unmapped' reads $request->user()->company_id, which is null under key auth.
+    Route::get('employees', [PublicApiController::class, 'employees'])->middleware('api-key:read');
 });

@@ -352,8 +352,9 @@ class BiometricController extends Controller
      * Public static: BiometricCloudSync feeds cloud-imported punches through the
      * exact same merge, so every ingest path behaves identically.
      */
-    public static function mergeIntoAttendance(int $companyId, array $rows): void
+    public static function mergeIntoAttendance(int $companyId, array $rows): array
     {
+        $skipped = [];
         $byDay = [];
         foreach ($rows as $r) {
             if (! $r['employee_id']) {
@@ -374,11 +375,17 @@ class BiometricController extends Controller
             $firstIn = $punches['in'] ?? null;
             $lastOut = $punches['out'] ?? null;
 
-            $attendance = EmployeeAttendanceLog::withoutGlobalScopes()
+            // 16-Aug: deterministic pick. The unique key is (employee_id, work_date,
+            // SOURCE), so a CLIENT row and a BIOMETRIC row can both exist for one day —
+            // a bare ->first() with no order let the storage engine decide which one got
+            // updated, and it could flip between two identical requests.
+            $dayRows = EmployeeAttendanceLog::withoutGlobalScopes()
                 ->where('company_id', $companyId)
                 ->where('employee_id', (int) $employeeId)
                 ->whereDate('work_date', $date)
-                ->first();
+                ->orderBy('id')
+                ->get();
+            $attendance = $dayRows->firstWhere('source', 'BIOMETRIC') ?? $dayRows->first();
 
             if (! $attendance) {
                 EmployeeAttendanceLog::create([
@@ -395,7 +402,17 @@ class BiometricController extends Controller
 
             // QA Phase 3: an approved MANUAL verdict (HR regularization / leave) is never
             // overwritten by raw punches — payroll edits stand until HR reconciles them.
-            if ($attendance->source === 'MANUAL') {
+            // 16-Aug: ON_LEAVE / ABSENT join it, matching AttendanceDerivation::deriveDay
+            // (the merge ran BEFORE derivation, so a late punch could still reopen a day
+            // HR had closed). Skips are returned so the caller can report them.
+            if ($attendance->source === 'MANUAL'
+                || in_array($attendance->status, ['ON_LEAVE', 'ABSENT'], true)) {
+                $skipped[] = [
+                    'employee_id' => (int) $employeeId,
+                    'date'        => $date,
+                    'source'      => (string) $attendance->source,
+                    'status'      => (string) $attendance->status,
+                ];
                 continue;
             }
 
@@ -410,6 +427,8 @@ class BiometricController extends Controller
                 $attendance->update($updates);
             }
         }
+
+        return $skipped;
     }
 
     private function mismatchStatus($punch, $login, $diff): string

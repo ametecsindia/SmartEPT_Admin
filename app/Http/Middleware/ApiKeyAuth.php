@@ -12,6 +12,12 @@ use Illuminate\Http\Request;
  * On success the resolved ApiKey and its company_id are attached to the request
  * so ingest/read controllers stay company-scoped. Optional scope enforcement:
  * ->middleware('api-key:ingest').
+ *
+ * Keys are no longer immortal. The bridge (SBB) stores its key in a config file
+ * on a customer's Windows PC, so a leak used to mean unlimited access until a
+ * human noticed and revoked it. Two limits now apply when they are set:
+ *  - expires_at   — hard cut-off, the key stops working on its own.
+ *  - allowed_ips  — an IP / CIDR allow-list; empty means "anywhere".
  */
 class ApiKeyAuth
 {
@@ -30,6 +36,12 @@ class ApiKeyAuth
         if (! $key) {
             return $this->deny('Invalid or revoked API key.', 401);
         }
+        if ($key->expires_at && $key->expires_at->isPast()) {
+            return $this->deny('This API key expired on ' . $key->expires_at->toDateString() . '. Issue a new one on the Integrations screen.', 401);
+        }
+        if (! $this->ipAllowed($key, (string) $request->ip())) {
+            return $this->deny('This API key is not allowed from ' . $request->ip() . '.', 403);
+        }
         if ($scope && ! $key->hasScope($scope)) {
             return $this->deny('This API key does not have the "' . $scope . '" scope.', 403);
         }
@@ -43,6 +55,47 @@ class ApiKeyAuth
         $request->attributes->set('api_company_id', $key->company_id);
 
         return $next($request);
+    }
+
+    /** Empty / null allow-list = any IP. Entries may be plain IPs or CIDR blocks. */
+    private function ipAllowed(ApiKey $key, string $ip): bool
+    {
+        $allowed = array_filter((array) ($key->allowed_ips ?: []));
+
+        if (! $allowed) {
+            return true;
+        }
+
+        foreach ($allowed as $entry) {
+            $entry = trim((string) $entry);
+
+            if ($entry === $ip) {
+                return true;
+            }
+            if (str_contains($entry, '/') && $this->inCidr($ip, $entry)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** IPv4 CIDR match. Non-IPv4 / malformed entries simply do not match. */
+    private function inCidr(string $ip, string $cidr): bool
+    {
+        [$subnet, $bits] = array_pad(explode('/', $cidr, 2), 2, null);
+
+        $ipLong = ip2long($ip);
+        $subnetLong = ip2long((string) $subnet);
+        $bits = (int) $bits;
+
+        if ($ipLong === false || $subnetLong === false || $bits < 0 || $bits > 32) {
+            return false;
+        }
+
+        $mask = $bits === 0 ? 0 : (-1 << (32 - $bits)) & 0xFFFFFFFF;
+
+        return ($ipLong & $mask) === ($subnetLong & $mask);
     }
 
     private function deny(string $msg, int $code)

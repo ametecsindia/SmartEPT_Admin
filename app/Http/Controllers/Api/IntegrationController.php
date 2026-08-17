@@ -25,6 +25,9 @@ class IntegrationController extends Controller
             ->map(fn ($k) => [
                 'id' => $k->id, 'name' => $k->name, 'prefix' => $k->prefix,
                 'scopes' => $k->scopes, 'active' => $k->active,
+                'expires_at' => optional($k->expires_at)->toDateString(),
+                'expired' => (bool) ($k->expires_at && $k->expires_at->isPast()),
+                'allowed_ips' => $k->allowed_ips,
                 'last_used_at' => optional($k->last_used_at)->toDateTimeString(),
                 'created_at' => $k->created_at->toDateString(),
             ]);
@@ -38,6 +41,11 @@ class IntegrationController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'scopes' => ['nullable', 'array'],
             'scopes.*' => ['in:ingest,read'],
+            // A bridge key lives in a config file on a customer PC: give it an
+            // expiry and, where the site has a fixed WAN address, an allow-list.
+            'expires_at' => ['nullable', 'date', 'after:today'],
+            'allowed_ips' => ['nullable', 'array'],
+            'allowed_ips.*' => ['string', 'max:64'],
         ]);
 
         // The full secret is shown exactly once; only its hash is stored.
@@ -50,12 +58,22 @@ class IntegrationController extends Controller
             'prefix' => $prefix,
             'key_hash' => hash('sha256', $secret),
             'scopes' => $data['scopes'] ?? ['ingest', 'read'],
+            'expires_at' => $data['expires_at'] ?? null,
+            'allowed_ips' => $data['allowed_ips'] ?? null,
             'active' => true,
         ]);
 
-        $this->audit($request, 'CREATE', ApiKey::class, $key->id, ['name' => $key->name, 'scopes' => $key->scopes]);
+        $this->audit($request, 'CREATE', ApiKey::class, $key->id, [
+            'name' => $key->name, 'scopes' => $key->scopes,
+            'expires_at' => optional($key->expires_at)->toDateString(),
+            'allowed_ips' => $key->allowed_ips,
+        ]);
 
-        return response()->json(['data' => ['id' => $key->id, 'name' => $key->name, 'prefix' => $prefix], 'secret' => $secret], 201);
+        return response()->json(['data' => [
+            'id' => $key->id, 'name' => $key->name, 'prefix' => $prefix,
+            'expires_at' => optional($key->expires_at)->toDateString(),
+            'allowed_ips' => $key->allowed_ips,
+        ], 'secret' => $secret], 201);
     }
 
     public function revokeKey(Request $request, ApiKey $apiKey): JsonResponse
