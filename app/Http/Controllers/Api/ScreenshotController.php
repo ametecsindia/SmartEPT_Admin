@@ -30,10 +30,6 @@ class ScreenshotController extends Controller
     public function upload(Request $request, PolicyResolver $resolver, StorageService $storage): JsonResponse
     {
         $employee = $this->agentEmployee($request);
-        // QA Phase 3 (A3): no screenshot capture while the gate is closed (pre-punch /
-        // punched-out) — evidence can't be force-posted before verified arrival.
-        $this->assertGateOpen($employee);
-
         $data = $request->validate([
             'device_uuid'    => ['required', 'string'],
             'image'          => ['required', 'file', 'mimes:jpg,jpeg,png', 'max:8192'],
@@ -47,6 +43,13 @@ class ScreenshotController extends Controller
             'screenshot_policy_version'  => ['nullable', 'integer'],
             'effective_interval_seconds' => ['nullable', 'integer'],
         ]);
+
+        // QA Phase 3 (A3): no screenshot capture while the gate is closed (pre-punch /
+        // punched-out) — evidence can't be force-posted before verified arrival. Checked
+        // AFTER validation so device_uuid is known: without it a per-machine exclusion was
+        // ignored here while it applied on every other ingest route, which both blocked an
+        // excluded machine's screenshots forever and let a REQUIRED machine's through.
+        $this->assertGateOpen($employee, $this->agentDevice($request, $employee));
 
         $bundle = $resolver->bundleForEmployee($employee);
         $shot = $bundle['policies']['screenshot'] ?? null;

@@ -149,11 +149,20 @@ class DeviceController extends Controller
                 ]);
             }
 
+            // A machine crossing tenants must NOT carry the previous company's policy
+            // overrides with it: gate_mode EXCLUDED set by client A's admin would silently
+            // lift Gate-to-PC for client B's employee, and device_uuid is agent-supplied,
+            // so this is reachable on purpose as well as by accident. Reset to inherit.
+            $crossTenantReset = ($existing && $existing->company_id !== $employee->company_id)
+                ? ['gate_mode' => null, 'gate_mode_from' => null, 'gate_mode_until' => null,
+                    'gate_mode_reason' => null, 'gate_mode_by_user_id' => null, 'tracking_mode' => null]
+                : [];
+
             // Unscoped for the same reason as the lookup above: the row may currently
             // belong to another company; updateOrCreate must SEE it to update, not insert.
             $device = EmployeeDevice::withoutGlobalScopes()->updateOrCreate(
                 ['device_uuid' => $data['device_uuid']],
-                array_merge($data, [
+                array_merge($data, $crossTenantReset, [
                     'company_id'      => $employee->company_id,
                     'employee_id'     => $employee->id,
                     'current_status'  => 'ONLINE',
@@ -252,8 +261,8 @@ class DeviceController extends Controller
 
         if ($device->employee) {
             $svc = app(\App\Services\GateService::class);
-            $gate = $svc->stateFor($device->employee);           // backward-compatible nested block
-            $gateStatus = $svc->statusFor($device->employee);    // gate_required, open, message, reason
+            $gate = $svc->stateFor($device->employee, $device);           // backward-compatible nested block
+            $gateStatus = $svc->statusFor($device->employee, $device);    // gate_required, open, message, reason
         }
 
         // Section 2: piggyback the currently-joinable meeting (participant + in window +
@@ -432,6 +441,32 @@ class DeviceController extends Controller
 
         $device->update(['tracking_mode' => $data['tracking_mode'] ?? null]);
         $this->audit($request, 'DEVICE_TRACKING_MODE', EmployeeDevice::class, $device->id, $data);
+
+        return response()->json(['data' => $device->fresh()]);
+    }
+
+    /**
+     * PUT /api/devices/{device}/gate-mode — Gate-to-PC exclusion for ONE machine
+     * (a shared kiosk, a visitor laptop, a WFH desktop that never sees the door).
+     * null = inherit from the employee / team / department / branch.
+     */
+    public function gateMode(Request $request, EmployeeDevice $device): JsonResponse
+    {
+        $data = $request->validate([
+            'gate_mode' => ['nullable', 'in:REQUIRED,EXCLUDED'],
+            'gate_mode_from' => ['nullable', 'date'],
+            'gate_mode_until' => ['nullable', 'date', 'after_or_equal:gate_mode_from'],
+            'gate_mode_reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $device->update([
+            'gate_mode' => $data['gate_mode'] ?? null,
+            'gate_mode_from' => $data['gate_mode_from'] ?? null,
+            'gate_mode_until' => $data['gate_mode_until'] ?? null,
+            'gate_mode_reason' => $data['gate_mode_reason'] ?? null,
+            'gate_mode_by_user_id' => ($data['gate_mode'] ?? null) ? $request->user()->id : null,
+        ]);
+        $this->audit($request, 'DEVICE_GATE_MODE', EmployeeDevice::class, $device->id, $data);
 
         return response()->json(['data' => $device->fresh()]);
     }

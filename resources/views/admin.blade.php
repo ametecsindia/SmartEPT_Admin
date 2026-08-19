@@ -425,7 +425,8 @@
     <div class="nav" data-view="policies"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.5 3v5.2c0 4.8-3.2 8.2-7.5 9.8-4.3-1.6-7.5-5-7.5-9.8V6z"/><path d="M9 11.8l2.1 2.1 3.9-4.2"/></svg></span> Policies</div>
     <div class="nav" data-view="rules"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h11M4 18h7"/><circle cx="18.5" cy="16.5" r="3"/><path d="M20.6 18.6 23 21"/></svg></span> App &amp; Web Rules</div>
     <div class="nav" data-view="biometric"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8A9 9 0 0 1 21 12c0 2.6-.4 5-1.2 7"/><path d="M3.6 8.4A9 9 0 0 0 3 12c0 2.8.6 5.2 1.6 7.2"/><path d="M12 8.4a3.6 3.6 0 0 1 3.6 3.6c0 2.3-.3 4.5-1 6.6"/><path d="M8.4 12a3.6 3.6 0 0 1 .4-1.7M8.6 15.6c.3 1.5.2 3-.2 4.6"/><path d="M12 12v2.4c0 1.7-.2 3.4-.7 5"/></svg></span> Biometric</div>
-    <div class="navgrp">INSIGHT</div>
+        <div class="nav" data-view="gateexcl"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V6.2a2 2 0 0 1 1.3-1.9l7-2.2a1 1 0 0 1 1.3 1v18"/><path d="M12.6 21H21V9.4a2 2 0 0 0-1.4-1.9l-7-2.2"/><path d="M8.4 12.2v1.6"/><path d="M2 21h20"/></svg></span> Gate Exclusions</div>
+<div class="navgrp">INSIGHT</div>
     <div class="nav" data-view="reports"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11.5M7.5 10l4.5 4.5L16.5 10"/><path d="M4 17v2.4A1.6 1.6 0 0 0 5.6 21h12.8a1.6 1.6 0 0 0 1.6-1.6V17"/></svg></span> Reports &amp; Exports</div>
     <div class="nav" data-view="license"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="12" r="4.6"/><path d="M12.6 12H21M17.5 12v3.4M21 12v2.4"/></svg></span> Licence</div>
     <div class="nav" data-view="integrations"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg></span> API &amp; Integrations</div>
@@ -829,6 +830,11 @@
           <span class="mut" id="gate-msg"></span>
         </div>
         <div class="mut" style="font-size:11.5px;margin-top:8px">When ON: an employee who opens the agent sees a "Punch in at the door" wall — tracking and the work clock start the instant their gate IN punch reaches SmartEPT (physical device or an IN punch pushed via the API). No punch = no login. The grace window lets a punch that lands a few minutes late still open the gate. Mid-day OUT punch = automatic out-of-office break + soft lock; the return punch closes it to the second (under 2 min merges away, over 45 min flagged, over 3 hours HR is emailed). OFF mode never gates anyone, whatever else is set.</div>
+        <div style="margin-top:12px;padding:11px 13px;border:1px dashed var(--border-2);border-radius:9px;background:var(--card-2)">
+          <b style="font-size:12.5px">🎟️ Exclusion Policy <span class="hint" style="font-weight:400">— let chosen people sign in without a door punch</span></b>
+          <div class="mut" style="font-size:11.5px;margin-top:5px">Night shift, field engineers, work-from-home staff and visiting contractors reach a PC without passing the reader. Set an exclusion on the <b>Branch</b>, <b>Department</b> or <b>Team</b> (Organisation screen) or on an individual person (Employees → Edit → <i>Gate-to-PC exclusion</i>), and on a single machine from Devices. The most specific setting wins — <b>Device → Employee → Team → Department → Branch</b> — so you can exclude a whole branch and still mark one team <b>Required</b> to keep them punching in. Leave a level on <i>Inherit</i> and it follows the one above.</div>
+          <div class="mut" style="font-size:11.5px;margin-top:7px"><b>Every exclusion can be dated</b> — <i>valid from</i> / <i>valid until</i> (both days included). Leave the dates blank for a permanent one. Use a dated exclusion whenever the cause is temporary: the door controller is under repair, a fingerprint has stopped reading, or <b>the punches are reaching the device but not reaching SmartEPT because the site's network or internet link is down</b> — the punch happened, the server just can't see it, and without an exclusion that employee sits in front of a walled PC unable to work. Set the window, and the gate re-arms itself the day after it ends — nobody has to remember to undo it. Every grant records the reason and the admin who allowed it. Per-machine exclusions are available on the API (<code>PUT /devices/{id}/gate-mode</code>); the emergency override stays for one-off "fix it in the next 30 seconds" days.</div>
+        </div>
       </div>
       <div class="filters">
         <label>Date</label><input type="date" id="bio-date" style="min-width:0">
@@ -917,6 +923,22 @@
     </div>
 
     <!-- 9. REPORTS & EXPORTS -->
+    <!-- 8b. GATE EXCLUSIONS (Ejaz, 18-Aug-2026) — every standing exception to Gate-to-PC
+         in one list, so a temporary one can't quietly become permanent. -->
+    <div class="view" id="v-gateexcl">
+      <div class="card" id="gx-state-card">
+        <h3>Gate-to-PC status <span class="hint">exclusions only matter while the gate is switched on</span></h3>
+        <div id="gx-state" class="mut">Loading…</div>
+      </div>
+      <div class="card">
+        <h3>Standing exclusions <span class="hint">who may sign in without punching at the door — and until when</span>
+          <button class="btn solid" id="gx-add" style="float:right">+ Add exclusion</button></h3>
+        <div class="mut" style="font-size:11.5px;margin-bottom:10px">Most specific wins: <b>Machine → Employee → Team → Department → Branch</b>. <b>Excluded</b> lets them in without a punch; <b>Required</b> puts a sub-group back behind the gate even when a level above them is excluded. Blank dates mean permanent; otherwise it applies between those dates (both included) and lapses on its own.</div>
+        <table><thead><tr><th>Level</th><th>Applies to</th><th>Setting</th><th>From</th><th>Until</th><th>Status</th><th>Reason</th><th>Granted by</th><th></th></tr></thead>
+          <tbody id="gx-rows"></tbody></table>
+      </div>
+    </div>
+
     <div class="view" id="v-reports">
       <div class="card">
         <h3>Live productivity — all employees <span class="hint">day-wise · today updates live · click a column to sort</span></h3>
@@ -1460,6 +1482,37 @@
 </div>
 
 <!-- ORG UNIT EDITOR (17-Jul) -->
+<!-- Gate exclusion editor -->
+<div class="ovl" id="gx-ovl">
+  <div class="modal">
+    <div class="mhead"><b id="gx-m-title">Add gate exclusion</b><button class="x" data-close="gx-ovl">&times;</button></div>
+    <div class="mbody">
+      <div class="fgrid">
+        <div><label>Level</label><select id="gx-level">
+          <option value="branches">Branch — everyone at a site</option>
+          <option value="departments">Department</option>
+          <option value="teams">Team</option>
+          <option value="employees">Employee — one person</option>
+          <option value="devices">Machine — one PC</option>
+        </select></div>
+        <div><label>Applies to</label><select id="gx-target"></select></div>
+        <div><label>Setting</label><select id="gx-mode">
+          <option value="EXCLUDED">Excluded — may sign in without a door punch</option>
+          <option value="REQUIRED">Required — must punch in, even if a level above is excluded</option>
+        </select></div>
+        <div><label>Valid from <span style="font-weight:400;color:var(--ink-3)">— blank = immediately</span></label><input id="gx-from" type="date"></div>
+        <div><label>Valid until <span style="font-weight:400;color:var(--ink-3)">— blank = permanent</span></label><input id="gx-until" type="date"></div>
+        <div class="full"><label>Reason</label><input id="gx-reason" maxlength="255" placeholder="e.g. site link down — punches are on the device but not reaching SmartEPT"></div>
+      </div>
+      <div class="mut" style="font-size:11.5px;margin-top:8px">A dated exclusion re-arms the gate by itself the day after it ends. Your name is recorded against the grant.</div>
+      <div class="err" id="gx-err"></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn" data-close="gx-ovl">Cancel</button>
+      <button class="btn solid" id="gx-save">Save</button>
+    </div>
+  </div>
+</div>
 <div class="ovl" id="org-ovl">
   <div class="modal" style="width:520px">
     <div class="mhead"><div class="mt"><b id="org-m-title">Add</b><span>Organisation structure — used across employees, attendance &amp; policies</span></div>
@@ -1704,6 +1757,19 @@
             <option value="PRESENCE_ONLY">Presence &amp; breaks only — no screenshots, no activity</option>
             <option value="EXCLUDED">Do Not Track — capture nothing at all</option>
           </select></div>
+        <div class="full"><label>Gate-to-PC exclusion <span style="font-weight:400;color:var(--ink-3)">— whether this person must punch in at the door before their PC starts working</span></label>
+          <select id="f-gate">
+            <option value="">Inherit (from team / department / branch)</option>
+            <option value="EXCLUDED">Excluded — may sign in without a door punch</option>
+            <option value="REQUIRED">Required — must punch in, even if their branch or team is excluded</option>
+          </select>
+          <div class="row" style="margin-top:8px;align-items:flex-end;gap:10px">
+            <div><label style="font-size:11px">Valid from</label><input id="f-gate-from" type="date" style="width:160px"></div>
+            <div><label style="font-size:11px">Valid until</label><input id="f-gate-until" type="date" style="width:160px"></div>
+            <div style="flex:1;min-width:200px"><label style="font-size:11px">Reason</label><input id="f-gate-reason" maxlength="255" placeholder="e.g. fingerprint not reading — re-enrolment booked"></div>
+          </div>
+          <div class="mut" style="font-size:11px;margin-top:5px">Leave both dates blank for a permanent setting. Otherwise it applies only between those dates (both included) and stops by itself afterwards — the gate re-arms with nothing to remember.</div>
+        </div>
       </div>
       <div class="err" id="emp-m-err"></div>
     </div>
@@ -2174,8 +2240,12 @@ function applyCardAccess() {
 }
 function applyAttendanceMode() {
   const off = ME && ME.attendance_mode === 'AGENT_ONLY';
-  const nav = document.querySelector('.nav[data-view="biometric"]');
-  if (nav) nav.style.display = off ? 'none' : '';
+  // Gate Exclusions rides with Biometric: with no door reader there is no gate to be
+  // excluded from, so the screen would only ever say "nothing applies".
+  ['biometric', 'gateexcl'].forEach((v) => {
+    const nav = document.querySelector('.nav[data-view="' + v + '"]');
+    if (nav) nav.style.display = off ? 'none' : '';
+  });
 }
 // QA Phase 4 (B5): does the current user hold a permission? Super/Company Admin
 // always do (they bypass every check server-side); everyone else is checked against
@@ -2331,6 +2401,7 @@ const TITLES = {
   reports: ['Reports & Exports', 'CSV exports for Excel and payroll'],
   license: ['Licence', 'Key, plan, device seats & daily validation'],
   integrations: ['API & Integrations', 'Connect SmartEPT to SmartPRS & any external device or app'],
+  gateexcl: ['Gate Exclusions', 'Who may sign in without a door punch — and until when'],
   ops: ['Audit & Ops', 'Who did what, storage growth & database backups'],
   help: ['Help & Troubleshooting', 'System health, common fixes & the application log'],
 };
@@ -2358,6 +2429,7 @@ function show(v) {
   if (v === 'policies') initPolicies();
   if (v === 'rules') initRules();
   if (v === 'biometric') initBiometric();
+  if (v === 'gateexcl') initGateExcl();
   if (v === 'reports') initReports();
   if (v === 'license') loadLicense();
   if (v === 'integrations') initIntegrations();
@@ -2379,6 +2451,7 @@ function refreshView() {
   else if (v === 'webcam') loadWebcam();
   else if (v === 'usage') initUsage();
   else if (v === 'violations') initViolations();
+  else if (v === 'gateexcl') loadGateExcl();
   else if (v === 'employees') loadEmployees();
   else if (v === 'org') initOrg();
   else if (v === 'meetings') initMeetings();
@@ -3390,11 +3463,15 @@ async function openEmpModal(id) {
       set('#f-doj', e.date_of_joining ? String(e.date_of_joining).slice(0, 10) : '');
       set('#f-bio', e.biometric_id);
       set('#f-track', e.tracking_mode || '');
+      set('#f-gate', e.gate_mode || '');
+      set('#f-gate-from', e.gate_mode_from ? String(e.gate_mode_from).slice(0, 10) : '');
+      set('#f-gate-until', e.gate_mode_until ? String(e.gate_mode_until).slice(0, 10) : '');
+      set('#f-gate-reason', e.gate_mode_reason || '');
     } catch (err) { $('#emp-m-err').textContent = err.message; }
   } else {
-    ['#f-first', '#f-last', '#f-code', '#f-email', '#f-mobile', '#f-doj', '#f-bio'].forEach((s) => set(s, ''));
+    ['#f-first', '#f-last', '#f-code', '#f-email', '#f-mobile', '#f-doj', '#f-bio', '#f-gate-from', '#f-gate-until', '#f-gate-reason'].forEach((s) => set(s, ''));
     set('#f-status', 'ACTIVE');
-    ['#f-branch', '#f-dept', '#f-team', '#f-manager', '#f-desig', '#f-shift', '#f-track'].forEach((s) => set(s, ''));
+    ['#f-branch', '#f-dept', '#f-team', '#f-manager', '#f-desig', '#f-shift', '#f-track', '#f-gate'].forEach((s) => set(s, ''));
   }
   $('#emp-ovl').classList.add('open');
 }
@@ -3550,6 +3627,162 @@ function renderApiDocs() {
     + 'Same signature header. Point this at your SmartPRS punch-ingest endpoint and attendance flows straight through.';
 }
 
+// ---- Gate Exclusions (Ejaz, 18-Aug-2026) --------------------------------------------
+// One screen for every standing exception to Gate-to-PC. The rows live on branches /
+// departments / teams / employees / devices; this reads them back through the roll-up
+// endpoint and writes through each resource's own endpoint, so permissions and the audit
+// trail stay exactly where they already were.
+const GX_LEVEL_LABEL = { BRANCH: 'Branch', DEPARTMENT: 'Department', TEAM: 'Team', EMPLOYEE: 'Employee', DEVICE: 'Machine' };
+const GX_LEVEL_PATH  = { BRANCH: 'branches', DEPARTMENT: 'departments', TEAM: 'teams', EMPLOYEE: 'employees', DEVICE: 'devices' };
+let GX_INIT = false;
+
+function initGateExcl() {
+  if (!GX_INIT) {
+    GX_INIT = true;
+    $('#gx-add').onclick = () => gxOpen(null);
+    $('#gx-level').onchange = () => gxFillTargets();
+    $('#gx-save').onclick = gxSave;
+    $('#gx-rows').addEventListener('click', (ev) => {
+      const b = ev.target.closest('button[data-gx]');
+      if (!b) return;
+      if (b.dataset.gx === 'edit') gxEdit(b.dataset.level, Number(b.dataset.id));
+      else gxRemove(b.dataset.level, Number(b.dataset.id), b.dataset.name || '');
+    });
+  }
+  loadGateExcl();
+}
+
+async function loadGateExcl() {
+  const body = $('#gx-rows');
+  body.innerHTML = '<tr><td colspan="9" class="mut">Loading…</td></tr>';
+  try {
+    const r = await api('/gate-exclusions');
+    gxRenderState(r.meta || {});
+    const rows = r.data || [];
+    body.innerHTML = rows.length ? rows.map(gxRow).join('')
+      : '<tr><td colspan="9" class="mut">No exclusions — every employee must punch in at the door. Click + Add exclusion to let a branch, team, person or machine sign in without one.</td></tr>';
+  } catch (e) {
+    body.innerHTML = '<tr><td colspan="9" class="mut">' + esc(e.message) + '</td></tr>';
+  }
+}
+
+function gxRenderState(m) {
+  const el = $('#gx-state');
+  if (!el) return;
+  if (m.attendance_mode === 'AGENT_ONLY') {
+    el.innerHTML = '<b style="color:var(--ink-2)">This organisation records attendance from the agent only</b> — there is no door punch to require, so nothing here applies. Change it under Organisation → Attendance source.';
+    return;
+  }
+  el.innerHTML = m.gate_enabled
+    ? '<b style="color:var(--ok)">Gate-to-PC is ON.</b> Employees must punch in at the door before their PC starts a work session — except where an exclusion below applies.'
+    : '<b style="color:var(--warn)">Gate-to-PC is OFF.</b> Nobody is being gated right now, so the exclusions below have no effect until you switch it on (Biometric screen).';
+}
+
+function gxRow(r) {
+  const badge = r.gate_mode === 'EXCLUDED'
+    ? '<span class="tag t-ok">Excluded</span>'
+    : '<span class="tag t-danger">Required</span>';
+  const st = { ACTIVE: ['t-ok', 'Active'], SCHEDULED: ['t-info', 'Scheduled'], EXPIRED: ['t-off', 'Expired'] }[r.status] || ['t-off', r.status];
+  return '<tr>'
+    + '<td>' + esc(GX_LEVEL_LABEL[r.level] || r.level) + '</td>'
+    + '<td><span class="nm">' + esc(r.name || ('#' + r.id)) + '</span></td>'
+    + '<td>' + badge + '</td>'
+    + '<td>' + esc(r.from || '—') + '</td>'
+    + '<td>' + esc(r.until || '—') + '</td>'
+    + '<td><span class="tag ' + st[0] + '">' + st[1] + '</span></td>'
+    + '<td class="mut" style="max-width:260px">' + esc(r.reason || '—') + '</td>'
+    + '<td class="mut">' + esc(r.granted_by || '—') + '</td>'
+    // Buttons carry their arguments in data- attributes and are handled by one delegated
+    // listener. Building an inline onclick by concatenation is not safe here: esc() turns
+    // an apostrophe into &#39;, the HTML parser turns it back into ' BEFORE compiling the
+    // handler, so a branch called O'Brien Site breaks the button — and a crafted name (or
+    // a computer_name, which the agent supplies freely at registration) would execute in
+    // the admin's session.
+    + '<td style="white-space:nowrap">'
+    + '<button class="btn" data-gx="edit" data-level="' + esc(r.level) + '" data-id="' + esc(r.id) + '">Edit</button> '
+    + '<button class="btn danger" data-gx="remove" data-level="' + esc(r.level) + '" data-id="' + esc(r.id) + '" data-name="' + esc(r.name || '') + '">Remove</button>'
+    + '</td></tr>';
+}
+
+// The target dropdown is filled from the lists the console already caches.
+async function gxFillTargets(selectedId) {
+  const path = $('#gx-level').value;
+  const sel = $('#gx-target');
+  sel.innerHTML = '<option value="">Loading…</option>';
+  let list = [];
+  try {
+    if (path === 'employees') {
+      list = ((await api('/employees?per_page=500')).data || [])
+        .map((e) => ({ id: e.id, name: (e.first_name || '') + ' ' + (e.last_name || '') + ' (' + e.employee_code + ')' }));
+    } else if (path === 'devices') {
+      list = (await devicesList(true))
+        .map((d) => ({ id: d.id, name: (d.computer_name || d.device_uuid) + (d.employee_name ? ' — ' + d.employee_name : '') }));
+    } else {
+      list = ((await api('/org/' + path)).data || []).map((r) => ({ id: r.id, name: r.name }));
+    }
+  } catch (e) { /* fall through to the empty state below */ }
+  sel.innerHTML = list.length
+    ? list.map((r) => '<option value="' + r.id + '"' + (String(selectedId) === String(r.id) ? ' selected' : '') + '>' + esc(r.name) + '</option>').join('')
+    : '<option value="">— nothing to choose —</option>';
+}
+
+let GX_EDIT = null;
+async function gxOpen(row) {
+  GX_EDIT = row;
+  $('#gx-m-title').textContent = row ? 'Edit gate exclusion' : 'Add gate exclusion';
+  $('#gx-err').textContent = '';
+  $('#gx-level').value = row ? GX_LEVEL_PATH[row.level] : 'branches';
+  $('#gx-level').disabled = !!row; // moving an exclusion between levels = remove and re-add
+  $('#gx-mode').value = row ? row.gate_mode : 'EXCLUDED';
+  $('#gx-from').value = row && row.from ? row.from : '';
+  $('#gx-until').value = row && row.until ? row.until : '';
+  $('#gx-reason').value = row && row.reason ? row.reason : '';
+  $('#gx-ovl').classList.add('open');
+  await gxFillTargets(row ? row.id : null);
+  if (row) $('#gx-target').disabled = true; else $('#gx-target').disabled = false;
+}
+
+async function gxEdit(level, id) {
+  const r = ((await api('/gate-exclusions')).data || []).find((x) => x.level === level && x.id === id);
+  if (r) gxOpen(r);
+}
+
+async function gxRemove(level, id, name) {
+  if (!confirm('Remove the gate exclusion on ' + (GX_LEVEL_LABEL[level] || level) + ' "' + name + '"? They go back behind the door punch immediately.')) return;
+  try { await gxWrite(GX_LEVEL_PATH[level], id, { gate_mode: null, gate_mode_from: null, gate_mode_until: null, gate_mode_reason: null });
+    toast('Exclusion removed'); loadGateExcl(); }
+  catch (e) { toast(e.message); }
+}
+
+// Each level is written through its own resource endpoint.
+function gxWrite(path, id, body) {
+  if (path === 'devices') return api('/devices/' + id + '/gate-mode', { method: 'PUT', body: JSON.stringify(body) });
+  if (path === 'employees') return api('/employees/' + id, { method: 'PUT', body: JSON.stringify(body) });
+  return api('/org/' + path + '/' + id, { method: 'PUT', body: JSON.stringify(body) });
+}
+
+async function gxSave() {
+  const path = $('#gx-level').value;
+  const id = $('#gx-target').value;
+  const err = $('#gx-err');
+  err.textContent = '';
+  if (!id) { err.textContent = 'Choose who this applies to.'; return; }
+  const from = $('#gx-from').value || null;
+  const until = $('#gx-until').value || null;
+  if (from && until && until < from) { err.textContent = '"Valid until" cannot be before "valid from".'; return; }
+  try {
+    await gxWrite(path, id, {
+      gate_mode: $('#gx-mode').value,
+      gate_mode_from: from,
+      gate_mode_until: until,
+      gate_mode_reason: $('#gx-reason').value.trim() || null,
+    });
+    $('#gx-ovl').classList.remove('open');
+    toast('Exclusion saved');
+    loadGateExcl();
+  } catch (e) { err.textContent = e.message; }
+}
+
 // ---- organisation management (17-Jul) ----// ---- organisation management (17-Jul) ----
 const TZ_LIST = ['UTC',
   'America/Los_Angeles','America/Denver','America/Chicago','America/New_York','America/Toronto','America/Mexico_City','America/Bogota','America/Sao_Paulo','America/Argentina/Buenos_Aires',
@@ -3559,11 +3792,11 @@ const TZ_LIST = ['UTC',
   'Australia/Perth','Australia/Sydney','Pacific/Auckland'];
 const ORG_DEFS = {
   branches:     { label: 'Branch',      cols: ['name','code','city','state','timezone'],
-                  fields: [['name','Name','text',1],['code','Code','text'],['city','City','text'],['state','State','text'],['timezone','Time zone (overrides company default)','tz'],['tracking_mode','Tracking mode for this branch','trackmode']] },
+                  fields: [['name','Name','text',1],['code','Code','text'],['city','City','text'],['state','State','text'],['timezone','Time zone (overrides company default)','tz'],['tracking_mode','Tracking mode for this branch','trackmode'],['gate_mode','Gate-to-PC exclusion for this branch','gatemode'],['gate_mode_from','… valid from (blank = immediately)','date'],['gate_mode_until','… valid until, inclusive (blank = permanent)','date'],['gate_mode_reason','… reason (e.g. door reader under repair)','text']] },
   departments:  { label: 'Department',  cols: ['name','code','branch'],
-                  fields: [['name','Name','text',1],['code','Code','text'],['branch_id','Branch','select:branches'],['tracking_mode','Tracking mode for this department','trackmode']] },
+                  fields: [['name','Name','text',1],['code','Code','text'],['branch_id','Branch','select:branches'],['tracking_mode','Tracking mode for this department','trackmode'],['gate_mode','Gate-to-PC exclusion for this department','gatemode'],['gate_mode_from','… valid from (blank = immediately)','date'],['gate_mode_until','… valid until, inclusive (blank = permanent)','date'],['gate_mode_reason','… reason (e.g. door reader under repair)','text']] },
   teams:        { label: 'Team',        cols: ['name','code','department'],
-                  fields: [['name','Name','text',1],['code','Code','text'],['department_id','Department','select:departments'],['tracking_mode','Tracking mode for this team','trackmode']] },
+                  fields: [['name','Name','text',1],['code','Code','text'],['department_id','Department','select:departments'],['tracking_mode','Tracking mode for this team','trackmode'],['gate_mode','Gate-to-PC exclusion for this team','gatemode'],['gate_mode_from','… valid from (blank = immediately)','date'],['gate_mode_until','… valid until, inclusive (blank = permanent)','date'],['gate_mode_reason','… reason (e.g. door reader under repair)','text']] },
   designations: { label: 'Designation', cols: ['name','code','level'],
                   fields: [['name','Name','text',1],['code','Code','text'],['level','Level (0=junior)','num']] },
   shifts:       { label: 'Shift',       cols: ['name','code','timing'],
@@ -3689,6 +3922,16 @@ function orgField(f, val) {
   if (type === 'tz') {
     return '<label>' + label + star + '</label><select data-k="' + k + '"><option value="">— company default —</option>'
       + TZ_LIST.map((z) => '<option value="' + z + '"' + (val === z ? ' selected' : '') + '>' + z + '</option>').join('') + '</select>';
+  }
+  if (type === 'date') {
+    return '<label>' + label + star + '</label><input data-k="' + k + '" type="date" value="' + esc(val ? String(val).slice(0, 10) : '') + '">';
+  }
+  if (type === 'gatemode') {
+    const opts = [['', 'Inherit (from the level above)'],
+      ['EXCLUDED', 'Excluded — sign-in is enough, no door punch needed'],
+      ['REQUIRED', 'Required — must punch in, even if a level above is excluded']];
+    return '<label>' + label + star + '</label><select data-k="' + k + '">'
+      + opts.map((o) => '<option value="' + o[0] + '"' + ((val || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>';
   }
   if (type === 'trackmode') {
     const opts = [['', 'Inherit (from parent / company)'], ['FULL', 'Full — capture everything'],
@@ -3912,6 +4155,10 @@ $('#emp-m-save').onclick = async () => {
     date_of_joining: $('#f-doj').value || null,
     biometric_id: $('#f-bio').value.trim() || null,
     tracking_mode: $('#f-track').value || null,
+    gate_mode: $('#f-gate').value || null,
+    gate_mode_from: $('#f-gate-from').value || null,
+    gate_mode_until: $('#f-gate-until').value || null,
+    gate_mode_reason: $('#f-gate-reason').value.trim() || null,
   };
   try {
     if (EMP_EDIT_ID) {

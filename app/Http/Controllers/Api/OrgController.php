@@ -36,7 +36,7 @@ class OrgController extends Controller
     public function store(Request $request, string $type): JsonResponse
     {
         $class = $this->model($type);
-        $data = $request->validate($this->rules($type));
+        $data = $this->stampGateGrantor($request, $request->validate($this->rules($type)));
         /** @var Model $row */
         $row = $class::create($data); // company_id auto-filled by BelongsToCompany
         $this->audit($request, 'CREATE', $class, $row->id, $data);
@@ -48,7 +48,7 @@ class OrgController extends Controller
     {
         $class = $this->model($type);
         $row = $class::findOrFail($id);
-        $data = $request->validate($this->rules($type, false));
+        $data = $this->stampGateGrantor($request, $request->validate($this->rules($type, false)));
         $row->update($data);
         $this->audit($request, 'UPDATE', $class, $row->id, $data);
 
@@ -83,16 +83,40 @@ class OrgController extends Controller
                 'country' => ['nullable', 'string'], 'public_ip_whitelist' => ['nullable', 'array'],
                 'timezone' => ['nullable', 'timezone'],   // EPT-20: per-branch override of company timezone
                 'tracking_mode' => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
+                // Gate-to-PC exclusion (18-Aug-2026): EXCLUDED = no door punch needed here,
+                // REQUIRED = claw back an exclusion granted higher up. null = inherit.
+                // The from/until window is what makes "the reader is dead this week" safe:
+                // outside it the setting stops applying and the gate re-arms itself.
+                'gate_mode' => ['nullable', 'in:REQUIRED,EXCLUDED'],
+                'gate_mode_from' => ['nullable', 'date'],
+                'gate_mode_until' => ['nullable', 'date', 'after_or_equal:gate_mode_from'],
+                'gate_mode_reason' => ['nullable', 'string', 'max:255'],
             ],
             'departments' => $base + [
                 'branch_id' => ['nullable', 'integer', Rule::exists('branches', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
                 'tracking_mode' => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
+                // Gate-to-PC exclusion (18-Aug-2026): EXCLUDED = no door punch needed here,
+                // REQUIRED = claw back an exclusion granted higher up. null = inherit.
+                // The from/until window is what makes "the reader is dead this week" safe:
+                // outside it the setting stops applying and the gate re-arms itself.
+                'gate_mode' => ['nullable', 'in:REQUIRED,EXCLUDED'],
+                'gate_mode_from' => ['nullable', 'date'],
+                'gate_mode_until' => ['nullable', 'date', 'after_or_equal:gate_mode_from'],
+                'gate_mode_reason' => ['nullable', 'string', 'max:255'],
             ],
             'teams' => $base + [
                 'department_id' => ['nullable', 'integer', Rule::exists('departments', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
                 'manager_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
                 'team_leader_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
                 'tracking_mode' => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
+                // Gate-to-PC exclusion (18-Aug-2026): EXCLUDED = no door punch needed here,
+                // REQUIRED = claw back an exclusion granted higher up. null = inherit.
+                // The from/until window is what makes "the reader is dead this week" safe:
+                // outside it the setting stops applying and the gate re-arms itself.
+                'gate_mode' => ['nullable', 'in:REQUIRED,EXCLUDED'],
+                'gate_mode_from' => ['nullable', 'date'],
+                'gate_mode_until' => ['nullable', 'date', 'after_or_equal:gate_mode_from'],
+                'gate_mode_reason' => ['nullable', 'string', 'max:255'],
             ],
             'designations' => $base + ['level' => ['nullable', 'integer', 'min:0']],
             'shifts' => $base + [
@@ -104,5 +128,37 @@ class OrgController extends Controller
             ],
             default => $base,
         };
+    }
+
+    /**
+     * Stamp WHO granted a gate exclusion, server-side. A client cannot claim someone else
+     * authorised it, and clearing gate_mode clears the attribution with it. (18-Aug-2026:
+     * Ejaz — exclusions must be traceable to the admin who allowed them.)
+     */
+    private function stampGateGrantor(Request $request, array $data): array
+    {
+        $keys = ['gate_mode', 'gate_mode_from', 'gate_mode_until', 'gate_mode_reason'];
+
+        // Any touch of the exclusion — including a PUT that only moves the end date —
+        // re-attributes it. Otherwise extending someone else's expiring exclusion left
+        // the ORIGINAL admin's name on a decision they did not make.
+        if (! array_intersect($keys, array_keys($data))) {
+            return $data;
+        }
+
+        // Only an explicit gate_mode => null removes the exclusion (and with it the window
+        // and the attribution). A partial PUT that never mentions gate_mode must not.
+        if (array_key_exists('gate_mode', $data) && ! $data['gate_mode']) {
+            return array_merge($data, [
+                'gate_mode_from' => null,
+                'gate_mode_until' => null,
+                'gate_mode_reason' => null,
+                'gate_mode_by_user_id' => null,
+            ]);
+        }
+
+        $data['gate_mode_by_user_id'] = $request->user()?->id;
+
+        return $data;
     }
 }

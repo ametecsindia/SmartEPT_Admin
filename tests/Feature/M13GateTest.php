@@ -109,6 +109,56 @@ class M13GateTest extends TestCase
         $this->assertFalse($this->gate()['enabled']);
     }
 
+    /**
+     * Ejaz 18-Aug-2026: after a biometric trial, moving the ORGANISATION to
+     * "Without biometric device" must free the agent immediately — the leftover
+     * ACTIVE device row (and any gate_enabled flag) kept the wall up on
+     * "punch in at the door" and the employee could never start a session.
+     */
+    public function test_agent_only_attendance_mode_disables_the_gate(): void
+    {
+        $this->addPunchDevice();
+        $this->assertTrue($this->gate()['enabled']); // gated during the biometric trial
+
+        $this->withToken($this->deviceToken)->postJson('/api/agent/consent', [
+            'device_uuid' => 'GATE-DEV-1', 'acknowledged' => true,
+        ])->assertSuccessful();
+
+        // The agent is walled: no punch today → LOGIN is refused.
+        $this->withToken($this->deviceToken)->postJson('/api/agent/attendance-event', [
+            'device_uuid' => 'GATE-DEV-1', 'event_type' => 'LOGIN',
+        ])->assertStatus(423);
+
+        $this->withToken($this->adminToken)->putJson('/api/companies/' . $this->employee->company_id, [
+            'attendance_mode' => 'AGENT_ONLY',
+        ])->assertOk();
+
+        $g = $this->gate();
+        $this->assertFalse($g['enabled']);
+        $this->assertSame('IN', $g['state']);
+
+        $status = $this->withToken($this->deviceToken)->getJson('/api/agent/gate-status')->assertOk();
+        $this->assertFalse($status->json('gate_required'));
+        $this->assertTrue($status->json('open'));
+
+        // …and the work session now starts on credentials alone.
+        $this->withToken($this->deviceToken)->postJson('/api/agent/attendance-event', [
+            'device_uuid' => 'GATE-DEV-1', 'event_type' => 'LOGIN',
+        ])->assertSuccessful();
+    }
+
+    /** The explicit Gate-to-PC toggle must not out-rank "no biometric device". */
+    public function test_agent_only_beats_an_explicit_gate_on_override(): void
+    {
+        $this->addPunchDevice();
+
+        $this->withToken($this->adminToken)->putJson('/api/companies/' . $this->employee->company_id, [
+            'biometric_gate' => 'on', 'attendance_mode' => 'AGENT_ONLY',
+        ])->assertOk();
+
+        $this->assertFalse($this->gate()['enabled']);
+    }
+
     public function test_midday_out_punch_opens_door_break_and_return_closes_it(): void
     {
         $this->addPunchDevice();

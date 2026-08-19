@@ -39,10 +39,11 @@ class ActivityController extends Controller
             'events.*.mouse_activity'     => ['nullable', 'boolean'],
         ]);
 
-        $this->agentDevice($request, $employee);
+        $device = $this->agentDevice($request, $employee);
         // QA Phase 3 (A3): no activity capture while the gate is closed (pre-punch /
-        // punched-out) — the work clock only ever runs on verified arrival.
-        $this->assertGateOpen($employee);
+        // punched-out) — the work clock only ever runs on verified arrival. The device is
+        // passed so a per-machine gate exclusion is honoured here too (18-Aug-2026).
+        $this->assertGateOpen($employee, $device);
         $now = now();
         $rows = [];
         $lastActivity = null;
@@ -155,8 +156,8 @@ class ActivityController extends Controller
             'reason'           => ['nullable', 'in:NO_INPUT,LOCKED,AWAY'],
         ]);
 
-        $this->agentDevice($request, $employee);
-        $this->assertGateOpen($employee); // QA Phase 3 (A3): no capture while gate closed
+        $device = $this->agentDevice($request, $employee);
+        $this->assertGateOpen($employee, $device); // QA Phase 3 (A3): no capture while gate closed
         $start = Carbon::parse($data['idle_start']);
         $end = isset($data['idle_end']) ? Carbon::parse($data['idle_end']) : null;
 

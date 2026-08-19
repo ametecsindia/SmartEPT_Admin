@@ -33,7 +33,7 @@ class AttendanceController extends Controller
     public function gateStatus(Request $request, GateService $gate): JsonResponse
     {
         $employee = $this->agentEmployee($request);
-        return response()->json($gate->statusFor($employee));
+        return response()->json($gate->statusFor($employee, $this->agentDevice($request, $employee)));
     }
 
     public function store(Request $request): JsonResponse
@@ -46,12 +46,13 @@ class AttendanceController extends Controller
             'occurred_at' => ['nullable', 'date'],
         ]);
 
-        $this->agentDevice($request, $employee);
+        $device = $this->agentDevice($request, $employee);
 
         // GATE-TO-PC (USP): a LOGIN/UNLOCK is refused until the door punch arrives.
-        // The work clock therefore only ever starts on real, verified arrival.
+        // The work clock therefore only ever starts on real, verified arrival — unless a
+        // standing exemption covers this device / person / team / department / branch.
         if (in_array($data['event_type'], ['LOGIN', 'UNLOCK'], true)
-            && ! app(GateService::class)->isOpen($employee)) {
+            && ! app(GateService::class)->isOpen($employee, $device)) {
             return response()->json([
                 'error' => ['code' => 'GATE_CLOSED',
                     'message' => 'No door punch received yet. Punch IN at the entrance to start your session.'],

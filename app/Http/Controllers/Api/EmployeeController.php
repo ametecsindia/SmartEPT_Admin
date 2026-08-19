@@ -71,7 +71,7 @@ class EmployeeController extends Controller
             ], 409);
         }
 
-        $data = $this->validated($request, true);
+        $data = $this->stampGateGrantor($request, $this->validated($request, true));
         $employee = Employee::create($data); // company_id auto-filled
         $this->audit($request, 'CREATE', Employee::class, $employee->id, $data);
 
@@ -118,7 +118,7 @@ class EmployeeController extends Controller
     {
         $this->assertEmployeeVisible($request, $employee->id);
 
-        $data = $this->validated($request, false, $employee);
+        $data = $this->stampGateGrantor($request, $this->validated($request, false, $employee));
 
         // 14-Aug-2026: bringing a relieved employee back takes a seat, exactly
         // like creating one — otherwise relieve-then-reactivate walks the cap.
@@ -449,6 +449,12 @@ class EmployeeController extends Controller
             'compliance_policy_id' => ['nullable', 'integer', Rule::exists('compliance_policies', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
             // Tracking mode override (null = inherit from team/dept/branch/company).
             'tracking_mode'        => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
+            // Gate-to-PC exclusion override (null = inherit from team/dept/branch), with an
+            // optional validity window — "her fingerprint won't read, 18–25 Aug".
+            'gate_mode'            => ['nullable', 'in:REQUIRED,EXCLUDED'],
+            'gate_mode_from'       => ['nullable', 'date'],
+            'gate_mode_until'      => ['nullable', 'date', 'after_or_equal:gate_mode_from'],
+            'gate_mode_reason'     => ['nullable', 'string', 'max:255'],
         ]);
     }
 
@@ -685,4 +691,52 @@ class EmployeeController extends Controller
         return response()->json(['data' => $resolver->traceForEmployee($employee)]);
     }
 
+    /**
+     * GET /api/employees/{employee}/gate-trace — read-only "why is this person gated
+     * (or not)?". Shows the company switch, the resolved exclusion level and the live
+     * gate state in one payload, so a stuck agent is answerable from the console
+     * instead of by reading the database. (Ejaz, 18-Aug-2026.)
+     */
+    public function gateTrace(Request $request, Employee $employee, \App\Services\GateService $gate): JsonResponse
+    {
+        // Same visibility rule as show()/update(): route-model binding already tenant-bounds
+        // non-super-admins, and this narrows a BRANCH_ADMIN to their own people. (A bare
+        // company_id comparison would 403 every SUPER_ADMIN, whose company_id is null.)
+        $this->assertEmployeeVisible($request, $employee->id);
+
+        return response()->json(['data' => $gate->traceFor($employee)]);
+    }
+
+
+    /**
+     * Stamp WHO granted a gate exclusion, server-side. A client cannot claim someone else
+     * authorised it, and clearing gate_mode clears the attribution with it. (18-Aug-2026:
+     * Ejaz — exclusions must be traceable to the admin who allowed them.)
+     */
+    private function stampGateGrantor(Request $request, array $data): array
+    {
+        $keys = ['gate_mode', 'gate_mode_from', 'gate_mode_until', 'gate_mode_reason'];
+
+        // Any touch of the exclusion — including a PUT that only moves the end date —
+        // re-attributes it. Otherwise extending someone else's expiring exclusion left
+        // the ORIGINAL admin's name on a decision they did not make.
+        if (! array_intersect($keys, array_keys($data))) {
+            return $data;
+        }
+
+        // Only an explicit gate_mode => null removes the exclusion (and with it the window
+        // and the attribution). A partial PUT that never mentions gate_mode must not.
+        if (array_key_exists('gate_mode', $data) && ! $data['gate_mode']) {
+            return array_merge($data, [
+                'gate_mode_from' => null,
+                'gate_mode_until' => null,
+                'gate_mode_reason' => null,
+                'gate_mode_by_user_id' => null,
+            ]);
+        }
+
+        $data['gate_mode_by_user_id'] = $request->user()?->id;
+
+        return $data;
+    }
 }

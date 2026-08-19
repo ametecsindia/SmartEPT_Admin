@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\StorageConfigController;
 use App\Http\Controllers\Api\TenantBrandingController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\GateExclusionController;
 use App\Http\Controllers\Api\OrgController;
 use App\Http\Controllers\Api\PolicyController;
 use App\Http\Controllers\Api\PresenceController;
@@ -337,6 +338,12 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
         ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN');
 
     // ---- Organisation sub-entities: branches / departments / teams / designations / shifts ----
+    // Gate Exclusions (18-Aug-2026): read-only roll-up of every standing exception to
+    // Gate-to-PC across branches / departments / teams / employees / machines. Writes go
+    // through each resource's own endpoint, which keeps their permissions and audit trail.
+    Route::get('gate-exclusions', [GateExclusionController::class, 'index'])
+        ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,HR_ADMIN');
+
     Route::get('org/{type}', [OrgController::class, 'index'])
         ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,HR_ADMIN,MANAGER,AUDITOR');
     Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,HR_ADMIN')->group(function () {
@@ -381,6 +388,8 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
         ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,HR_ADMIN,MANAGER,TEAM_LEADER,AUDITOR');
     Route::get('employees/{employee}/policy-trace', [EmployeeController::class, 'policyTrace']) // read-only: why each capability is on/off
         ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,HR_ADMIN');
+    Route::get('employees/{employee}/gate-trace', [EmployeeController::class, 'gateTrace']) // read-only: why the Gate-to-PC wall is up (or not)
+        ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,HR_ADMIN');
     Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,HR_ADMIN')->group(function () {
         Route::post('employees', [EmployeeController::class, 'store']);
         Route::post('employees/bulk-import', [EmployeeController::class, 'bulkImport']); // 17-Jul SmartPRS-style bulk onboarding
@@ -402,6 +411,7 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
         Route::post('devices/{device}/unbind', [DeviceController::class, 'unbind']);
         Route::post('devices/{device}/rebind', [DeviceController::class, 'rebind']);
         Route::put('devices/{device}/tracking-mode', [DeviceController::class, 'trackingMode']);
+        Route::put('devices/{device}/gate-mode', [DeviceController::class, 'gateMode']); // Gate-to-PC exclusion for one machine
     });
 
     // ---- Policy Engine ----

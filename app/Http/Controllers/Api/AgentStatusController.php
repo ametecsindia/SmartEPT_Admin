@@ -28,14 +28,20 @@ class AgentStatusController extends Controller
         $employee = $this->agentEmployee($request);
         $gate = app(\App\Services\GateService::class);
 
+        // Resolved OUTSIDE the try: a device/token mismatch must surface as its own 403,
+        // not be swallowed by the fail-closed catch below and reported as SERVER_ERROR.
+        // Null when the caller sends no device_uuid (the agent's bare poll) — the
+        // exclusion walk then simply starts at EMPLOYEE.
+        $device = $this->agentDevice($request, $employee);
+
         try {
             // QA Phase 2 (A3): return BOTH shapes. The nested `gate` block keeps the
             // existing console/heartbeat consumers working; the TOP-LEVEL
             // {gate_required, open, message, reason} is what the agent actually reads
             // in ensureGateThenBegin (it was reading top-level keys that never existed —
             // the gate silently never blocked). Now they exist and are correct.
-            $status = $gate->statusFor($employee);      // gate_required, open, message, reason
-            $status['gate'] = $gate->stateFor($employee); // backward-compatible nested block
+            $status = $gate->statusFor($employee, $device);      // gate_required, open, message, reason
+            $status['gate'] = $gate->stateFor($employee, $device); // backward-compatible nested block
 
             return response()->json($status);
         } catch (\Throwable $e) {

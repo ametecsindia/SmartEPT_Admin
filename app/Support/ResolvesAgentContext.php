@@ -21,9 +21,9 @@ trait ResolvesAgentContext
      * can't be force-posted. Returns 423 with the same GATE_CLOSED shape the agent
      * already handles on attendance-event. No-op for non-gated companies.
      */
-    protected function assertGateOpen(Employee $employee): void
+    protected function assertGateOpen(Employee $employee, ?EmployeeDevice $device = null): void
     {
-        if (! app(GateService::class)->isOpen($employee)) {
+        if (! app(GateService::class)->isOpen($employee, $device)) {
             throw new HttpResponseException(response()->json([
                 'error' => [
                     'code'    => 'GATE_CLOSED',
