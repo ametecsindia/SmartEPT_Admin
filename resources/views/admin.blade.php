@@ -556,6 +556,12 @@
         <button class="btn acc" id="wc-load">Load</button>
         <span class="tag t-info" style="margin-left:auto">EVERY VIEW IS AUDIT-LOGGED</span>
       </div>
+      <!-- 19-Aug-2026: presence and photos are two different streams. Presence lands here even
+           when photo capture is off, so an empty photo wall no longer reads as "presence broken". -->
+      <div class="card">
+        <h3>Webcam presence detected</h3>
+        <div id="wc-presence"></div>
+      </div>
       <div class="card">
         <h3>Webcam presence photos</h3>
         <div id="wc-grid" class="shots"></div>
@@ -612,6 +618,7 @@
       <div class="filters">
         <input id="emp-q" class="search" placeholder="Search name / code…" style="min-width:220px">
         <button class="btn" id="emp-template" style="margin-left:auto">Download CSV template</button>
+        <button class="btn" id="emp-export">Export employees (CSV)</button>
         <button class="btn acc" id="emp-import">Bulk import (CSV)</button>
         <button class="btn solid" id="emp-add">+ Add employee</button>
       </div>
@@ -1559,8 +1566,11 @@
         <b style="color:var(--accent-ink)">CSV columns</b>
         <div style="font-size:11.5px;line-height:1.7">
           <b>Required:</b> employee_code, first_name<br>
-          <b>Optional:</b> last_name, email, mobile, department, team, branch, designation, shift, date_of_joining, biometric_id<br>
-          A login is created for every row that has an email (opt out below). Download the template for the exact header row.
+          <b>Optional:</b> last_name, email, mobile, department, team, branch, designation, shift, date_of_joining, biometric_id, employment_status, password<br>
+          <b>password</b> sets that employee's own login password (min 8 characters). Leave it blank to
+          generate a temporary one they must change at first sign-in.<br>
+          A login is created for every row that has an email (opt out below). Download the template for the exact header row —
+          it matches <b>Export employees (CSV)</b>, so an export can be edited and re-imported.
         </div>
       </div>
       <label>Choose CSV file</label>
@@ -3040,10 +3050,11 @@ async function loadWebcam() {
   try {
     const d = await api('/reports/webcam?date=' + encodeURIComponent(date));
     if (seq !== WC_SEQ) return;
+    renderPresence(d.presence || []);
     const shots = d.data || [];
     if (!shots.length) {
       grid.innerHTML = ''; empty.className = 'empty';
-      empty.innerHTML = '<b>No webcam photos for this day.</b><br>Photos appear here once the desktop agent uploads them for any employee whose webcam policy has photo capture enabled.';
+      empty.innerHTML = '<b>No webcam photos for this day.</b><br>Photos are a separate setting from presence — turn on <b>photo_enabled</b> in Policies → Webcam. Presence detection is shown in the panel above.';
       return;
     }
     grid.innerHTML = shots.map((s) => '<div class="shotcard"><div class="img" id="wc-img-' + s.id + '">loading…</div>'
@@ -3065,6 +3076,29 @@ async function loadWebcam() {
     grid.innerHTML = ''; empty.className = 'empty';
     empty.innerHTML = isDenied(e) ? '<b>Your role cannot view webcam photos.</b><br>The webcam.view permission is required.' : esc(e.message);
   }
+}
+// Presence roll-up: one row per employee, seconds per detected status. CAMERA_UNAVAILABLE /
+// CAMERA_BLOCKED are called out in red — those are the rows that say the webcam itself is the
+// problem, as opposed to presence simply never having been switched on.
+function renderPresence(rows) {
+  const box = $('#wc-presence');
+  if (!box) return;
+  if (!rows.length) {
+    box.innerHTML = '<div class="empty"><b>No presence detected for this day.</b><br>'
+      + 'Check Policies → Webcam has <b>presence_enabled</b> ticked and the policy is assigned, that the employee\u2019s '
+      + 'tracking mode is FULL (PRESENCE_ONLY and EXCLUDED both switch presence off server-side), and that the agent has been '
+      + 'restarted since the policy changed.</div>';
+    return;
+  }
+  const hhmm = (s) => Math.floor(s / 3600) + ':' + String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+  const bad = (k) => k === 'CAMERA_UNAVAILABLE' || k === 'CAMERA_BLOCKED';
+  box.innerHTML = '<table><thead><tr><th>Employee</th><th>Detected</th><th>Last seen</th></tr></thead><tbody>'
+    + rows.map((r) => '<tr><td><b>' + esc(r.employee_name) + '</b><div class="mut">' + esc(r.employee_code || '') + '</div></td>'
+      + '<td>' + Object.entries(r.by_status).map(([k, v]) =>
+          '<span class="tag ' + (bad(k) ? 't-warn' : 't-ok') + '" style="margin-right:6px">'
+          + esc(k) + ' · ' + hhmm(v.seconds) + ' (' + v.events + ')</span>').join('')
+      + '</td><td class="mut">' + dt(r.last_at) + '</td></tr>').join('')
+    + '</tbody></table>';
 }
 $('#wc-load') && ($('#wc-load').onclick = loadWebcam);
 $('#wc-date') && $('#wc-date').addEventListener('change', loadWebcam);
@@ -3800,7 +3834,7 @@ const ORG_DEFS = {
   designations: { label: 'Designation', cols: ['name','code','level'],
                   fields: [['name','Name','text',1],['code','Code','text'],['level','Level (0=junior)','num']] },
   shifts:       { label: 'Shift',       cols: ['name','code','timing'],
-                  fields: [['name','Name','text',1],['code','Code','text'],['start_time','Start (HH:MM)','time'],['end_time','End (HH:MM)','time'],['grace_minutes','Grace (min)','num'],['break_minutes_allowed','Break allowed (min)','num']] },
+                  fields: [['name','Name','text',1],['code','Code','text'],['start_time','Start (HH:MM)','time'],['end_time','End (HH:MM)','time'],['grace_minutes','Grace (min)','num'],['break_minutes_allowed','Break allowed (min)','num'],['post_shift_auto_logout_minutes','Auto sign-out after shift end (min)','num',1]] },
 };
 let ORG_TAB = 'branches';
 async function initOrg() {
@@ -4084,15 +4118,26 @@ $('#role-rows').addEventListener('click', async (ev) => {
 });
 
 // ---- bulk import (17-Jul) ----
-const EMP_CSV_HEADER = 'employee_code,first_name,last_name,email,mobile,department,team,branch,designation,shift,date_of_joining,biometric_id';
+// 19-Aug-2026 (Ejaz): the header now ends with employment_status + password, and it is the
+// SAME column list the Export button produces (EmployeeController::IMPORT_COLUMNS) — so an
+// export can be edited and fed straight back in. A blank password = generate a temp one and
+// force a change at first sign-in; a value = that employee's real login password.
+const EMP_CSV_HEADER = 'employee_code,first_name,last_name,email,mobile,department,team,branch,designation,shift,date_of_joining,biometric_id,employment_status,password';
 $('#emp-template').onclick = () => {
   const sample = EMP_CSV_HEADER + '\n'
-    + 'E-2001,Rahul,Sharma,rahul.sharma@company.com,9848012345,Operations,Team A,Head Office,Executive,General Shift,2026-07-01,\n'
-    + 'E-2002,Sneha,Iyer,sneha.iyer@company.com,9848067890,Sales,Team B,Head Office,Manager,General Shift,2026-07-01,BIO-114';
+    + 'E-2001,Rahul,Sharma,rahul.sharma@company.com,9848012345,Operations,Team A,Head Office,Executive,General Shift,2026-07-01,,ACTIVE,Welcome@2026\n'
+    + 'E-2002,Sneha,Iyer,sneha.iyer@company.com,9848067890,Sales,Team B,Head Office,Manager,General Shift,2026-07-01,BIO-114,ACTIVE,';
   const blob = new Blob([sample], { type: 'text/csv' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = 'smartept-employees-template.csv';
   a.click(); URL.revokeObjectURL(a.href);
+};
+// Export the employee master with exactly the import columns, honouring the search box and
+// the caller's role scope (a Branch Admin gets only their own people).
+$('#emp-export').onclick = () => {
+  const q = ($('#emp-q').value || '').trim();
+  downloadCsv('/employees/export' + (q ? '?q=' + encodeURIComponent(q) : ''),
+    'smartept-employees-' + new Date().toISOString().slice(0, 10) + '.csv');
 };
 $('#emp-import').onclick = () => {
   $('#import-file').value = ''; $('#import-result').innerHTML = ''; $('#import-run').disabled = true;
@@ -4373,6 +4418,8 @@ const POLICY_FIELDS = {
     { k: 'late_grace_minutes', l: 'Late grace (min)', t: 'num' },
     { k: 'early_logout_grace_minutes', l: 'Early-logout grace (min)', t: 'num' },
     { k: 'min_working_hours', l: 'Minimum working hours', t: 'num' },
+    // 19-Aug-2026: the fallback used when a Shift leaves its own auto sign-out blank.
+    { k: 'post_shift_auto_logout_minutes', l: 'Auto sign-out after working end time (min) — blank = never', t: 'num' },
     { k: 'attendance_sources', l: 'Sources (comma-separated, e.g. AGENT, BIOMETRIC)', t: 'list', full: 1 },
     { k: 'settings', l: 'Extra settings (JSON object)', t: 'json', full: 1 },
   ],

@@ -379,6 +379,10 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
     // Employee Archive (deleted-employee backups) — MUST precede employees/{employee}
     // so the literal "archives" segment is not captured as a route-model-bound employee.
     Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,BRANCH_ADMIN,HR_ADMIN')->group(function () {
+        // 19-Aug-2026 (Ejaz): employee master export. Header is EXACTLY the bulk-import
+        // sample's columns so the file re-imports as-is. MUST precede employees/{employee}
+        // or "export" is captured as a route-model-bound employee.
+        Route::get('employees/export', [EmployeeController::class, 'export']);
         Route::get('employees/archives', [EmployeeController::class, 'archives']);
         Route::get('employees/archives/{archive}/download', [EmployeeController::class, 'downloadArchive']);
         Route::post('employees/archives/{archive}/rebuild', [EmployeeController::class, 'rebuildArchive']); // Part C #22 — build a stuck/failed archive now

@@ -69,6 +69,17 @@ class InstallationLicense extends Model
         return ! empty($this->license_key);
     }
 
+    /**
+     * Was this licence established from a signed .lic FILE rather than from Central?
+     * LicenseFile::apply() stamps bundle.source = 'file'. A file licence carries its
+     * own RSA signature and machine binding, so Central adds nothing to it — and must
+     * never be allowed to overrule it (see LicenseClient).
+     */
+    public function fromFile(): bool
+    {
+        return ($this->bundle['source'] ?? null) === 'file';
+    }
+
     public function deviceLimit(): ?int
     {
         return isset($this->bundle['device_limit']) ? (int) $this->bundle['device_limit'] : null;
@@ -110,6 +121,14 @@ class InstallationLicense extends Model
         return ($this->created_at ?? now())->copy()->addDays(self::EVALUATION_DAYS)->endOfDay();
     }
 
+    /** How long an as-yet-unconfirmed key stays usable, measured from when it was saved. */
+    private function unverifiedGraceOpen(): bool
+    {
+        $since = $this->last_checked_at ?? $this->updated_at ?? $this->created_at ?? now();
+
+        return now()->lte($since->copy()->addDays(self::EVALUATION_DAYS)->endOfDay());
+    }
+
     public function evaluationDaysLeft(): int
     {
         return max(0, (int) now()->startOfDay()->diffInDays($this->evaluationEndsAt(), false));
@@ -131,7 +150,17 @@ class InstallationLicense extends Model
         return match ($this->status) {
             'active' => true,
             'expired' => $this->withinGrace(),
-            'unconfigured' => true, // key saved but never validated yet (Central unreachable)
+            // A key was saved but Central has never confirmed it — Central was
+            // unreachable at the moment it was entered. That is a genuine, transient
+            // cloud state, so it is allowed… but only for the same 7 days the no-key
+            // evaluation gets. Left open-ended this WAS a free licence: on an air-gapped
+            // server, typing any string into the Licence screen granted permanent,
+            // uncapped access, because nothing would ever move the status off
+            // 'unconfigured'. (Ejaz, 19-Aug-2026.)
+            //
+            // A properly licensed on-premise install is NOT affected: a signed .lic
+            // makes the status 'active' via LicenseFile::apply(), never 'unconfigured'.
+            'unconfigured' => $this->unverifiedGraceOpen(),
             default => false,
         };
     }

@@ -133,7 +133,7 @@ class AuthController extends Controller
     private function licenceBlock(User $user): ?string
     {
         try {
-            if (! filter_var(config('smartept.licence_enforce', true), FILTER_VALIDATE_BOOLEAN)) {
+            if (! \App\Services\DevLicenceKey::enforcementOn()) {
                 return null;
             }
             // Admins are the rescue route and are never blocked at sign-in. (On the

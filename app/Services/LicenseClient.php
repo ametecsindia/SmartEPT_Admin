@@ -177,6 +177,22 @@ class LicenseClient
             }
         } else {
             $reason = (string) ($json['reason'] ?? ('http_' . $resp->status()));
+
+            // A .lic licence is verified locally against our public key and this
+            // machine's fingerprint. Central not recognising the key means Central is
+            // out of date, NOT that the client is unlicensed — so record the reason but
+            // leave the verdict alone. Without this an explicit "Revalidate" click on an
+            // on-premise install could take a paid client's console down.
+            if ($license->fromFile()) {
+                $license->forceFill([
+                    'last_checked_at' => now(),
+                    'unreachable_since' => null,
+                    'last_error' => 'Central did not recognise this key (' . $reason
+                        . ') — the signed licence file remains authoritative.',
+                ])->save();
+
+                return $license;
+            }
             // Central reasons: unknown_key | licence_expired | licence_suspended | licence_revoked | server_mismatch
             $status = str_starts_with($reason, 'licence_') ? substr($reason, 8) : $reason;
             $license->forceFill([

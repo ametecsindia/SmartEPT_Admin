@@ -21,6 +21,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use App\Support\ScopesVisibleEmployees;
 
 class EmployeeController extends Controller
@@ -534,15 +535,28 @@ class EmployeeController extends Controller
                         'shift_id'       => $this->resolveUnit(Shift::class, $r['shift'] ?? '', $companyId),
                         'biometric_id'   => trim($r['biometric_id'] ?? '') ?: null,
                         'date_of_joining' => $this->parseDate($r['date_of_joining'] ?? ''),
-                        'employment_status' => 'ACTIVE',
+                        // 19-Aug-2026: honour the column when present so a sheet produced by the
+                        // Export button re-imports faithfully (an ON_LEAVE / RELIEVED employee does
+                        // not silently come back ACTIVE). Anything unrecognised falls back to ACTIVE.
+                        'employment_status' => in_array(strtoupper(trim((string) ($r['employment_status'] ?? ''))),
+                            ['ACTIVE', 'ON_LEAVE', 'RELIEVED'], true)
+                            ? strtoupper(trim((string) $r['employment_status'])) : 'ACTIVE',
                     ];
 
+                    // 19-Aug-2026 (Ejaz): the sheet may now carry a `password` column so IT can
+                    // set each employee's own login password at import time instead of everyone
+                    // receiving a random one they must then be told. It is NEVER stored on the
+                    // employee row — it goes straight to the users table (hashed by the cast) —
+                    // so it is kept out of $attrs and validated separately.
+                    $password = trim((string) ($r['password'] ?? ''));
+
                     // Per-row validation with the same rules as single-create.
-                    $v = validator($attrs + ['company_id' => $companyId], [
+                    $v = validator($attrs + ['company_id' => $companyId, 'password' => $password ?: null], [
                         'employee_code' => ['required', 'string', 'max:64',
                             Rule::unique('employees', 'employee_code')->where(fn ($q) => $q->where('company_id', $companyId))],
                         'first_name' => ['required', 'string', 'max:255'],
                         'email' => ['nullable', 'email'],
+                        'password' => ['nullable', 'string', 'min:8', 'max:72'],
                     ]);
                     if ($v->fails()) {
                         throw new \RuntimeException(implode(' ', $v->errors()->all()));
@@ -561,17 +575,26 @@ class EmployeeController extends Controller
                     $out = ['employee_id' => $employee->id];
 
                     if ($createLogin && $employee->email && ! User::where('email', $employee->email)->exists()) {
-                        $temp = Str::password(10);
+                        // A password in the sheet is the employee's REAL password — they are not
+                        // forced to change it on first sign-in. A blank column keeps the old
+                        // behaviour: a random temp password that must be changed.
+                        $supplied = $password !== '';
+                        $temp = $supplied ? $password : Str::password(10);
                         $login = User::create([
                             'name' => $employee->fullName(), 'email' => $employee->email, 'password' => $temp,
                             'company_id' => $companyId, 'branch_id' => $employee->branch_id,
                             'role_id' => Role::where('slug', 'EMPLOYEE')->whereNull('company_id')->value('id'),
-                            'status' => 'ACTIVE', 'must_change_password' => true,
+                            'status' => 'ACTIVE', 'must_change_password' => ! $supplied,
                         ]);
                         $employee->update(['user_id' => $login->id]);
                         MailService::sendCredentials($login, $temp);
-                        $credentials[] = ['email' => $login->email, 'temp_password' => $temp];
+                        // Only echo back passwords WE generated. Repeating one the admin already
+                        // typed into the sheet just puts it in a second place.
+                        if (! $supplied) {
+                            $credentials[] = ['email' => $login->email, 'temp_password' => $temp];
+                        }
                         $out['login'] = $login->email;
+                        $out['password_source'] = $supplied ? 'from file' : 'generated';
                     }
                     return $out;
                 });
@@ -595,6 +618,92 @@ class EmployeeController extends Controller
             'results' => $results,
             'credentials' => $credentials, // shown once so IT can hand them out
         ]);
+    }
+
+    /**
+     * The bulk-import column order — ONE definition, used by the sample template, the
+     * importer's documentation and the export, so the three can never drift apart
+     * (Ejaz, 19-Aug-2026: "all the columns should match same as in import sample; so that
+     * this exported data can be re-imported in future if required").
+     */
+    public const IMPORT_COLUMNS = [
+        'employee_code', 'first_name', 'last_name', 'email', 'mobile',
+        'department', 'team', 'branch', 'designation', 'shift',
+        'date_of_joining', 'biometric_id', 'employment_status', 'password',
+    ];
+
+    /**
+     * GET /api/employees/export — the employee master as a CSV whose header is EXACTLY
+     * IMPORT_COLUMNS, so the file can be edited and fed straight back into
+     * POST /api/employees/bulk-import.
+     *
+     * The `password` column is emitted EMPTY on purpose: passwords are stored as bcrypt
+     * hashes and cannot be read back. Blank means "leave it alone / generate one" on
+     * re-import; typing a value into the column sets that employee's login password.
+     *
+     * Role-scoped exactly like the list: a Branch Admin exports only their own people.
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        $visible = $this->visibleEmployeeIds($request->user());
+
+        $employees = Employee::query()
+            ->with(['team:id,name', 'department:id,name', 'branch:id,name', 'designation:id,name', 'shift:id,name'])
+            ->when($request->team_id, fn ($q, $v) => $q->where('team_id', $v))
+            ->when($request->department_id, fn ($q, $v) => $q->where('department_id', $v))
+            ->when($request->branch_id, fn ($q, $v) => $q->where('branch_id', $v))
+            ->when($request->status, fn ($q, $v) => $q->where('employment_status', $v))
+            ->when($request->q, fn ($q, $v) => $q->where(fn ($w) =>
+                $w->where('first_name', 'like', "%{$v}%")
+                  ->orWhere('last_name', 'like', "%{$v}%")
+                  ->orWhere('employee_code', 'like', "%{$v}%")))
+            ->when($visible !== null, fn ($q) => $q->whereIn('id', $visible))
+            ->orderBy('employee_code')
+            ->get();
+
+        $this->audit($request, 'EXPORT', Employee::class, null, [
+            'report' => 'employees', 'format' => 'csv', 'rows' => $employees->count(),
+        ]);
+
+        $filename = 'smartept-employees-' . now()->format('Y-m-d') . '.csv';
+
+        return response()->streamDownload(function () use ($employees) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, self::IMPORT_COLUMNS);
+            foreach ($employees as $e) {
+                fputcsv($out, [
+                    $this->csvSafe($e->employee_code),
+                    $this->csvSafe($e->first_name),
+                    $this->csvSafe($e->last_name),
+                    $this->csvSafe($e->email),
+                    $this->csvSafe($e->mobile),
+                    $this->csvSafe($e->department?->name),
+                    $this->csvSafe($e->team?->name),
+                    $this->csvSafe($e->branch?->name),
+                    $this->csvSafe($e->designation?->name),
+                    $this->csvSafe($e->shift?->name),
+                    // The importer parses this leniently, but Y-m-d is what it round-trips cleanest.
+                    $e->date_of_joining ? $e->date_of_joining->format('Y-m-d') : '',
+                    $this->csvSafe($e->biometric_id),
+                    $this->csvSafe($e->employment_status),
+                    '', // password — write-only; never exported
+                ]);
+            }
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    /** Neutralise a leading = + - @ TAB CR so an exported cell cannot run as a spreadsheet formula. */
+    private function csvSafe($v): string
+    {
+        if ($v === null) {
+            return '';
+        }
+        $s = (string) $v;
+        if ($s !== '' && preg_match('/^[=+\-@\t\r]/', $s)) {
+            $s = "'" . $s;
+        }
+        return $s;
     }
 
     /** Case-insensitive resolve of an org unit by name within the company; auto-creates when missing. */
@@ -626,6 +735,8 @@ class EmployeeController extends Controller
             'phone' => 'mobile', 'contact' => 'mobile', 'dept' => 'department',
             'doj' => 'date_of_joining', 'joining_date' => 'date_of_joining',
             'biometric' => 'biometric_id', 'bio_id' => 'biometric_id',
+            'pwd' => 'password', 'login_password' => 'password', 'passwd' => 'password',
+            'status' => 'employment_status',
         ];
         foreach ($alias as $from => $to) {
             if (isset($out[$from]) && ! isset($out[$to])) {

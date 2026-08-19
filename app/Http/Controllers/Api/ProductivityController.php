@@ -205,6 +205,10 @@ class ProductivityController extends Controller
             'Allotted break (hh:mm)', 'Meeting Time', 'Break Exceed Mins (Break Time - Allotted Time)',
             'Productive Hrs (Working + Meeting)', 'Non Productive Hrs (Idle + Break Exceed)',
             'Net Hrs (Actual Logged Hours-Allotted Break)', 'Productive% [ Productive Hrs/ Net Hrs]',
+            // 19-Aug: column T is OURS, not the client template's — it names the rows where the
+            // recorded sign-out was earlier than the last tracked activity, so Actual Present had
+            // to be floored at the tracked span. Blank on a healthy row.
+            'Data Issue',
         ];
 
         $ss = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
@@ -214,10 +218,10 @@ class ProductivityController extends Controller
         foreach ($headers as $i => $h) {
             $sheet->setCellValue($this->col($i + 1) . '1', $h);
         }
-        $sheet->getStyle('A1:S1')->getFont()->setBold(true);
-        $sheet->getStyle('A1:S1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+        $sheet->getStyle('A1:T1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:T1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
             ->getStartColor()->setRGB('E3F4F7');
-        $sheet->getStyle('A1:S1')->getAlignment()->setWrapText(true);
+        $sheet->getStyle('A1:T1')->getAlignment()->setWrapText(true);
 
         $DUR = '[h]:mm';   // duration — Excel-compatible, valid past 24h, never a date
         $CLK = 'h:mm';     // clock time for login/logout
@@ -250,10 +254,15 @@ class ProductivityController extends Controller
                 $sheet->setCellValue('S' . $r, round(((float) $x['productivity']) / 100, 4));
                 $this->fmt($sheet, 19, $r, '0%');
             }
+            if (! empty($x['data_issue'])) {                                          // Data Issue (ours, col T)
+                $sheet->setCellValueExplicit('T' . $r,
+                    'No sign-out recorded — present time floored to tracked activity',
+                    \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            }
             $r++;
         }
 
-        foreach (range(1, 19) as $c) {
+        foreach (range(1, 20) as $c) {
             $sheet->getColumnDimension($this->col($c))->setAutoSize(true);
         }
         $sheet->freezePane('A2');
@@ -652,23 +661,39 @@ class ProductivityController extends Controller
         $firstIn = $m['first_in'];
         $lastOut = $m['last_out'];
 
-        // Actual Present = logout − login; when logout is missing (today / open shift) fall back
-        // to the tracked present span so the row still shows a sensible figure.
-        $actualPresent = ($firstIn && $lastOut)
-            ? max(0, (int) Carbon::parse($lastOut)->diffInSeconds(Carbon::parse($firstIn), true))
-            : $trackedPresent;
-
         $work = (int) $m['work'];
         $idle = (int) $m['idle'];
         $meeting = (int) ($m['meeting'] ?? 0);
         $breakSecs = (int) $m['break_secs'];
+
+        // Actual Present = logout − login; when logout is missing (today / open shift) fall back
+        // to the tracked present span so the row still shows a sensible figure.
+        $clockPresent = ($firstIn && $lastOut)
+            ? max(0, (int) Carbon::parse($lastOut)->diffInSeconds(Carbon::parse($firstIn), true))
+            : $trackedPresent;
+
+        // 19-Aug (Ejaz, AI0043 on 14-Aug): a STALE logout — the agent died / the PC slept /
+        // the employee never signed out and something closed the session early — left
+        // check_out_at hours before the day's last tracked activity. Actual Present then came
+        // out SHORTER than the time the day actually recorded (01:05 vs Working 05:39 +
+        // Idle 02:07), Net Hrs collapsed to 00:57, and Productive% printed 596%.
+        // The employee cannot have been present for less time than the day tracked, so floor
+        // Actual Present at the tracked span (active + idle + break). Rows with a sound logout
+        // are untouched, because for them logout − login is always the larger number.
+        $trackedFloor = max($trackedPresent, $work + $idle + $breakSecs);
+        $actualPresent = max($clockPresent, $trackedFloor);
+        // Flagged so the console/export can show WHICH rows were repaired — a clamped row is
+        // evidence of a missing sign-out that the post-shift auto-logout should have caught.
+        $clockGapSeconds = max(0, $trackedFloor - $clockPresent);
 
         $allotted = ScoringService::allottedBreakSeconds($emp->shift, $actualPresent);
         $breakExceed = max(0, $breakSecs - $allotted);
         $productive = $work + $meeting;
         $nonProductive = $idle + $breakExceed;
         $netHrs = max(0, $actualPresent - $allotted);
-        $productivity = $netHrs > 0 ? round($productive / $netHrs * 100, 1) : null; // null => N/A (shown as —)
+        // Hard cap at 100%: Productive Hrs can still nudge past Net Hrs when the allotted break
+        // is pro-rated away, and a >100% cell reads as a broken report to the client.
+        $productivity = $netHrs > 0 ? min(100.0, round($productive / $netHrs * 100, 1)) : null; // null => N/A (shown as —)
 
         return [
             'work_date' => $date,
@@ -682,6 +707,10 @@ class ProductivityController extends Controller
             // present_seconds now carries Actual Present Hrs (logout − login); tracked span kept too.
             'present_seconds' => $actualPresent,
             'tracked_present_seconds' => $trackedPresent,
+            // Raw logout − login before the stale-logout floor, plus the gap that was repaired.
+            'clock_present_seconds' => $clockPresent,
+            'clock_gap_seconds' => $clockGapSeconds,
+            'data_issue' => $clockGapSeconds > 0 ? 'MISSING_LOGOUT' : null,
             'work_seconds' => $work,
             'idle_seconds' => $idle,
             'break_seconds' => $breakSecs,

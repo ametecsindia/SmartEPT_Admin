@@ -125,6 +125,10 @@ class OrgController extends Controller
                 'grace_minutes' => ['nullable', 'integer', 'min:0'],
                 'working_days' => ['nullable', 'array'],
                 'break_minutes_allowed' => ['nullable', 'integer', 'min:0'],
+                // 19-Aug-2026: minutes AFTER end_time at which an agent that never signed out is
+                // signed out by the server. null = inherit the attendance policy; 0 = at shift end.
+                // Capped at 12h so a typo cannot park a session open for a week.
+                'post_shift_auto_logout_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
             ],
             default => $base,
         };

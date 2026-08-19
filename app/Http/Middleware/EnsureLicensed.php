@@ -65,14 +65,26 @@ class EnsureLicensed
         // internal installs open; (b) FAIL-SOFT — an internal error inside the
         // licence machinery must never take a client's monitoring down, so any
         // throw lets the request through (real licence verdicts still block).
-        if (! filter_var(config('smartept.licence_enforce', true), FILTER_VALIDATE_BOOLEAN)) {
+        // licence_enforce=false (demo/internal), OR the developer toggle file for this
+        // machine (php artisan smartept:licence off). The toggle is keyed to the machine
+        // fingerprint and excluded from client builds — see App\Services\DevLicenceKey.
+        if (! \App\Services\DevLicenceKey::enforcementOn()) {
             return $next($request);
         }
 
         try {
             $license = InstallationLicense::governing($request->user()?->company);
 
-            if ($license->configured()) {
+            // A licence that came from a signed .lic file is self-authoritative: the
+            // signature and the machine binding ARE the proof, so there is nothing for
+            // Central to add. Skipping the phone-home here fixes two things for
+            // on-premise clients (Ejaz, 19-Aug-2026):
+            //   1. a fully paid offline install could be BRICKED by a *successful*
+            //      call — if Central did not recognise the key it overwrote the good
+            //      .lic verdict with 'unknown_key' and blocked the whole console;
+            //   2. the first request after midnight paid a ~10s synchronous timeout
+            //      on a server that has no internet by design.
+            if ($license->configured() && ! $license->fromFile()) {
                 $license = $this->client->ensureFresh($license);
             }
         } catch (\Throwable $e) {

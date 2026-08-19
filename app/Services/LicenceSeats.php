@@ -33,7 +33,7 @@ class LicenceSeats
     /** Master switch — the same one that gates EnsureLicensed (demo/internal installs). */
     public function enforced(): bool
     {
-        return filter_var(config('smartept.licence_enforce', true), FILTER_VALIDATE_BOOLEAN);
+        return DevLicenceKey::enforcementOn();
     }
 
     /** [governing licence, company id to count by (null = whole install)] */

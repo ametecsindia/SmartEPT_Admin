@@ -83,6 +83,11 @@ class PresenceController extends Controller
         $bundle = $resolver->bundleForEmployee($employee);
         $webcam = $bundle['policies']['webcam'] ?? null;
         abort_if(! $webcam, 403, 'Webcam policy not assigned.');
+        // 19-Aug-2026: with BOTH flags off this used to write a metadata-only row that no screen
+        // can ever show (the wall filters on storage_file_id), so the table grew rows nobody
+        // could read. Gate the whole endpoint the way presence-event is gated.
+        abort_if(empty($webcam['presence_enabled']) && empty($webcam['photo_enabled']),
+            403, 'Webcam capture is not enabled by policy.');
 
         $storageFileId = null;
         if ($request->hasFile('image')) {

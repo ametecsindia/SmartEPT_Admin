@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Employee;
+use App\Models\EmployeePresenceEvent;
 use App\Models\EmployeeWebcamLog;
 use App\Models\StorageFile;
 use App\Models\WebcamPhotoAccessLog;
@@ -52,7 +54,61 @@ class WebcamController extends Controller
 
         $this->audit($request, 'EXPORT', EmployeeWebcamLog::class, null, ['scope' => 'all', 'date' => $date]);
 
-        return response()->json(['date' => $date, 'count' => $logs->count(), 'data' => $logs]);
+        return response()->json([
+            'date' => $date, 'count' => $logs->count(), 'data' => $logs,
+            'presence' => $this->presenceRollup($date, $visible),
+        ]);
+    }
+
+    /**
+     * 19-Aug-2026 (Ejaz: "webcam presence is not captured even though the webcam is connected").
+     *
+     * Webcam PRESENCE and webcam PHOTOS are two different streams, and this screen only ever
+     * showed photos. The shipped default webcam policy is presence_enabled=true /
+     * photo_enabled=false, so a tenant doing everything right saw a permanently empty wall and
+     * concluded presence was broken.
+     *
+     * This returns the day's presence detection per employee — including CAMERA_UNAVAILABLE
+     * and CAMERA_BLOCKED, which are the rows that actually diagnose a camera problem — so the
+     * console can say "presence IS being captured, photos are simply off" or "the agent reports
+     * the camera as unavailable", rather than showing nothing either way.
+     */
+    private function presenceRollup(string $date, ?array $visible): array
+    {
+        $rows = EmployeePresenceEvent::query()
+            ->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))
+            ->whereDate('started_at', $date)
+            ->selectRaw('employee_id, event_type, COUNT(*) events, COALESCE(SUM(duration_seconds),0) secs, MAX(started_at) last_at')
+            ->groupBy('employee_id', 'event_type')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        $names = Employee::whereIn('id', $rows->pluck('employee_id')->unique())
+            ->get(['id', 'first_name', 'last_name', 'employee_code'])->keyBy('id');
+
+        $byEmployee = [];
+        foreach ($rows as $r) {
+            $e = $names[$r->employee_id] ?? null;
+            $byEmployee[$r->employee_id] ??= [
+                'employee_id'   => $r->employee_id,
+                'employee_name' => $e ? trim($e->first_name . ' ' . $e->last_name) : '—',
+                'employee_code' => $e?->employee_code,
+                'last_at'       => null,
+                'by_status'     => [],
+            ];
+            $byEmployee[$r->employee_id]['by_status'][$r->event_type] = [
+                'events'  => (int) $r->events,
+                'seconds' => (int) $r->secs,
+            ];
+            if (! $byEmployee[$r->employee_id]['last_at'] || $r->last_at > $byEmployee[$r->employee_id]['last_at']) {
+                $byEmployee[$r->employee_id]['last_at'] = $r->last_at;
+            }
+        }
+
+        return array_values($byEmployee);
     }
 
     /** GET /api/webcam/{webcam}/file — stream the protected photo, access-logged. */

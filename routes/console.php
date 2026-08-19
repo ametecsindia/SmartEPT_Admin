@@ -40,6 +40,13 @@ Schedule::command('smartept:build-archives')->everyMinute()->withoutOverlapping(
 // end (so "Meeting" status ends on time even if the employee never presses End).
 Schedule::command('smartept:close-meetings')->everyMinute();
 
+// 19-Aug-2026 (Ejaz): post-shift auto logout. mark-attendance already closes forgotten
+// sessions, but only at 00:15 the next day — long enough for a stale check_out_at to reach
+// the productivity report (the 596% AI0043 row). This runs every 5 minutes and signs the
+// agent out AT shift end + the configured minutes. No-op for shifts/policies where the
+// minutes are not set, so it is inert until an admin turns it on.
+Schedule::command('smartept:auto-logout')->everyFiveMinutes()->withoutOverlapping();
+
 // QA Phase 3 (B6): scheduler self-diagnosis. A 1-minute closure stamps a heartbeat
 // cache key; Help → Troubleshooting turns RED when it goes stale — the tell-tale that
 // Windows Task Scheduler / cron is NOT running `php artisan schedule:run`, which would
