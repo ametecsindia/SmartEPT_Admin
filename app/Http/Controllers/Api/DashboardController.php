@@ -51,7 +51,20 @@ class DashboardController extends Controller
         // heartbeat); the authoritative status_timeline then decides WHICH working state an
         // online employee is in — active / idle / on a specific break / in a meeting — so an
         // employee falls into exactly one category and can never be "active AND on break".
-        $devByEmp = $devices->keyBy('employee_id');
+        // An employee can own several device rows — a replaced PC, a second desk, a re-bind,
+        // a laptop and a desktop. keyBy() keeps the LAST row for a duplicate key, and the fetch
+        // order is simply the table's, so a long-dead device could win over the one the
+        // employee is signed in on right now — and a live agent then reads OFFLINE here.
+        //
+        // 26-Aug-2026 (Ejaz): Enforce02 had DESKTOP-KN8IQRK heartbeating 24 seconds earlier AND
+        // DESKTOP-LRCR8LO dead since 24-Aug. The dead one won, so ACTIVE showed 0 while the
+        // agent was demonstrably working — screenshots and violations landing all afternoon.
+        //
+        // Sorting ascending by last heartbeat makes the most recently seen device the one that
+        // survives keyBy(), which is the only device that can be the employee's live session.
+        $devByEmp = $devices
+            ->sortBy(fn ($d) => $d->last_heartbeat_at?->getTimestamp() ?? 0)
+            ->keyBy('employee_id');
 
         $employees = Employee::with(['team:id,name', 'department:id,name'])
             ->where('employment_status', 'ACTIVE')
