@@ -91,6 +91,9 @@ class LicenseController extends Controller
             'bundle' => null,
             'last_error' => null,
             'unreachable_since' => null,
+            // Anchors the 7-day unverified window. Written ONLY where a key is
+            // actually entered, so a failed nightly phone-home cannot reopen it.
+            'key_saved_at' => now(),
         ])->save();
 
         $license = $this->client->validate($license);

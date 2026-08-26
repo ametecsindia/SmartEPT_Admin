@@ -132,6 +132,8 @@ class ProvisionController extends Controller
                     'bundle' => null,
                     'last_error' => null,
                     'unreachable_since' => null,
+                    // Anchors the 7-day unverified window — see InstallationLicense.
+                    'key_saved_at' => now(),
                 ])->save();
             }
             try {

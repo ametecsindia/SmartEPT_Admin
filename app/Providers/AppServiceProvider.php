@@ -19,8 +19,48 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->applyOrganisationTimezone();
         $this->registerGcsDisk();
         $this->registerEvidenceDisk();
+    }
+
+    /**
+     * Run the whole application on the timezone set in Organisation → Company (Ejaz,
+     * 26-Aug-2026: "whether it is cloud or on premises — it should consider the timezone set
+     * in the Organization tab").
+     *
+     * Why this rather than fixing call sites: the agent writes LOCAL wall-clock times, and the
+     * server has ~125 `now()` calls compared against them — shift ends, heartbeat staleness,
+     * meeting auto-close, licence checks. If PHP's clock is UTC and the tenant is IST, every
+     * one of those is 5h30m out, and the failure is silent: things simply happen hours late.
+     * Setting the clock once at boot makes all of them correct with no call-site churn, and
+     * stops a fresh install starting wrong because .env was left at the default. The
+     * Organisation tab becomes the single place a timezone is set.
+     *
+     * Only applied when the installation holds exactly ONE company (every on-prem install and
+     * the current cloud console). With several tenants there is no single right answer for a
+     * process-wide clock, so APP_TIMEZONE stands and the per-company resolvers — bizTz() for
+     * requests, ResolvesLocalNow for console commands — remain authoritative.
+     *
+     * Guarded end to end: an un-migrated database, a missing table or an unreadable cache must
+     * never stop the app booting (this runs during `migrate` and `key:generate` too).
+     */
+    private function applyOrganisationTimezone(): void
+    {
+        try {
+            $tz = \Illuminate\Support\Facades\Cache::remember('smartept:org_timezone', 3600, function () {
+                $rows = \App\Models\Company::withoutGlobalScopes()->limit(2)->pluck('timezone');
+
+                return $rows->count() === 1 ? (string) $rows->first() : '';
+            });
+
+            if ($tz && $tz !== config('app.timezone') && in_array($tz, timezone_identifiers_list(), true)) {
+                config(['app.timezone' => $tz]);
+                date_default_timezone_set($tz);
+            }
+        } catch (\Throwable $e) {
+            // No DB yet, no cache store, or a bad value — keep booting on APP_TIMEZONE.
+        }
     }
 
     /**

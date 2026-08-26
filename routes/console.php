@@ -17,7 +17,10 @@ Schedule::command('smartept:daily-summary')->dailyAt('00:30');
 Schedule::command('smartept:purge-expired')->dailyAt('02:00');
 
 // R2-1: daily licence phone-home to SmartEPT Central (metadata only — the hard wall).
-Schedule::command('smartept:validate-license')->dailyAt('01:00');
+// withoutOverlapping (21-Aug-2026): the command walks every tenant row and each
+// call blocks for up to 10s on an unreachable Central, so on an offline install
+// with a dozen tenants a run can still be going when the next one starts.
+Schedule::command('smartept:validate-license')->dailyAt('01:00')->withoutOverlapping();
 
 // R2-2: ops alerts — silent-agent sweep + violation-spike watch (admin emails),
 // and a morning digest of application errors so problems never hide in the log.

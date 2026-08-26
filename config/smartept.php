@@ -44,6 +44,18 @@ return [
     // permanently-disconnected PC never blocks the employee forever).
     'session_stale_minutes' => (int) env('SMARTEPT_SESSION_STALE_MINUTES', 10),
 
+    // Enforcement: how long a tenant must spend in the LEARNING period before
+    // blocking may be switched on.
+    //
+    // This is the control that stops a bad rollout — the report is what tells an
+    // admin that Teams or Zoom would have been blocked. Short is convenient and
+    // weak: twenty minutes only proves nobody has opened their usual programs
+    // yet. Longer is inconvenient and honest.
+    //
+    // Set per deployment. For a regulated client, raise it — 4320 is three days,
+    // which is what the auditor documentation describes.
+    'min_audit_minutes' => (int) env('SMARTEPT_MIN_AUDIT_MINUTES', 20),
+
     // Policy resolution precedence (most specific first).
     'policy_precedence' => ['DEVICE', 'EMPLOYEE', 'TEAM', 'DEPARTMENT', 'BRANCH', 'COMPANY'],
 

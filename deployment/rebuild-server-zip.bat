@@ -55,11 +55,13 @@ robocopy "%SRC%" "%STAGE%" /E /NFL /NDL /NJH /NJS /NP /R:1 /W:1 ^
 if %errorlevel% geq 8 ( echo [ERROR] Staging via robocopy failed. & pause & exit /b 1 )
 
 REM deployment\ ships ONLY install-helper.php - INSTALL.bat and install-linux.sh both run it.
-REM Everything else in there is our build tooling and internal notes.
-for %%f in ("rebuild-server-zip.bat" "RUN-BUILD-LOGGED.bat" "make-clientside.php" ^
-            "verify-package.php" "build-log.txt" "INSTALL-GUIDE.md") do (
-  if exist "%STAGE%\deployment\%%~f" del /f /q "%STAGE%\deployment\%%~f"
+REM An ALLOW-list, not a deny-list: the first version named the six build files to delete, which
+REM meant anything NEW in that folder would ship by default. A stray www.lnk turned up there the
+REM same day and proved the point. Whatever lands in deployment\ from now on stays behind.
+for %%f in ("%STAGE%\deployment\*") do (
+  if /i not "%%~nxf"=="install-helper.php" del /f /q "%%~f" >nul 2>nul
 )
+for /d %%d in ("%STAGE%\deployment\*") do rmdir /s /q "%%~d" >nul 2>nul
 
 REM keep the empty runtime folders so Laravel boots on the client
 for %%d in ("storage\logs" "storage\framework\cache" "storage\framework\sessions" ^
@@ -82,40 +84,28 @@ if errorlevel 1 (
 
 echo.
 echo [3/5] Compressing to ZIP (this can take a minute)...
-if exist "%OUT%" del /f /q "%OUT%"
-set "TMPZIP=%TEMP%\%NAME%-Setup-%VER%.zip"
-if exist "%TMPZIP%" del /f /q "%TMPZIP%"
-
-REM 19-Aug-2026: `tar -a -c -f "C:\...\out.zip"` fails with "Cannot connect to C: resolve
-REM failed" - bsdtar reads any argument containing a colon as host:path (scp style), and it has
-REM no --force-local. So build the archive under %TEMP% with a RELATIVE name (no colon anywhere)
-REM and move the finished file into the downloads folder afterwards.
-where tar >nul 2>nul
-if %errorlevel%==0 (
-  REM Windows built-in tar - bsdtar - handles long vendor paths reliably.
-  pushd "%TEMP%"
-  tar -a -c -f "%NAME%-Setup-%VER%.zip" "%NAME%"
-  popd
-)
-if not exist "%TMPZIP%" (
-  echo    tar produced no archive - falling back to PowerShell Compress-Archive...
-  powershell -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Path '%STAGE%' -DestinationPath '%TMPZIP%' -Force"
-)
-if not exist "%TMPZIP%" ( echo [ERROR] ZIP was not created. See messages above. & pause & exit /b 1 )
-move /y "%TMPZIP%" "%OUT%" >nul
-if not exist "%OUT%" ( echo [ERROR] Could not move the ZIP into %OUTDIR%. & pause & exit /b 1 )
+REM Built with PHP's ZipArchive, not `tar`. Two separate failures made `tar` untrustworthy here:
+REM   - bsdtar reads "C:\..." as host:path and dies with "Cannot connect to C: resolve failed"
+REM   - the `tar` first on PATH in Cmder/Laragon is GNU tar, whose -a only understands COMPRESSION
+REM     suffixes, so `-a -c -f x.zip` silently writes a plain TAR file named .zip
+REM PHP is already required by this script and ext-zip already ships for phpspreadsheet, so
+REM ZipArchive gives the same real zip on every machine, with no PATH roulette.
+"%PHP%" "%SRC%\deployment\make-zip.php" "%STAGE%" "%OUT%" "%NAME%"
+if errorlevel 1 ( echo [ERROR] ZIP was not created. See messages above. & pause & exit /b 1 )
+if not exist "%OUT%" ( echo [ERROR] ZIP was not created. See messages above. & pause & exit /b 1 )
 
 echo.
 echo [4/5] Verifying the built ZIP...
-REM Proves the archive is a REAL zip, not a tar that merely ends in .zip - GNU tar's -a only
-REM understands compression suffixes, so on a machine where `tar` is GNU rather than the Windows
-REM bsdtar this step is the only thing standing between that mistake and a client download.
-REM It also re-runs every content check against the artefact that will actually be published.
+REM Defence in depth: make-zip.php already reopens what it wrote, but this checks the file that
+REM is actually sitting in the downloads folder under its published name, and re-runs every
+REM content rule against it. What the portal serves is what gets verified.
 "%PHP%" "%SRC%\deployment\verify-package.php" --zip "%OUT%"
 if errorlevel 1 (
   echo.
-  echo [ERROR] The BUILT ZIP failed verification - deleting it so it cannot be served.
-  del /f /q "%OUT%"
+  echo [ERROR] The BUILT ZIP failed verification.
+  echo         Renaming it to .REJECTED so it cannot be served but can still be inspected.
+  if exist "%OUT%.REJECTED" del /f /q "%OUT%.REJECTED"
+  move /y "%OUT%" "%OUT%.REJECTED" >nul
   pause & exit /b 1
 )
 

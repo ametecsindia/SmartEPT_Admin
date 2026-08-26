@@ -129,6 +129,9 @@ class OrgController extends Controller
                 // signed out by the server. null = inherit the attendance policy; 0 = at shift end.
                 // Capped at 12h so a typo cannot park a session open for a week.
                 'post_shift_auto_logout_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
+                // 26-Aug-2026: refuse AGENT sign-in outside [start_time, end_time + the
+                // minutes above]. Agent only — the admin console does not use this path.
+                'restrict_login_to_shift' => ['nullable', 'boolean'],
             ],
             default => $base,
         };

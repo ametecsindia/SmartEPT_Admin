@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\EmployeeDevice;
+use App\Support\ResolvesLocalNow;
 use App\Support\ScopesVisibleEmployees;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\Cache;
 class DeviceController extends Controller
 {
     use ScopesVisibleEmployees;
+    use ResolvesLocalNow;
 
     /** GET /api/devices — admin/manager view of registered endpoints (tenant-scoped). */
     public function index(Request $request): JsonResponse
@@ -24,6 +26,22 @@ class DeviceController extends Controller
             ->when($request->status, fn ($q, $v) => $q->where('current_status', $v))
             ->latest('last_heartbeat_at')
             ->paginate((int) $request->integer('per_page', 25));
+
+        // 26-Aug-2026: a PC that is switched off sends no "goodbye", it just stops
+        // heartbeating, so `current_status` kept whatever the last heartbeat wrote and the
+        // screen showed employees ONLINE indefinitely.
+        //
+        // Fixed at READ time, not by a scheduled job that writes OFFLINE into the column.
+        // A writer fights the heartbeat for the same field — 30s apart, opposite directions —
+        // and whichever ran last wins, which is how a live agent ends up displayed as offline.
+        // The Live Dashboard already decides this at read time (3-minute window), and
+        // deviceHealth() below already overrides agent_health the same way. One convention.
+        $stale = now()->subMinutes(10);
+        $devices->getCollection()->each(function ($d) use ($stale) {
+            if (! $d->last_heartbeat_at || $d->last_heartbeat_at->lt($stale)) {
+                $d->current_status = 'OFFLINE';
+            }
+        });
 
         return response()->json($devices);
     }
@@ -74,6 +92,24 @@ class DeviceController extends Controller
                     'message' => 'This device was unbound by an administrator. Ask them to approve a re-bind on the Devices screen.',
                 ],
             ], 409);
+        }
+
+        // Shift-bounded sign-in (Ejaz, 26-Aug-2026): outside the employee's shift the agent is
+        // refused. Enforced HERE and nowhere else on purpose — /auth/login is shared with the
+        // admin console, so gating that would lock admins out of the console after hours,
+        // while register-device is only ever called by the agent.
+        //
+        // Off unless the shift opts in, so an upgrade changes nothing until an admin says so.
+        $shift = $employee->shift;
+        if ($shift?->restrict_login_to_shift
+            && ! $shift->coversSignInAt($this->localNow($employee->company_id))) {
+            return response()->json([
+                'error' => [
+                    'code' => 'OUTSIDE_SHIFT',
+                    'message' => 'Sign-in is only allowed during your shift (' . $shift->windowLabel()
+                        . '). Please sign in during those hours, or ask your administrator.',
+                ],
+            ], 403);
         }
 
         $isNewDevice = $existing === null;
@@ -194,7 +230,7 @@ class DeviceController extends Controller
                 ->where('session_status', 'ACTIVE')
                 ->get();
             foreach ($retired as $o) {
-                $o->employee?->user?->tokens()->where('name', 'device:' . $o->device_uuid)->delete();
+                $o->revokeAgentToken();
                 $o->update(['session_status' => 'LOGGED_OUT', 'current_status' => 'OFFLINE']);
             }
             if ($retired->isNotEmpty()) {
@@ -237,6 +273,18 @@ class DeviceController extends Controller
         ]);
 
         $device = EmployeeDevice::where('device_uuid', $data['device_uuid'])->firstOrFail();
+
+        // 26-Aug-2026: the heartbeat is how the agent LEARNS it has been signed out — its
+        // handleSessionRevoked() fires on a 401 here. Until now the only thing that produced
+        // that 401 was the token being deleted, so any close that missed the token left the
+        // agent running happily while every screen said the employee was signed out. The
+        // device row now answers directly, so an agent can never outlive its session by more
+        // than one heartbeat (~30s) whatever else went wrong.
+        if ($device->unbound_at || $device->session_status !== 'ACTIVE') {
+            return response()->json([
+                'error' => ['code' => 'SESSION_ENDED', 'message' => 'This device session has ended. Please sign in again.'],
+            ], 401);
+        }
 
         // EPT-25: clock-skew tamper check. The agent stamps its local time; a large
         // gap from server time usually means the PC clock was changed to fake hours.
@@ -324,8 +372,7 @@ class DeviceController extends Controller
     public function unbind(Request $request, EmployeeDevice $device): JsonResponse
     {
         // Revoke exactly this device's agent token (named on creation).
-        $device->employee?->user?->tokens()
-            ->where('name', 'device:' . $device->device_uuid)->delete();
+        $device->revokeAgentToken();
 
         app(\App\Services\LicenseClient::class)->deactivateDevice($device->device_uuid, $device->company_id);
 
@@ -394,8 +441,7 @@ class DeviceController extends Controller
             $this->assertEmployeeVisible($request, (int) $device->employee_id);
         }
 
-        $device->employee?->user?->tokens()
-            ->where('name', 'device:' . $device->device_uuid)->delete();
+        $device->revokeAgentToken();
 
         $device->update([
             'session_status'  => 'FORCE_LOGOUT',

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\EmployeeBreakLog;
 use App\Services\ConflictingStatusException;
+use App\Services\OutboundPusher;
 use App\Services\StatusService;
 use App\Support\ResolvesAgentContext;
 use Illuminate\Http\JsonResponse;
@@ -100,6 +101,11 @@ class BreakController extends Controller
                 'approval_status' => 'NOT_REQUIRED',
             ]);
 
+            // Ejaz 26-Aug: a break is an OUT punch to SmartPRS, so PRS can compute break
+            // time from the punch stream exactly as it would from a biometric terminal.
+            // Only on a real open — the deduped and 409 paths returned above.
+            $this->relay($employee, 'OUT', $at, $data['device_uuid']);
+
             return response()->json(['ok' => true, 'break_id' => $break->id], 201);
         }
 
@@ -152,6 +158,12 @@ class BreakController extends Controller
             Log::warning('StatusService mirror failed on break END', ['e' => $e->getMessage()]);
         }
 
+        // Back from the break → IN. Guarded by $closed so a stray END (nothing was open)
+        // never fabricates a punch pair in SmartPRS.
+        if ($closed > 0) {
+            $this->relay($employee, 'IN', $at, $data['device_uuid']);
+        }
+
         return response()->json([
             'ok'      => true,
             'closed'  => $closed,
@@ -160,6 +172,20 @@ class BreakController extends Controller
             'reason_required' => ! empty($overWithoutReason),
             'over_types'      => $overWithoutReason,
         ], 200);
+    }
+
+    /**
+     * Relay a break boundary to any outbound target on "attendance.punch", the same
+     * way AttendanceController relays login/logout. Best-effort: a slow or dead target
+     * must never fail or delay the employee's break.
+     */
+    private function relay($employee, string $punchType, Carbon $at, string $deviceUuid): void
+    {
+        try {
+            app(OutboundPusher::class)->relayPunch(
+                $employee->company_id, $employee, $punchType, $at, $deviceUuid, 'AGENT'
+            );
+        } catch (\Throwable $e) { /* relay is never allowed to fail the break */ }
     }
 
     /** Section 3: permitted seconds for a break type, from this company's limits. */

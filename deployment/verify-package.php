@@ -92,6 +92,7 @@ const FORBIDDEN_FILES = [
     // install-linux.sh both run it, so it has to ship.
     'make-clientside.php'    => 'our client-build generator',
     'verify-package.php'     => 'this verifier',
+    'make-zip.php'           => 'our packaging script',
     'rebuild-server-zip.bat' => 'our packaging script',
     'RUN-BUILD-LOGGED.bat'   => 'our packaging script',
     'INSTALL-GUIDE.md'       => 'our internal install/build notes',
@@ -105,6 +106,7 @@ const FORBIDDEN_PATTERNS = [
     '*.commit.txt'   => 'commit-message scratch files',
     '*.fuse_hidden*' => 'editor scratch files',
     'build-log.txt'  => 'our build log',
+    '*.lnk'          => 'Windows shortcuts (they point at paths on OUR machine)',
 ];
 
 /** Files a client package cannot boot without. Paths relative to the app root. */

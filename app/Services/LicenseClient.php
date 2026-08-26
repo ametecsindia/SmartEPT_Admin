@@ -112,6 +112,72 @@ class LicenseClient
         }
     }
 
+    /**
+     * The only reasons Central is allowed to demote a licence with.
+     *
+     * A closed set on purpose. Anything outside it — a new reason string, a
+     * proxy error page, a truncated body — is treated as "Central could not
+     * answer", not as "this client is unlicensed". The cost of being wrong in
+     * one direction is a client keeps working for another day; in the other it
+     * is a paid client's console going dark.
+     */
+    private const DEMOTING_REASONS = [
+        'unknown_key',
+        'server_mismatch',
+        'licence_expired',
+        'licence_suspended',
+        'licence_revoked',
+        'licence_superseded',
+    ];
+
+    /**
+     * Did Central actually deliver a verdict, or did it merely fail?
+     *
+     * THE REASON IS THE VERDICT, NOT THE HTTP STATUS. Central answers a genuine
+     * rejection with **403** — see smartept-central
+     * `app/Http/Controllers/Api/LicenseController.php:58`:
+     *
+     *     return response()->json($result, ($result['ok'] ?? false) ? 200 : 403);
+     *
+     * So requiring a 200 here would mean no licence could ever be demoted
+     * again, which is a far worse bug than the one being fixed. What separates
+     * a verdict from an outage is whether the body names a reason we recognise:
+     * a 500 with an HTML error page, a proxy timeout or a body we cannot parse
+     * name nothing, and say nothing about whether this client has paid.
+     */
+    private function isVerdict(array $json, string $reason): bool
+    {
+        if (! array_key_exists('reason', $json)) {
+            return false;
+        }
+
+        return in_array($reason, self::DEMOTING_REASONS, true);
+    }
+
+    /**
+     * Merge Central's bundle over ours WITHOUT losing how this licence arrived.
+     *
+     * `bundle['source']` is the only thing marking a licence as coming from a
+     * signed .lic file, and fromFile() is what protects an on-premise client
+     * from being demoted by Central. Central's bundle does not carry that key,
+     * so replacing the bundle wholesale quietly converted a file licence into a
+     * Central one — after which the very next unknown_key DID take the console
+     * down, which is the defect the fromFile() guard was written to prevent.
+     */
+    private function mergeBundle(InstallationLicense $license, ?array $incoming): ?array
+    {
+        if (! is_array($incoming)) {
+            return $license->bundle;
+        }
+
+        $existing = is_array($license->bundle) ? $license->bundle : [];
+        if (isset($existing['source']) && ! isset($incoming['source'])) {
+            $incoming['source'] = $existing['source'];
+        }
+
+        return $incoming;
+    }
+
     /** Validate the stored key against Central and cache the entitlement bundle. */
     public function validate(?InstallationLicense $license = null): InstallationLicense
     {
@@ -157,7 +223,7 @@ class LicenseClient
         if ($resp->successful() && ($json['ok'] ?? false)) {
             $license->forceFill([
                 'status' => 'active',
-                'bundle' => $json['bundle'] ?? $license->bundle,
+                'bundle' => $this->mergeBundle($license, $json['bundle'] ?? null),
                 'last_checked_at' => now(),
                 'unreachable_since' => null,
                 'last_error' => null,
@@ -193,6 +259,31 @@ class LicenseClient
 
                 return $license;
             }
+
+            // Only an ANSWER from Central may demote a licence. A 500, a 502, a 405
+            // from a misrouted request, or a body we do not understand are all
+            // Central-side failures — they say nothing about whether this client is
+            // paid up. Writing 'http_500' into status was silently fatal: nothing
+            // matches it in InstallationLicense::operational(), so it fell through to
+            // `default => false` and 403'd the entire console until Central came back.
+            //
+            // Same failure shape as the http_405 incident. Treat it as unreachable:
+            // the last known verdict stands, and availability wins.
+            if (! $this->isVerdict($json, $reason)) {
+                $license->forceFill([
+                    'unreachable_since' => $license->unreachable_since ?: now(),
+                    'last_checked_at' => now(),
+                    'last_error' => 'Central could not answer (' . $reason
+                        . ') — the last known verdict stands.',
+                ])->save();
+                Log::warning('License validation: Central did not return a verdict', [
+                    'status' => $resp->status(),
+                    'reason' => $reason,
+                ]);
+
+                return $license;
+            }
+
             // Central reasons: unknown_key | licence_expired | licence_suspended | licence_revoked | server_mismatch
             $status = str_starts_with($reason, 'licence_') ? substr($reason, 8) : $reason;
             $license->forceFill([
@@ -233,6 +324,22 @@ class LicenseClient
      */
     public function activateDevice(string $deviceUid, ?string $hostname = null, ?int $companyId = null): array
     {
+        // The developer toggle applies HERE too.
+        //
+        // It is documented as "turns licence enforcement off on OUR machines",
+        // and EnsureLicensed honours it — but this path did not, so on a dev
+        // install every PC that had already registered kept working while every
+        // NEW one was refused by Central with "invalid_licence". The symptom is
+        // an employee who cannot sign in at all on a second computer, which
+        // reads as a broken agent rather than a licence that was supposed to be
+        // switched off.
+        //
+        // Fails safe the same way DevLicenceKey does: the toggle is a keyed file
+        // bound to this machine's fingerprint, so a client cannot create one.
+        if (! DevLicenceKey::enforcementOn()) {
+            return ['ok' => true, 'reason' => null];
+        }
+
         $license = $this->licenseForCompanyId($companyId);
 
         if (! $license->configured() || ! $this->baseUrl()) {
@@ -259,6 +366,13 @@ class LicenseClient
     /** Release a device seat on Central (offboarding / unbind). Best-effort. */
     public function deactivateDevice(string $deviceUid, ?int $companyId = null): bool
     {
+        // Symmetrical with activateDevice. Releasing a seat that was never taken
+        // is a no-op, and calling Central about it on a dev install only
+        // produces noise in the log.
+        if (! DevLicenceKey::enforcementOn()) {
+            return true;
+        }
+
         $license = $this->licenseForCompanyId($companyId);
 
         if (! $license->configured() || ! $this->baseUrl()) {

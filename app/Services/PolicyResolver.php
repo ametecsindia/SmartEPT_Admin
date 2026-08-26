@@ -13,14 +13,17 @@ use App\Models\CompliancePolicy;
 use App\Models\DevicePolicy;
 use App\Models\Employee;
 use App\Models\EmployeeDevice;
+use App\Models\EnforcementState;
 use App\Models\MonitoringPolicy;
 use App\Models\NetworkPolicy;
 use App\Models\PolicyAssignment;
+use App\Models\PolicyRule;
 use App\Models\ScreenshotPolicy;
 use App\Models\UsbPolicy;
 use App\Models\VpnProxyPolicy;
 use App\Models\WebcamPolicy;
 use App\Models\WebsitePolicy;
+use App\Support\EnforcementMode;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -73,6 +76,11 @@ class PolicyResolver
         $trackingMode = $this->effectiveTrackingMode($employee, $device, $company);
         $this->applyTrackingMode($policies, $trackingMode);
 
+        // Whether this PERSON is inside enforcement. Separate from the tenant
+        // switch below: the tenant decides whether anything blocks at all, this
+        // decides whether it blocks for them.
+        $enforcementMode = $this->effectiveEnforcementMode($employee, $device, $company);
+
         // QA Phase 5 (B11/D5): surface the RESOLVED screenshot cadence explicitly so the
         // agent schedules on the effective value (not a stale/default) and stamps every
         // shot with the policy id + version it obeyed. This is where the "every minute
@@ -84,10 +92,54 @@ class PolicyResolver
             $policies['screenshot']['effective_interval_seconds'] = (int) ($s['interval_seconds'] ?? 600);
         }
 
+        // Per-rule actions (21-Aug-2026). Each blocked item carries its own action
+        // instead of sharing one policy-level action_on_blocked. The old arrays and
+        // the policy-level action are left exactly as they were, so an agent at or
+        // below 0.14 reads the bundle it has always read and behaves identically.
+        $this->attachRules($policies, $employee->company_id);
+
+        // Whether this tenant's enforcement is off, learning, or actually blocking.
+        // No row means OFF: running an upgrade must never start blocking for anybody.
+        $enforcement = EnforcementState::withoutGlobalScopes()
+            ->where('company_id', $employee->company_id)
+            ->first();
+
         return [
             'employee_id'     => $employee->id,
+            // Who this bundle was resolved FOR. The enforcement service stores the
+            // policy against this reference locally, so an applied policy can always
+            // be traced back to an employee — and reverted when they sign out and
+            // the machine falls back to its baseline.
+            'employee_ref'    => [
+                'employee_id'  => $employee->id,
+                'employee_code' => $employee->employee_code ?? null,
+                'name'         => trim((string) ($employee->first_name ?? '') . ' ' . (string) ($employee->last_name ?? '')) ?: null,
+                'user_id'      => $employee->user_id ?? null,
+                'device_uuid'  => $device?->device_uuid,
+                // The Windows account SID the agent last reported for this device.
+                // AppLocker rules are written against a SID, so an employee overlay
+                // cannot be generated without one.
+                'windows_sid'  => $device?->windows_sid,
+            ],
             'device_uuid'     => $device?->device_uuid,
             'company_id'      => $employee->company_id,
+            'enforcement'     => [
+                'mode'            => $enforcement->mode ?? EnforcementState::OFF,
+                'policy_version'  => (int) ($enforcement->policy_version ?? 1),
+                'audit_started_at' => $enforcement?->audit_started_at?->toIso8601String(),
+                // Per-employee. ENFORCED or EXEMPT, already resolved through the
+                // six levels, so neither the agent nor the endpoint has to know
+                // the hierarchy exists.
+                'employee_mode'   => $enforcementMode,
+                // The single boolean both clients act on: does THIS sign-in
+                // block anything? Sent as well as the mode so a future third
+                // value cannot silently change what an old agent does.
+                'employee_enforced' => $enforcementMode === EnforcementMode::ENFORCED,
+            ],
+            // Bumped whenever any rule or the enforcement mode changes. The agent
+            // heartbeat returns this value; an endpoint whose stored version differs
+            // re-syncs. That is the whole push mechanism — there is no WebSocket.
+            'latest_policy_version' => $this->latestPolicyVersionFor($employee->company_id),
             'consent_required' => (bool) ($monitoring['consent_required'] ?? true),
             'policy_version'  => (int) ($monitoring['version'] ?? 1),
             'tracking_mode'    => $trackingMode,
@@ -101,6 +153,79 @@ class PolicyResolver
             ],
             'policies'        => $policies,
         ];
+    }
+
+    /**
+     * Hang each policy's per-rule list off the resolved policy.
+     *
+     * The rules live in policy_rules, keyed by (policy_type, policy_id), so only
+     * the rules belonging to the policy this employee actually resolved to are
+     * shipped — not the whole tenant's.
+     *
+     * @param array<string,mixed> $policies
+     */
+    private function attachRules(array &$policies, int $companyId): void
+    {
+        $map = ['application' => 'APPLICATION', 'website' => 'WEBSITE'];
+
+        foreach ($map as $key => $type) {
+            if (! isset($policies[$key]) || ! is_array($policies[$key])) {
+                continue;
+            }
+            $policyId = $policies[$key]['id'] ?? null;
+            if (! $policyId) {
+                $policies[$key]['rules'] = [];
+                continue;
+            }
+
+            $policies[$key]['rules'] = PolicyRule::withoutGlobalScopes()
+                ->where('company_id', $companyId)
+                ->where('policy_type', $type)
+                ->where('policy_id', $policyId)
+                ->orderBy('item')
+                ->get([
+                    'item', 'label', 'status', 'action', 'suggested_action',
+                    'catalog_app_id', 'identifiers', 'confirmed_at',
+                ])
+                ->map(static function (PolicyRule $r): array {
+                    return [
+                        'item'             => $r->item,
+                        'label'            => $r->label,
+                        'status'           => $r->status,
+                        'action'           => $r->action,
+                        'suggested_action' => $r->suggested_action,
+                        'catalog_app_id'   => $r->catalog_app_id,
+                        'identifiers'      => $r->identifiers,
+                        // True only for the actions that actually prevent something.
+                        // The agent still warns on the rest, exactly as before.
+                        'enforced'         => $r->isEnforcing(),
+                        'confirmed'        => $r->confirmed_at !== null,
+                    ];
+                })
+                ->all();
+        }
+    }
+
+    /**
+     * The tenant's current policy version, as one number the agent can compare
+     * against what it has stored.
+     *
+     * bundle['policy_version'] is the MONITORING policy's version and does not
+     * move when app or website rules change — which is exactly why rule edits
+     * never reached endpoints promptly. This one moves for any of them.
+     */
+    public function latestPolicyVersionFor(int $companyId): int
+    {
+        $appMax = (int) ApplicationPolicy::withoutGlobalScopes()
+            ->where('company_id', $companyId)->max('version');
+        $siteMax = (int) WebsitePolicy::withoutGlobalScopes()
+            ->where('company_id', $companyId)->max('version');
+        $ruleMax = (int) PolicyRule::withoutGlobalScopes()
+            ->where('company_id', $companyId)->max('version');
+        $stateMax = (int) EnforcementState::withoutGlobalScopes()
+            ->where('company_id', $companyId)->max('policy_version');
+
+        return max(1, $appMax + $siteMax + $ruleMax + $stateMax);
     }
 
     /**
@@ -126,6 +251,85 @@ class PolicyResolver
         }
 
         return 'FULL';
+    }
+
+    /**
+     * Is THIS person enforced, on THIS device?
+     *
+     * Same six levels and the same most-specific-wins rule as
+     * effectiveTrackingMode above, on purpose. Two settings that look alike and
+     * resolve differently is how a console ends up with a rule nobody can
+     * predict.
+     *
+     *     device -> employee -> team -> department -> branch -> company
+     *
+     * A dated exemption on the employee row beats everything, because that is
+     * what a dated exemption is for: "Priya covers client calls this week" must
+     * stop by itself on Friday. An exemption an administrator has to remember to
+     * remove is an exemption that becomes permanent.
+     *
+     * Returning ENFORCED is NOT the same as blocking. The tenant-wide
+     * EnforcementState still has to be ENFORCE, against a clean learning report,
+     * before anything on any PC is refused.
+     */
+    public function effectiveEnforcementMode(Employee $employee, ?EmployeeDevice $device = null, ?Company $company = null): string
+    {
+        // A live, dated exemption wins outright.
+        if ($this->exemptionIsLive($employee)) {
+            return EnforcementMode::EXEMPT;
+        }
+
+        $candidates = [];
+        if ($device) { $candidates[] = $device->enforcement_mode ?? null; }
+        $candidates[] = $employee->enforcement_mode ?? null;
+        if ($employee->team_id)       { $candidates[] = optional(Team::withoutGlobalScopes()->find($employee->team_id))->enforcement_mode; }
+        if ($employee->department_id) { $candidates[] = optional(Department::withoutGlobalScopes()->find($employee->department_id))->enforcement_mode; }
+        if ($employee->branch_id)     { $candidates[] = optional(Branch::withoutGlobalScopes()->find($employee->branch_id))->enforcement_mode; }
+        $candidates[] = ($company ?? Company::find($employee->company_id))?->enforcement_mode;
+
+        foreach ($candidates as $m) {
+            if ($clean = EnforcementMode::clean($m)) {
+                return $clean;
+            }
+        }
+
+        return EnforcementMode::DEFAULT;
+    }
+
+    /**
+     * Is a dated exemption in force today?
+     *
+     * Both dates are inclusive, and either may be blank:
+     *
+     *     from blank, until blank   ->  not a dated exemption at all; the
+     *                                   enforcement_mode column decides
+     *     from set, until blank     ->  from that day onwards
+     *     from blank, until set     ->  up to and including that day
+     *
+     * Compared in the COMPANY's timezone, not the server's. An exemption that
+     * ends "on Friday" has to end on the client's Friday, or somebody in India
+     * loses their exemption five and a half hours early.
+     */
+    private function exemptionIsLive(Employee $employee): bool
+    {
+        $from  = $employee->enforcement_exempt_from ?? null;
+        $until = $employee->enforcement_exempt_until ?? null;
+
+        if (! $from && ! $until) {
+            return false;
+        }
+
+        $tz = optional(Company::find($employee->company_id))->timezone ?: config('app.timezone');
+        $today = now($tz)->toDateString();
+
+        if ($from && $today < \Illuminate\Support\Carbon::parse($from)->toDateString()) {
+            return false;
+        }
+        if ($until && $today > \Illuminate\Support\Carbon::parse($until)->toDateString()) {
+            return false;
+        }
+
+        return true;
     }
 
     /** Fold a non-FULL tracking mode back into the resolved policy flags. */

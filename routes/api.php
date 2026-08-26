@@ -37,6 +37,11 @@ use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\GateExclusionController;
 use App\Http\Controllers\Api\OrgController;
 use App\Http\Controllers\Api\PolicyController;
+use App\Http\Controllers\Api\PolicyRuleController;
+use App\Http\Controllers\Api\EnforcementController;
+use App\Http\Controllers\Api\EnforcementDiagnosticsController;
+use App\Http\Controllers\Api\EnforcerEnrollmentController;
+use App\Http\Controllers\Api\EnforcerSyncController;
 use App\Http\Controllers\Api\PresenceController;
 use App\Http\Controllers\Api\ProvisionController;
 use App\Http\Controllers\Api\ScreenshotController;
@@ -70,6 +75,22 @@ Route::post('provision/status', [ProvisionController::class, 'setStatus'])->midd
 Route::post('auth/sso', [AuthController::class, 'sso'])->middleware('throttle:10,1');
 // Public branding for the per-client login page (admin.smartept.com/<slug>): name + logo only.
 Route::get('tenant-branding/{slug}', [TenantBrandingController::class, 'show'])->middleware('throttle:60,1');
+
+// Enforcement service machine enrolment. Unauthenticated BY NECESSITY — the machine has no
+// credential yet, which is what this is for. Guarded by: sha256 at rest, mandatory expiry,
+// mandatory use cap, revocable, company-scoped, throttled.
+Route::post('enforcer/enroll', [EnforcerEnrollmentController::class, 'enroll'])->middleware('throttle:20,1');
+
+// ---- Enforcement service sync (machine credential, ability 'enforcer') ----
+// Its OWN group, deliberately NOT inside the agent's: those require 'active-employee' and an
+// employee token, and the whole point of a machine credential is working with nobody signed in.
+// Also deliberately OUTSIDE 'licensed' — a lapsed invoice must not unblock WhatsApp on a bank's
+// floor. An endpoint that stops receiving policy keeps enforcing whatever it last applied.
+Route::prefix('enforcer')->middleware(['auth:sanctum', 'throttle:600,1'])->group(function () {
+    Route::post('heartbeat', [EnforcerSyncController::class, 'heartbeat']);
+    Route::get('policy', [EnforcerSyncController::class, 'policy']);
+    Route::post('audit', [EnforcerSyncController::class, 'storeAudit']);
+});
 
 // ---- Authenticated (any valid token) ----
 // 'licensed' (Ejaz, 14-Aug-2026 — finding 1.5): the licence now gates the WHOLE
@@ -188,12 +209,21 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
         // QA Phase 2 (A8): the agent reports exit/uninstall/service-stop tamper attempts.
         // Outside the consent wall — a tamper attempt must be recordable regardless.
         Route::post('tamper-attempt', [TamperController::class, 'report']);
+        // The agent asks, for the PC it runs on, for a one-hour single-use enrolment token so
+        // the enforcement service on that machine can enrol itself.
+        Route::post('enforcer-handoff', [EnforcerEnrollmentController::class, 'handoff']);
+        // The endpoint reports what its policy stopped, or would have stopped (audit mode).
+        Route::post('enforcement/audit-event', [EnforcementController::class, 'storeAuditEvent']);
         // Biometric Gate v1.1: PRE-consent by design — the wall shows before work
         // starts, and it exposes only the caller's own punch state.
         Route::get('gate-status', [AgentStatusController::class, 'gateStatus']);
 
         // Tracking ingestion (M2 + M3) — gated by recorded consent where policy requires it.
-        Route::middleware(['tracking-mode', 'consent'])->group(function () {
+        // 'live-session' (26-Aug-2026): the device row is the authority on whether a session
+        // is live. Without it a closed session still accepted violations, activity and
+        // screenshots for as long as the agent held a token — the console read 0 active
+        // agents while the violations tab kept filling up.
+        Route::middleware(['live-session', 'tracking-mode', 'consent'])->group(function () {
             Route::post('attendance-event', [AttendanceController::class, 'store']);
             Route::post('activity-events', [ActivityController::class, 'activity']);
             Route::post('idle-event', [ActivityController::class, 'idle']);
@@ -416,6 +446,33 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
         Route::post('devices/{device}/rebind', [DeviceController::class, 'rebind']);
         Route::put('devices/{device}/tracking-mode', [DeviceController::class, 'trackingMode']);
         Route::put('devices/{device}/gate-mode', [DeviceController::class, 'gateMode']); // Gate-to-PC exclusion for one machine
+    });
+
+    // ---- Per-rule actions (Rules screen): its own controller because these decide which
+    // programs a company's PCs refuse to open, and PolicyController validates nothing by design.
+    Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,COMPLIANCE_OFFICER')->group(function () {
+        Route::get('policies/{type}/{policy}/rules', [PolicyRuleController::class, 'index']);
+        Route::put('policies/{type}/{policy}/rules', [PolicyRuleController::class, 'replace']);
+    });
+
+    // ---- Enforcement: the audit gate + who is enforced and why ----
+    // Enforcement is never switched straight on: a tenant runs in AUDIT, endpoints report what
+    // they WOULD have blocked, and only a clean report can promote to ENFORCE. 'disable' is the
+    // kill switch and is never gated.
+    Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,COMPLIANCE_OFFICER')->group(function () {
+        Route::get('enforcement/audit-report', [EnforcementController::class, 'auditReport']);
+        Route::get('enforcement/diagnostics', [EnforcementDiagnosticsController::class, 'index']);
+        Route::post('enforcement/start-audit', [EnforcementController::class, 'startAudit']);
+        Route::post('enforcement/promote', [EnforcementController::class, 'promote']);
+        Route::post('enforcement/disable', [EnforcementController::class, 'disable']);
+        Route::post('enforcement/audit-event/{id}/resolve', [EnforcementController::class, 'resolveAuditEvent']);
+
+        // Enrolment admin: minting is the ONLY place an enrolment secret ever exists.
+        Route::get('enforcer/enrollment-tokens', [EnforcerEnrollmentController::class, 'tokens']);
+        Route::post('enforcer/enrollment-tokens', [EnforcerEnrollmentController::class, 'mint']);
+        Route::post('enforcer/enrollment-tokens/{id}/revoke', [EnforcerEnrollmentController::class, 'revoke']);
+        Route::get('enforcer/machines', [EnforcerEnrollmentController::class, 'machines']);
+        Route::post('enforcer/machines/{id}/revoke', [EnforcerEnrollmentController::class, 'revokeMachine']);
     });
 
     // ---- Policy Engine ----

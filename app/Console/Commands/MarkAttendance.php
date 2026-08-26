@@ -8,6 +8,7 @@ use App\Models\EmployeeAttendanceLog;
 use App\Models\EmployeeLoginSession;
 use App\Models\PolicyAssignment;
 use App\Services\WorkCalendar;
+use App\Support\ResolvesLocalNow;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 
@@ -24,6 +25,8 @@ use Illuminate\Support\Carbon;
  */
 class MarkAttendance extends Command
 {
+    use ResolvesLocalNow;
+
     protected $signature = 'smartept:mark-attendance {--date= : YYYY-MM-DD (defaults to yesterday)}';
     protected $description = 'Close stale sessions and complete the attendance sheet (ABSENT / HALF_DAY) for a day';
 
@@ -91,8 +94,23 @@ class MarkAttendance extends Command
     }
 
     /**
-     * Close every still-open session that started before the processed day at the
-     * login day's shift end (or 23:59:59 without a shift).
+     * Close every still-open session whose shift has ended, at the login day's shift end
+     * (or 23:59:59 without a shift), and finish the close properly: stamp the attendance
+     * sheet and stop the device reading ONLINE.
+     *
+     * 26-Aug-2026 (Ejaz) — two defects fixed here:
+     *
+     *  1. The filter was `login_at < $date`, i.e. strictly BEFORE the day being processed.
+     *     This job runs at 00:15 to complete YESTERDAY, so yesterday's own forgotten
+     *     sessions were skipped and only closed the following night — a ~24-hour window in
+     *     which the employee kept showing as signed in and the agent kept logging idle
+     *     time. It now considers the processed day too, but closes a session only once its
+     *     shift end is actually in the past, so a night shift still running at 00:15 is
+     *     left alone (which is what the old `<` was really protecting).
+     *  2. Closing the login session alone left `check_out_at` empty and the device row
+     *     still ONLINE / ACTIVE. The productivity report reads the attendance sheet, and
+     *     the Devices screen reads the device row, so the "still online today" symptom
+     *     survived the close. Both are now stamped, forward-only.
      */
     private function closeStaleSessions(string $date): int
     {
@@ -100,17 +118,30 @@ class MarkAttendance extends Command
 
         EmployeeLoginSession::withoutGlobalScopes()->with('employee.shift')
             ->whereNull('logout_at')
-            ->whereDate('login_at', '<', $date)
+            ->whereDate('login_at', '<=', $date)
             ->chunkById(200, function ($sessions) use (&$closed) {
                 foreach ($sessions as $session) {
                     $loginDay = $session->login_at->toDateString();
-                    $shiftEnd = $session->employee?->shift?->end_time;
-                    $logoutAt = Carbon::parse($loginDay . ' ' . ($shiftEnd ?: '23:59:59'));
+                    $shift = $session->employee?->shift;
+                    $logoutAt = Carbon::parse($loginDay . ' ' . ($shift?->end_time ?: '23:59:59'));
+
+                    // Night shift: the end belongs to the next calendar day.
+                    if ($shift && ($shift->crosses_midnight
+                        || ($shift->start_time && $logoutAt->lessThanOrEqualTo(Carbon::parse($loginDay . ' ' . $shift->start_time))))) {
+                        $logoutAt->addDay();
+                    }
 
                     // A login AFTER the shift end (late-night work) would yield a negative
                     // session; fall back to end of the login day.
                     if ($logoutAt->lessThanOrEqualTo($session->login_at)) {
                         $logoutAt = Carbon::parse($loginDay . ' 23:59:59');
+                    }
+
+                    // Still inside the shift — a night shift in progress, not a stale session.
+                    // Compared on the EMPLOYEE's wall clock: sessions are stored as local times,
+                    // so a UTC now() is hours out and mis-decides this (26-Aug-2026).
+                    if ($logoutAt->greaterThan($this->localNow($session->company_id))) {
+                        continue;
                     }
 
                     $session->update([
@@ -121,11 +152,54 @@ class MarkAttendance extends Command
                         ),
                         'logout_reason'    => 'AUTO_CLOSED',
                     ]);
+
+                    $this->finishClose($session, $logoutAt);
                     $closed++;
                 }
             });
 
         return $closed;
+    }
+
+    /**
+     * Carry an auto-close through to the two places that are actually read by users: the
+     * attendance sheet (which the productivity report divides by) and the device row (which
+     * the Devices screen prints). Both move FORWARD only — a real punch-out or an HR
+     * correction that is already later than the cutoff must win.
+     */
+    private function finishClose(EmployeeLoginSession $session, Carbon $logoutAt): void
+    {
+        $attendance = EmployeeAttendanceLog::withoutGlobalScopes()
+            ->where('employee_id', $session->employee_id)
+            ->whereDate('work_date', $session->login_at->toDateString())
+            ->first();
+
+        if ($attendance) {
+            $updates = [];
+            if (! $attendance->check_out_at || $attendance->check_out_at->lessThan($logoutAt)) {
+                $updates['check_out_at'] = $logoutAt;
+                $updates['check_out_source'] = 'AUTO_CLOSED';
+            }
+            if (! $attendance->final_logout_at || $attendance->final_logout_at->lessThan($logoutAt)) {
+                $updates['final_logout_at'] = $logoutAt;
+            }
+            if ($updates) {
+                $updates['derivation_note'] = trim((string) $attendance->derivation_note
+                    . ' | session auto-closed ' . $logoutAt->format('Y-m-d H:i') . ' (no sign-out recorded)', ' |');
+                $attendance->update($updates);
+            }
+        }
+
+        // Revoke the token as well as flipping the row. Flipping alone (26-Aug-2026) marked
+        // the employee signed out on every screen while the agent kept a live credential and
+        // went on uploading violations — the console read 0 active agents with the violations
+        // tab still filling. The agent stops when its token dies.
+        foreach (\App\Models\EmployeeDevice::withoutGlobalScopes()
+            ->where('employee_id', $session->employee_id)
+            ->where('session_status', 'ACTIVE')->get() as $device) {
+            $device->revokeAgentToken();
+            $device->update(['session_status' => 'LOGGED_OUT', 'current_status' => 'OFFLINE']);
+        }
     }
 
     /**

@@ -33,6 +33,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'tracking-mode' => \App\Http\Middleware\EnforceTrackingMode::class,
             'licensed'   => \App\Http\Middleware\EnsureLicensed::class,
             'active-employee' => \App\Http\Middleware\EnsureActiveEmployment::class,
+            // 26-Aug-2026: refuse tracking ingestion from a device whose session has ended.
+            'live-session' => \App\Http\Middleware\EnsureLiveDeviceSession::class,
             'api-key'    => \App\Http\Middleware\ApiKeyAuth::class,
         ]);
 

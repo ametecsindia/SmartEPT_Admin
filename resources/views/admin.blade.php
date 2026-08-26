@@ -785,18 +785,31 @@
         <select id="rule-add-status"><option value="TRACKED">Tracked</option><option value="ALLOWED">Allowed</option><option value="BLOCKED">Blocked</option><option value="VIOLATION">Violation</option></select>
         <button class="btn solid" id="rule-add-btn" type="button">+ Add</button>
         <span class="row" style="margin-left:auto">
-          <select id="rule-action" title="What the agent does when a Blocked/Violation item is opened"><option value="WARN">On block: warn employee</option><option value="SCREENSHOT">On block: warn + screenshot</option><option value="NOTIFY">On block: notify manager</option><option value="CLOSE">On block: close the app</option></select>
+          <select id="rule-action" title="Sets the action on every Blocked/Violation row at once. Each row can still be changed individually."><option value="">Set all blocked to\u2026</option><option value="WARN">Warn employee</option><option value="SCREENSHOT">Warn + screenshot</option><option value="NOTIFY">Notify manager</option><option value="CLOSE">Close the app / block the site</option></select>
           <button class="btn" id="rule-seed" type="button">Load common defaults</button>
           <button class="btn solid" id="rule-save" type="button">Save rules</button>
         </span>
       </div>
       <div class="card">
-        <h3>Apps &amp; Websites Rules <span class="hint">what the agent tracks, allows, blocks or flags as a violation \u00b7 applies company-wide</span>
+        <h3>Apps &amp; Websites Rules <span class="hint">what the agent tracks, allows, blocks or flags as a violation &middot; applies company-wide</span>
           <input id="rule-q" placeholder="Search item" autocomplete="off" style="width:170px;font-weight:400;font-size:12px;margin-left:auto">
         </h3>
-        <div style="overflow-x:auto"><table><thead><tr><th>Item</th><th>Type</th><th>Status</th><th></th></tr></thead><tbody id="rule-rows"></tbody></table></div>
-        <div class="mut" style="margin-top:10px;font-size:11.5px"><b>Allowed</b> = whitelisted/productive \u00b7 <b>Tracked</b> = monitored only \u00b7 <b>Blocked</b> = employee warned + logged as a violation \u00b7 <b>Violation</b> = blocked and flagged for review. Agents pick up changes on their next heartbeat (~30s).</div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Item</th><th>Type</th><th>Status</th><th>What happens</th><th></th></tr></thead><tbody id="rule-rows"></tbody></table></div>
+        <div class="mut" style="margin-top:10px;font-size:11.5px"><b>Allowed</b> = whitelisted/productive &middot; <b>Tracked</b> = monitored only &middot; <b>Blocked</b> = employee warned + logged as a violation &middot; <b>Violation</b> = blocked and flagged for review. Agents pick up changes on their next heartbeat (~30s).</div>
+        <div class="mut" style="margin-top:6px;font-size:11.5px"><b>What happens</b> is now per row \u2014 you can warn about one app and close another. Warn, screenshot and notify take effect immediately. <b>Close / block</b> only ever prevents anything once enforcement is switched on below.</div>
         <div class="mut" id="rule-msg" style="margin-top:8px"></div>
+      </div>
+
+      <!-- Enforcement: learn first, then block. Nothing here is on by default. -->
+      <div class="card" id="enf-diag-card" style="display:none">
+        <h3>Who is enforced, and why <span class="hint">blocking follows the person, not the PC</span></h3>
+        <div id="enf-diag-body" class="mut">Loading…</div>
+      </div>
+      <div class="card" id="enf-card">
+        <h3>Enforcement <span class="hint">whether "close / block" actually prevents anything on employee PCs</span>
+          <span id="enf-mode-tag" class="tag" style="margin-left:auto">\u2026</span>
+        </h3>
+        <div id="enf-body" class="mut">Loading\u2026</div>
       </div>
     </div>
 
@@ -977,7 +990,10 @@
           <th title="Net Hrs (Actual Logged Hours - Allotted Break)">Net Hrs</th>
           <th>Time-outs</th><th>Violations</th>
           <th title="Productive% [ Productive Hrs / Net Hrs ]">Prod. %</th>
-        </tr></thead><tbody id="pr-rows"><tr><td colspan="21" class="mut">Pick a range and press Show.</td></tr></tbody></table>
+          <th title="Minutes past the shift start time, from the attendance sheet">Late (min)</th>
+          <th title="Actual Present − (Working + Idle + Break). Positive = signed-in time nothing was recorded for; negative = overlapping records double-counting the same minutes">Unaccounted</th>
+          <th title="Why this row's Actual Present is not simply sign-out − sign-in">Data Issue</th>
+        </tr></thead><tbody id="pr-rows"><tr><td colspan="24" class="mut">Pick a range and press Show.</td></tr></tbody></table>
         </div>
         <div class="mut" id="pr-note" style="margin-top:8px"></div>
       </div>
@@ -1767,6 +1783,21 @@
             <option value="PRESENCE_ONLY">Presence &amp; breaks only — no screenshots, no activity</option>
             <option value="EXCLUDED">Do Not Track — capture nothing at all</option>
           </select></div>
+        <div class="full"><label>Enforcement <span style="font-weight:400;color:var(--ink-3)">— whether this person's PCs actually BLOCK the apps and websites on your rules</span></label>
+          <select id="f-enforce">
+            <option value="">Inherit (from team / department / branch / company)</option>
+            <option value="ENFORCED">Enforce ON — blocked apps and sites are refused for this person</option>
+            <option value="EXEMPT">Enforce OFF — this person is not blocked, on any PC they sign in to</option>
+          </select>
+          <div class="row" style="margin-top:8px;align-items:flex-end;gap:10px">
+            <div><label style="font-size:11px">Exempt from</label><input id="f-enf-from" type="date" style="width:160px"></div>
+            <div><label style="font-size:11px">Exempt until</label><input id="f-enf-until" type="date" style="width:160px"></div>
+            <div style="flex:1;min-width:200px"><label style="font-size:11px">Reason</label><input id="f-enf-reason" maxlength="191" placeholder="e.g. covering client calls on WhatsApp this week"></div>
+          </div>
+          <div class="mut" style="font-size:11px;margin-top:5px">Dates make the exemption temporary and it ends by itself — an exemption someone has to remember to remove becomes permanent. Both dates included. Leave them blank and the dropdown above decides.</div>
+          <div class="mut" style="font-size:11px;margin-top:5px"><b>Nothing is blocked for anybody</b> until enforcement is switched on for the whole company in App &amp; Web Rules, after the learning period. This setting only decides who is inside that.</div>
+          <div class="mut" style="font-size:11px;margin-top:5px;color:var(--warn)"><b>Websites are machine-wide.</b> Blocked sites are refused on the PC itself, so on a <i>shared</i> PC an exempt person still cannot reach them. Apps are per person and work as you expect.</div>
+        </div>
         <div class="full"><label>Gate-to-PC exclusion <span style="font-weight:400;color:var(--ink-3)">— whether this person must punch in at the door before their PC starts working</span></label>
           <select id="f-gate">
             <option value="">Inherit (from team / department / branch)</option>
@@ -2437,7 +2468,7 @@ function show(v) {
   if (v === 'users') loadUsers();
   if (v === 'devices') loadDevices();
   if (v === 'policies') initPolicies();
-  if (v === 'rules') initRules();
+  if (v === 'rules') { initRules(); initEnforcement(); }
   if (v === 'biometric') initBiometric();
   if (v === 'gateexcl') initGateExcl();
   if (v === 'reports') initReports();
@@ -2468,7 +2499,7 @@ function refreshView() {
   else if (v === 'users') loadUsers();
   else if (v === 'devices') loadDevices();
   else if (v === 'policies') initPolicies();
-  else if (v === 'rules') initRules();
+  else if (v === 'rules') { initRules(); initEnforcement(); }
   else if (v === 'biometric') initBiometric();
   else if (v === 'reports') initReports();
   else if (v === 'license') loadLicense();
@@ -3166,11 +3197,11 @@ async function loadUsage() {
   try {
     const a = await api('/reports/employee/' + id + '/app-usage' + q);
     secTable(a.data, ['app_name'], $('#us-app-rows'), 'No app usage recorded for this day.');
-  } catch (e) { $('#us-app-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="4" class="mut">' + esc(e.message) + '</td></tr>'; }
+  } catch (e) { $('#us-app-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="5" class="mut">' + esc(e.message) + '</td></tr>'; }
   try {
     const w = await api('/reports/employee/' + id + '/website-usage' + q);
     secTable(w.data, ['site'], $('#us-web-rows'), 'No website usage recorded for this day.');
-  } catch (e) { $('#us-web-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="4" class="mut">' + esc(e.message) + '</td></tr>'; }
+  } catch (e) { $('#us-web-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="5" class="mut">' + esc(e.message) + '</td></tr>'; }
   try {
     const c = await api('/reports/employee/' + id + '/compliance' + q);
     $('#us-comp-rows').innerHTML = (c.data || []).map((v) => {
@@ -3315,6 +3346,22 @@ function trackBadge(m) {
   if (m === 'PRESENCE_ONLY') return ' <span class="tag t-warn" title="Presence &amp; breaks only — no screenshots or activity">Presence only</span>';
   return '';
 }
+// An exemption from blocking has to be visible in the LIST, not only inside the
+// record. One nobody can see while scanning the page is one nobody ever reviews,
+// and "why was that person never blocked?" is a question asked after the damage.
+function enforceBadge(e) {
+  if (e.enforcement_mode !== 'EXEMPT') return '';
+  const dated = e.enforcement_exempt_from || e.enforcement_exempt_until;
+
+  let when = 'permanent';
+  if (dated) {
+    const f = e.enforcement_exempt_from ? String(e.enforcement_exempt_from).slice(0, 10) : 'now';
+    const u = e.enforcement_exempt_until ? String(e.enforcement_exempt_until).slice(0, 10) : 'no end date';
+    when = f + ' to ' + u;
+  }
+  const why = e.enforcement_exempt_reason ? ' — ' + e.enforcement_exempt_reason : '';
+  return ' <span class="tag t-warn" title="Not blocked: ' + esc(when + why) + '">Enforce OFF</span>';
+}
 async function loadEmployees() {
   const q = $('#emp-q').value.trim();
   try {
@@ -3333,7 +3380,7 @@ async function loadEmployees() {
       const st = { ACTIVE: 't-ok', ON_LEAVE: 't-warn', RELIEVED: 't-off' }[e.employment_status] || 't-off';
       return '<tr class="clk" data-id="' + e.id + '" data-name="' + esc(fullName(e)) + '">'
         + '<td>' + esc(e.employee_code) + '</td>'
-        + '<td><span class="nm">' + esc(fullName(e)) + '</span>' + trackBadge(e.tracking_mode) + '</td>'
+        + '<td><span class="nm">' + esc(fullName(e)) + '</span>' + trackBadge(e.tracking_mode) + enforceBadge(e) + '</td>'
         + '<td>' + esc(e.email || '—') + '</td>'
         + '<td>' + esc(e.department?.name || '—') + '</td><td>' + esc(e.team?.name || '—') + '</td>'
         + '<td>' + esc(e.shift?.name || '—') + '</td>'
@@ -3497,15 +3544,19 @@ async function openEmpModal(id) {
       set('#f-doj', e.date_of_joining ? String(e.date_of_joining).slice(0, 10) : '');
       set('#f-bio', e.biometric_id);
       set('#f-track', e.tracking_mode || '');
+      set('#f-enforce', e.enforcement_mode || '');
+      set('#f-enf-from', e.enforcement_exempt_from ? String(e.enforcement_exempt_from).slice(0, 10) : '');
+      set('#f-enf-until', e.enforcement_exempt_until ? String(e.enforcement_exempt_until).slice(0, 10) : '');
+      set('#f-enf-reason', e.enforcement_exempt_reason || '');
       set('#f-gate', e.gate_mode || '');
       set('#f-gate-from', e.gate_mode_from ? String(e.gate_mode_from).slice(0, 10) : '');
       set('#f-gate-until', e.gate_mode_until ? String(e.gate_mode_until).slice(0, 10) : '');
       set('#f-gate-reason', e.gate_mode_reason || '');
     } catch (err) { $('#emp-m-err').textContent = err.message; }
   } else {
-    ['#f-first', '#f-last', '#f-code', '#f-email', '#f-mobile', '#f-doj', '#f-bio', '#f-gate-from', '#f-gate-until', '#f-gate-reason'].forEach((s) => set(s, ''));
+    ['#f-first', '#f-last', '#f-code', '#f-email', '#f-mobile', '#f-doj', '#f-bio', '#f-gate-from', '#f-gate-until', '#f-gate-reason', '#f-enf-from', '#f-enf-until', '#f-enf-reason'].forEach((s) => set(s, ''));
     set('#f-status', 'ACTIVE');
-    ['#f-branch', '#f-dept', '#f-team', '#f-manager', '#f-desig', '#f-shift', '#f-track', '#f-gate'].forEach((s) => set(s, ''));
+    ['#f-branch', '#f-dept', '#f-team', '#f-manager', '#f-desig', '#f-shift', '#f-track', '#f-gate', '#f-enforce'].forEach((s) => set(s, ''));
   }
   $('#emp-ovl').classList.add('open');
 }
@@ -3834,7 +3885,7 @@ const ORG_DEFS = {
   designations: { label: 'Designation', cols: ['name','code','level'],
                   fields: [['name','Name','text',1],['code','Code','text'],['level','Level (0=junior)','num']] },
   shifts:       { label: 'Shift',       cols: ['name','code','timing'],
-                  fields: [['name','Name','text',1],['code','Code','text'],['start_time','Start (HH:MM)','time'],['end_time','End (HH:MM)','time'],['grace_minutes','Grace (min)','num'],['break_minutes_allowed','Break allowed (min)','num'],['post_shift_auto_logout_minutes','Auto sign-out after shift end (min)','num',1]] },
+                  fields: [['name','Name','text',1],['code','Code','text'],['start_time','Start (HH:MM)','time'],['end_time','End (HH:MM)','time'],['grace_minutes','Grace (min)','num'],['break_minutes_allowed','Break allowed (min)','num'],['post_shift_auto_logout_minutes','Auto sign-out after shift end (min) — blank = never','num'],['restrict_login_to_shift','Block agent sign-in outside these hours (the SmartEPT agent only — never the admin console)','yesno',1]] },
 };
 let ORG_TAB = 'branches';
 async function initOrg() {
@@ -3966,6 +4017,12 @@ function orgField(f, val) {
       ['REQUIRED', 'Required — must punch in, even if a level above is excluded']];
     return '<label>' + label + star + '</label><select data-k="' + k + '">'
       + opts.map((o) => '<option value="' + o[0] + '"' + ((val || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>';
+  }
+  if (type === 'yesno') {
+    const opts = [['0', 'No — sign-in allowed at any time'], ['1', 'Yes — refuse sign-in outside these hours']];
+    const cur = (val === true || val === 1 || val === '1') ? '1' : '0';
+    return '<label>' + label + star + '</label><select data-k="' + k + '">'
+      + opts.map((o) => '<option value="' + o[0] + '"' + (cur === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>';
   }
   if (type === 'trackmode') {
     const opts = [['', 'Inherit (from parent / company)'], ['FULL', 'Full — capture everything'],
@@ -4200,6 +4257,10 @@ $('#emp-m-save').onclick = async () => {
     date_of_joining: $('#f-doj').value || null,
     biometric_id: $('#f-bio').value.trim() || null,
     tracking_mode: $('#f-track').value || null,
+    enforcement_mode: $('#f-enforce').value || null,
+    enforcement_exempt_from: $('#f-enf-from').value || null,
+    enforcement_exempt_until: $('#f-enf-until').value || null,
+    enforcement_exempt_reason: $('#f-enf-reason').value.trim() || null,
     gate_mode: $('#f-gate').value || null,
     gate_mode_from: $('#f-gate-from').value || null,
     gate_mode_until: $('#f-gate-until').value || null,
@@ -4455,7 +4516,7 @@ async function loadPolicies() {
       || '<tr><td colspan="4" class="mut">No ' + esc(type.replace('_', '/')) + ' policies yet — create the first one on the right.</td></tr>';
   } catch (e) {
     POL_LIST = [];
-    $('#pol-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="4" class="mut">' + esc(e.message) + '</td></tr>';
+    $('#pol-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="5" class="mut">' + esc(e.message) + '</td></tr>';
   }
   refreshAssignPolicyOptions();
 }
@@ -4573,31 +4634,68 @@ const RULE_SEED = [
   { item: 'x.com', kind: 'site', status: 'BLOCKED' }, { item: 'reddit.com', kind: 'site', status: 'BLOCKED' },
   { item: 'tiktok.com', kind: 'site', status: 'VIOLATION' }, { item: 'netflix.com', kind: 'site', status: 'VIOLATION' },
 ];
+// What a rule does when it fires. Only CLOSE reaches the enforcement layer; the
+// rest are the agent's existing warn/notify/screenshot behaviour.
+//
+// The API stores CLOSE for applications and BLOCK for websites (the two tables
+// have always disagreed on the name). One label here, translated on save.
+const RULE_ACTIONS = ['WARN', 'SCREENSHOT', 'NOTIFY', 'CLOSE'];
+const RULE_ACTION_LABEL = {
+  WARN: 'Warn employee', SCREENSHOT: 'Warn + screenshot',
+  NOTIFY: 'Notify manager', CLOSE: 'Close / block it',
+};
+// Mirrors the agent's never-terminate list and PolicyRuleController::NEVER_ENFORCE.
+// Shown greyed in the dropdown so an admin sees WHY rather than hitting a 422.
+const RULE_NEVER_ENFORCE = ['explorer', 'winlogon', 'lsass', 'csrss', 'svchost', 'services',
+  'smss', 'wininit', 'dwm', 'msmpeng', 'trustedinstaller', 'smartept', 'smartept agent'];
+const RULE_CONFIRM_ENFORCE = ['cmd', 'powershell', 'pwsh', 'taskmgr', 'regedit', 'mmc',
+  'chrome', 'msedge', 'firefox', 'brave', 'outlook', 'teams', 'ms-teams', 'zoom', 'slack',
+  'anydesk', 'teamviewer'];
+const ruleBase = (item) => String(item || '').toLowerCase().replace(/\.exe$/, '').trim();
+const ruleBlocks = (r) => r.status === 'BLOCKED' || r.status === 'VIOLATION';
+
 function rulesFromPolicy(pol, kind) {
   if (!pol) return [];
   const allowed = (kind === 'app' ? pol.allowed_apps : pol.allowed_sites) || [];
   const blocked = (kind === 'app' ? pol.blocked_apps : pol.blocked_sites) || [];
   const cats = pol.categories || {};
+  // Per-rule rows from policy_rules, keyed by the normalised item so a row can
+  // find its own saved action. Absent on an older server — everything then
+  // falls back to the policy-level action, exactly as before.
+  const perRule = {};
+  (pol.rules || []).forEach((r) => { if (r && r.item) perRule[ruleBase(r.item)] = r; });
+  const fallback = String(pol.action_on_blocked || 'WARN').toUpperCase();
+
   const seen = new Set(); const out = [];
-  const add = (item, status) => { const k = String(item).toLowerCase(); if (!item || seen.has(k)) return; seen.add(k); out.push({ item: String(item), kind, status }); };
+  const add = (item, status) => {
+    const k = String(item).toLowerCase(); if (!item || seen.has(k)) return; seen.add(k);
+    const saved = perRule[ruleBase(item)];
+    // BLOCK and CLOSE are the same thing wearing the two tables' different names.
+    let action = String((saved && saved.action) || fallback).toUpperCase();
+    if (action === 'BLOCK') action = 'CLOSE';
+    if (action === 'LOG') action = 'WARN';
+    out.push({
+      item: String(item), kind, status,
+      action: RULE_ACTIONS.includes(action) ? action : 'WARN',
+      confirmed: !!(saved && saved.confirmed),
+    });
+  };
   Object.keys(cats).forEach((it) => { const c = String(cats[it]).toUpperCase(); if (RULE_ORDER.includes(c)) add(it, c); });
   allowed.forEach((it) => add(it, 'ALLOWED'));
   blocked.forEach((it) => { const c = String(cats[it] || '').toUpperCase(); add(it, c === 'VIOLATION' ? 'VIOLATION' : 'BLOCKED'); });
   return out;
 }
 async function initRules() {
-  $('#rule-rows').innerHTML = '<tr><td colspan="4" class="mut">Loading…</td></tr>';
+  $('#rule-rows').innerHTML = '<tr><td colspan="5" class="mut">Loading…</td></tr>';
   try {
     const [ap, wp] = await Promise.all([api('/policies/application'), api('/policies/website')]);
     RULE_POL.app = (ap.data || [])[0] || null;
     RULE_POL.site = (wp.data || [])[0] || null;
     RULES = rulesFromPolicy(RULE_POL.app, 'app').concat(rulesFromPolicy(RULE_POL.site, 'site'));
-    const act = (RULE_POL.app && RULE_POL.app.action_on_blocked) || (RULE_POL.site && RULE_POL.site.action_on_blocked);
-    if (act) $('#rule-action').value = act;
     renderRules();
     if (!RULES.length) $('#rule-msg').innerHTML = 'No rules yet. Click <b>Load common defaults</b> to start, then <b>Save rules</b>.';
   } catch (e) {
-    $('#rule-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="4" class="mut">' + esc(e.message) + '</td></tr>';
+    $('#rule-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="5" class="mut">' + esc(e.message) + '</td></tr>';
   }
 }
 function renderRules() {
@@ -4609,18 +4707,55 @@ function renderRules() {
     + '<td><select data-rule-status="' + i + '" class="rst rst-' + r.status + '">'
     + RULE_ORDER.map((sx) => '<option value="' + sx + '"' + (sx === r.status ? ' selected' : '') + '>' + RULE_LABEL[sx] + '</option>').join('')
     + '</select></td>'
+    + '<td>' + ruleActionCell(r, i) + '</td>'
     + '<td><button class="btn danger" data-rule-del="' + i + '" type="button">Remove</button></td></tr>').join('')
-    || '<tr><td colspan="4" class="mut">No rules match. Add one above or load defaults.</td></tr>';
+    || '<tr><td colspan="5" class="mut">No rules match. Add one above or load defaults.</td></tr>';
 }
+
+// The per-row action. Allowed/Tracked items have nothing to do when they fire,
+// so the cell says so rather than offering a choice that means nothing.
+function ruleActionCell(r, i) {
+  if (!ruleBlocks(r)) return '<span class="mut">—</span>';
+
+  const base = ruleBase(r.item);
+  const never = r.kind === 'app' && RULE_NEVER_ENFORCE.includes(base);
+  const confirm = r.kind === 'app' && RULE_CONFIRM_ENFORCE.includes(base);
+
+  const opts = RULE_ACTIONS.map((a) => {
+    // Refused server-side too — this just explains it before the click.
+    const off = (a === 'CLOSE' && never) ? ' disabled' : '';
+    return '<option value="' + a + '"' + (a === r.action ? ' selected' : '') + off + '>'
+      + RULE_ACTION_LABEL[a] + (a === 'CLOSE' && never ? ' — not allowed' : '') + '</option>';
+  }).join('');
+
+  let note = '';
+  if (never) {
+    note = '<div class="mut" style="font-size:11px">Windows needs this — it can never be closed.</div>';
+  } else if (confirm && r.action === 'CLOSE') {
+    note = '<div style="font-size:11px"><label><input type="checkbox" data-rule-confirm="' + i + '"'
+      + (r.confirmed ? ' checked' : '') + '> I understand this also stops people working</label></div>';
+  }
+
+  return '<select data-rule-action="' + i + '">' + opts + '</select>' + note;
+}
+
 function addRule() {
   const item = ($('#rule-add-item').value || '').trim().toLowerCase();
   if (!item) return;
   const kind = $('#rule-add-type').value, status = $('#rule-add-status').value;
   if (RULES.some((r) => r.item.toLowerCase() === item && r.kind === kind)) { toast('Already in the list'); return; }
-  RULES.push({ item, kind, status }); $('#rule-add-item').value = ''; renderRules();
+  // New rules start at WARN, never at CLOSE. Nothing this screen creates should
+  // ever start preventing something the moment it is saved.
+  RULES.push({ item, kind, status, action: 'WARN', confirmed: false });
+  $('#rule-add-item').value = ''; renderRules();
 }
 async function saveRules() {
-  const action = $('#rule-action').value;
+  // The policy-level action is now only a fallback for agents at or below 0.14,
+  // which read it and know nothing about per-rule actions. Send the gentlest
+  // thing any blocked row asks for, so an old agent can never do MORE than the
+  // console shows.
+  const blockedActions = RULES.filter(ruleBlocks).map((r) => r.action);
+  const action = blockedActions.length && blockedActions.every((a) => a === 'CLOSE') ? 'CLOSE' : 'WARN';
   const build = (kind) => {
     const allowed = [], blocked = [], categories = {};
     RULES.filter((r) => r.kind === kind).forEach((r) => {
@@ -4642,17 +4777,339 @@ async function saveRules() {
     if (RULE_POL.site) { await api('/policies/website/' + RULE_POL.site.id, { method: 'PUT', body: JSON.stringify(webBody) }); }
     else { const r = await api('/policies/website', { method: 'POST', body: JSON.stringify(webBody) }); RULE_POL.site = r.data;
       await api('/policies/assign', { method: 'POST', body: JSON.stringify({ policy_type: 'WEBSITE', policy_id: RULE_POL.site.id, assignable_type: 'COMPANY', assignable_id: ME.company_id }) }); }
+    // Per-rule actions. Saved separately from the policy because this endpoint
+    // validates properly — it refuses to enforce against Windows itself, and
+    // requires a confirmation for the tools people work with.
+    await saveRuleActions('application', RULE_POL.app, 'app');
+    await saveRuleActions('website', RULE_POL.site, 'site');
+
     msg.style.color = 'var(--ok)'; msg.textContent = '\u2713 Saved & applied company-wide — agents pick it up on their next heartbeat (~30s).';
     initRules();
-  } catch (e) { msg.style.color = 'var(--danger)'; msg.textContent = 'Error: ' + (e.message || e); }
+    initEnforcement();
+  } catch (e) {
+    msg.style.color = 'var(--danger)';
+    // api() already unwraps error.message, so a 422 from the rules endpoint
+    // arrives here naming the exact items it refused — far more use to an
+    // admin than a bare "Error".
+    msg.textContent = e.message || String(e);
+  }
+}
+
+async function saveRuleActions(type, policy, kind) {
+  if (!policy) return;
+  const rules = RULES.filter((r) => r.kind === kind).map((r) => ({
+    item: r.item,
+    label: r.item,
+    status: r.status,
+    // The two policy tables spell the same action differently: applications
+    // store CLOSE, websites store BLOCK. One control on screen, translated here.
+    action: !ruleBlocks(r) ? 'LOG'
+      : (r.action === 'CLOSE' ? (kind === 'site' ? 'BLOCK' : 'CLOSE') : r.action),
+    confirmed: !!r.confirmed,
+  }));
+  await api('/policies/' + type + '/' + policy.id + '/rules', {
+    method: 'PUT', body: JSON.stringify({ rules }),
+  });
 }
 $('#rule-add-btn').onclick = addRule;
 $('#rule-add-item').addEventListener('keydown', (e) => { if (e.key === 'Enter') addRule(); });
 $('#rule-save').onclick = saveRules;
-$('#rule-seed').onclick = () => { RULE_SEED.forEach((sd) => { if (!RULES.some((r) => r.item.toLowerCase() === sd.item && r.kind === sd.kind)) RULES.push({ item: sd.item, kind: sd.kind, status: sd.status }); }); renderRules(); toast('Loaded common defaults — review, then Save rules'); };
+// Defaults load as WARN, never as Close. The preset is populated but not armed —
+// the admin decides which rows start preventing something.
+$('#rule-seed').onclick = () => { RULE_SEED.forEach((sd) => { if (!RULES.some((r) => r.item.toLowerCase() === sd.item && r.kind === sd.kind)) RULES.push({ item: sd.item, kind: sd.kind, status: sd.status, action: 'WARN', confirmed: false }); }); renderRules(); toast('Loaded common defaults — review, then Save rules'); };
 $('#rule-q').addEventListener('input', renderRules);
-$('#rule-rows').addEventListener('change', (e) => { const s = e.target.closest('[data-rule-status]'); if (s) { RULES[+s.dataset.ruleStatus].status = s.value; s.className = 'rst rst-' + s.value; } });
+$('#rule-rows').addEventListener('change', (e) => {
+  const s = e.target.closest('[data-rule-status]');
+  if (s) {
+    RULES[+s.dataset.ruleStatus].status = s.value;
+    // Changing Tracked -> Blocked has to redraw: the row gains an action cell.
+    renderRules();
+    return;
+  }
+  const a = e.target.closest('[data-rule-action]');
+  if (a) {
+    const r = RULES[+a.dataset.ruleAction];
+    r.action = a.value;
+    // Stepping away from Close drops the confirmation with it — an admin who
+    // changes their mind must not leave a stale "I understand" behind.
+    if (r.action !== 'CLOSE') r.confirmed = false;
+    renderRules();
+    return;
+  }
+  const c = e.target.closest('[data-rule-confirm]');
+  if (c) RULES[+c.dataset.ruleConfirm].confirmed = c.checked;
+});
 $('#rule-rows').addEventListener('click', (e) => { const d = e.target.closest('[data-rule-del]'); if (d) { RULES.splice(+d.dataset.ruleDel, 1); renderRules(); } });
+// "Set all blocked to…" — a convenience over the per-row control, not a
+// replacement for it. Never applies Close to something that must never be closed.
+$('#rule-action').addEventListener('change', (e) => {
+  const v = e.target.value;
+  if (!v) return;
+  let skipped = 0;
+  RULES.forEach((r) => {
+    if (!ruleBlocks(r)) return;
+    if (v === 'CLOSE' && r.kind === 'app' && RULE_NEVER_ENFORCE.includes(ruleBase(r.item))) { skipped++; return; }
+    r.action = v;
+    if (v !== 'CLOSE') r.confirmed = false;
+  });
+  e.target.value = '';
+  renderRules();
+  toast(skipped ? ('Applied to all blocked rows (' + skipped + ' skipped — Windows needs them)') : 'Applied to all blocked rows');
+});
+// ---- Enforcement: learn first, then block ----------------------------------
+//
+// A tenant goes OFF -> AUDIT -> ENFORCE and never straight to ENFORCE. The strict
+// allow set covers Windows and Program Files only, so everything in the user
+// profile is denied — which stops portable browsers for free and ALSO stops
+// Teams, VS Code and anything else installed under AppData. The audit period is
+// how that list arrives from an event log instead of from an angry phone call.
+
+let ENF = null;
+
+async function initEnforcement() {
+  // Loaded alongside, not awaited: a diagnostics panel that fails must never
+  // stop the screen that actually turns enforcement on and off.
+  initEnforcementDiagnostics();
+
+  const body = $('#enf-body'), tag = $('#enf-mode-tag');
+  try {
+    const res = await api('/enforcement/audit-report');
+    ENF = res.data || null;
+    if (!ENF) { body.textContent = 'Unavailable.'; return; }
+
+    const mode = ENF.mode || 'OFF';
+    tag.textContent = { OFF: 'Off', AUDIT: 'Learning', ENFORCE: 'Enforcing' }[mode] || mode;
+    tag.className = 'tag ' + ({ OFF: 't-info', AUDIT: 't-warn', ENFORCE: 't-ok' }[mode] || 't-info');
+
+    body.innerHTML = enfMarkup(mode);
+    wireEnforcement();
+  } catch (e) {
+    body.innerHTML = isDenied(e) ? deniedCard() : '<span class="mut">' + esc(e.message || e) + '</span>';
+  }
+}
+
+// Minutes as something a person reads. The learning period is configurable per
+// deployment — 20 minutes on a pilot, three days at a bank — so the card cannot
+// hardcode either unit.
+function enfDuration(mins) {
+  const m = Math.max(0, Number(mins) || 0);
+  if (m < 90) return (Math.round(m * 10) / 10) + ' minute(s)';
+  if (m < 2880) return (Math.round(m / 6) / 10) + ' hour(s)';
+  return (Math.round(m / 144) / 10) + ' day(s)';
+}
+
+function enfMarkup(mode) {
+  if (mode === 'OFF') {
+    return '<p>Nothing is being prevented. Rules set to <b>Close / block</b> are recorded as violations '
+      + 'and the employee is warned, exactly as before.</p>'
+      + '<p class="mut">Before anything can actually be blocked, SmartEPT watches for '
+      + enfDuration(ENF.min_audit_minutes || 0) + ' and reports '
+      + 'what it <i>would</i> have blocked. That list almost always contains programs your staff genuinely use — '
+      + 'Teams, Zoom and VS Code install themselves somewhere Windows treats as untrusted. '
+      + 'Finding them now is the difference between a quiet rollout and a very loud morning.</p>'
+      + '<button class="btn solid" id="enf-start" type="button">Start learning</button>';
+  }
+
+  const p = ENF.promotion || {};
+  const rows = (list, empty) => (list && list.length)
+    ? '<div style="overflow-x:auto"><table><thead><tr><th>Program</th><th>Times seen</th><th>PC</th><th></th></tr></thead><tbody>'
+      + list.map((r) => '<tr><td>' + esc(r.target) + '</td><td>' + (r.occurrences || 1) + '</td>'
+        + '<td class="mut">' + esc(r.device_uuid || '—') + '</td>'
+        + '<td>' + (r.expected ? '' : '<button class="btn" data-enf-resolve="' + r.id + '" type="button">Allow / dismiss</button>') + '</td></tr>').join('')
+      + '</tbody></table></div>'
+    : '<p class="mut">' + empty + '</p>';
+
+  let html = '<p><b>' + (mode === 'AUDIT' ? 'Learning' : 'Enforcing') + '</b> for '
+    + enfDuration(ENF.audit_minutes || 0)
+    + (mode === 'AUDIT' ? ' of ' + enfDuration(ENF.min_audit_minutes || 0) : '')
+    + ' \u00b7 ' + (ENF.devices_reporting || 0) + ' PC(s) reporting.</p>';
+
+  if (mode === 'AUDIT') {
+    html += '<p class="mut">Nothing is blocked yet.</p>';
+  }
+
+  html += '<h4 style="margin:14px 0 6px">Would be blocked — intended</h4>'
+    + rows(ENF.intended, 'Nothing yet. Open a blocked app on a PC that has the agent, then refresh. '
+      + 'If <b>Violations</b> is showing that app but this stays empty, the agent reached the server '
+      + 'but this report did not \u2014 check the agent window for a line starting <code>[smartept] DROPPED</code>.')
+    + '<h4 style="margin:14px 0 6px">Would be blocked — <span style="color:var(--danger)">not on your rules</span></h4>'
+    + rows(ENF.unexpected, 'Nothing. Every program the policy would stop is one you asked for.');
+
+  if (mode === 'AUDIT') {
+    html += '<div style="margin-top:14px">'
+      + (p.allowed
+        ? '<button class="btn solid" id="enf-promote" type="button">Turn enforcement on</button>'
+        // A disabled button that looks clickable reads as a broken button. It is
+        // refusing on purpose, so it has to LOOK like it is refusing, and say why
+        // where the eye already is rather than only in a tooltip.
+        : '<button class="btn" disabled title="' + esc(p.reason || '') + '"'
+          + ' style="opacity:.5;cursor:not-allowed">\uD83D\uDD12 Turn enforcement on</button>'
+          + '<div style="margin-top:6px;font-size:11.5px;color:var(--danger)"><b>Not yet:</b> '
+          + esc(p.reason || 'the learning report is not clear.') + '</div>')
+      + '</div>';
+  }
+
+  // The kill switch is always available and never gated. A machine that cannot
+  // be un-blocked is the failure mode this whole design refuses to ship.
+  html += '<div style="margin-top:14px"><button class="btn danger" id="enf-disable" type="button">'
+    + (mode === 'AUDIT' ? 'Stop learning' : 'Switch enforcement off') + '</button>'
+    + '<span class="mut" style="margin-left:8px;font-size:11.5px">'
+    + (mode === 'AUDIT'
+      ? 'Goes back to Off. Nothing was being blocked, so nothing changes on any PC.'
+      : 'Takes effect on every PC within ~30 seconds.')
+    + '</span></div>';
+
+  return html;
+}
+
+// "Why is this person blocked and that one not?"
+//
+// Blocking resolves through six levels, so the honest answer is a short chain of
+// reasoning. It used to take reading the database by hand, which meant every
+// such question came back to us. A support answer that needs somebody to run a
+// script on the server is not a support answer, it is a promise to be available.
+async function initEnforcementDiagnostics() {
+  const card = $('#enf-diag-card');
+  const body = $('#enf-diag-body');
+  if (!card || !body) return;
+
+  let d;
+  try { d = (await api('/enforcement/diagnostics')).data; }
+  catch { card.style.display = 'none'; return; }
+
+  card.style.display = '';
+  let html = '';
+
+  // Schema first, and loudly. A missing column makes every endpoint heartbeat
+  // fail, so machines keep the last policy they were given — some block, some
+  // do not, and nothing on either PC looks wrong. That presents as "it works
+  // for some employees" and is the hardest report to act on.
+  if (d.schema && !d.schema.ok) {
+    html += '<div style="border:1px solid var(--danger);background:var(--danger-soft);'
+      + 'border-radius:8px;padding:12px 14px;margin-bottom:14px">'
+      + '<b style="color:var(--danger)">The database is missing columns this needs.</b><br>'
+      + '<span style="font-size:12px">' + esc(d.schema.why || '') + '</span><br>'
+      + '<code>' + esc(d.schema.fix || '') + '</code><br>'
+      + '<span class="mut" style="font-size:11.5px">Missing: ' + esc((d.schema.missing || []).join(', ')) + '</span>'
+      + '</div>';
+  }
+
+  if (d.tenant) {
+    html += '<div style="margin-bottom:12px"><b>Company enforcement: ' + esc(d.tenant.mode) + '</b>'
+      + ' <span class="mut" style="font-size:12px">' + esc(d.tenant.note || '') + '</span></div>';
+  }
+
+  const machines = d.machines || [];
+  html += '<h4 style="margin:10px 0 6px">Computers</h4>';
+  if (!machines.length) {
+    html += '<div class="mut" style="font-size:12px">No computer has enrolled yet.</div>';
+  } else {
+    html += '<table><thead><tr><th>Computer</th><th>Signed in</th>'
+      + '<th>Policy</th><th>Health</th><th>Last seen</th></tr></thead><tbody>';
+    machines.forEach((m) => {
+      html += '<tr>'
+        + '<td>' + esc(m.hostname) + '</td>'
+        + '<td>' + (m.signed_in ? esc(m.signed_in.name) : '<span class="mut">nobody</span>') + '</td>'
+        + '<td>v' + (m.policy || 0) + '</td>'
+        + '<td>' + esc(m.health) + '</td>'
+        + '<td>' + (m.stale
+            ? '<span class="tag t-warn" title="' + esc(m.note || '') + '">not checking in</span>'
+            : '<span class="mut">' + esc((m.last_seen_at || '').replace('T', ' ').slice(0, 16)) + '</span>')
+        + '</td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+
+  // The rules themselves. A rule saved in the console and never sent is the
+  // defect this product exists to remove: the admin sees it, believes it, and
+  // it does nothing.
+  const rules = d.rules || [];
+  const dropped = rules.filter((r) => !r.sent);
+  html += '<h4 style="margin:14px 0 6px">Rules <span class="mut" style="font-weight:400;font-size:12px">'
+    + rules.length + ' total, ' + dropped.length + ' NOT reaching any PC</span></h4>';
+  if (!rules.length) {
+    html += '<div class="mut" style="font-size:12px">No rules yet. Nothing will be blocked.</div>';
+  } else {
+    html += '<table><thead><tr><th>Type</th><th>Item</th><th>What happens</th>'
+      + '<th>Reaches PCs?</th><th>Why</th></tr></thead><tbody>';
+    rules.forEach((r) => {
+      html += '<tr>'
+        + '<td>' + esc(r.type) + '</td>'
+        + '<td>' + esc(r.label) + '</td>'
+        + '<td>' + esc(r.action || '—') + ' <span class="mut">' + esc(r.status || '') + '</span></td>'
+        + '<td><span class="tag ' + (r.sent ? 't-ok' : 't-off') + '">'
+        + (r.sent ? 'Sent' : 'DROPPED') + '</span></td>'
+        + '<td class="mut" style="font-size:12px">' + esc(r.why) + '</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table>';
+    if (dropped.length) {
+      html += '<div class="mut" style="font-size:11.5px;margin-top:6px;color:var(--warn)">'
+        + '<b>' + dropped.length + ' rule(s) are saved here and reach no PC.</b> '
+        + 'A rule can look completely correct on the Rules screen and still be dropped — '
+        + 'both "What happens" AND the row being armed have to be right.'
+        + '</div>';
+    }
+  }
+
+  const emps = d.employees || [];
+  const exempt = emps.filter((e) => e.mode !== 'ENFORCED');
+  html += '<h4 style="margin:14px 0 6px">People <span class="mut" style="font-weight:400;font-size:12px">'
+    + emps.length + ' total, ' + exempt.length + ' not enforced</span></h4>';
+  html += '<table><thead><tr><th>Employee</th><th>Enforced?</th>'
+    + '<th>Decided at</th><th>Why</th></tr></thead><tbody>';
+  emps.forEach((e) => {
+    const on = e.mode === 'ENFORCED';
+    html += '<tr>'
+      + '<td>' + esc(e.name) + (e.code ? ' <span class="mut">' + esc(e.code) + '</span>' : '') + '</td>'
+      + '<td><span class="tag ' + (on ? 't-ok' : 't-warn') + '">' + (on ? 'Enforced' : 'Not blocked') + '</span></td>'
+      + '<td>' + esc(e.level) + '</td>'
+      + '<td class="mut" style="font-size:12px">' + esc(e.why) + '</td>'
+      + '</tr>';
+  });
+  html += '</tbody></table>';
+
+  html += '<div class="mut" style="font-size:11.5px;margin-top:10px">'
+    + 'An employee shown <b>Not blocked</b> blocks nothing when they sign in. '
+    + 'The most common surprise is an exemption inherited from a team, department or branch — '
+    + 'nothing on the person\'s own record looks wrong, so "Decided at" is where to look.'
+    + '</div>';
+
+  body.innerHTML = html;
+}
+
+function wireEnforcement() {
+  const start = $('#enf-start');
+  if (start) start.onclick = async () => {
+    try { await api('/enforcement/start-audit', { method: 'POST' }); toast('Learning started — nothing is blocked'); initEnforcement(); }
+    catch (e) { toast(e.message || 'Could not start'); }
+  };
+
+  const promote = $('#enf-promote');
+  if (promote) promote.onclick = async () => {
+    if (!confirm('Turn enforcement on?\n\nBlocked apps will stop opening on employee PCs. You can switch it off again at any time.')) return;
+    try { const r = await api('/enforcement/promote', { method: 'POST' }); toast('Enforcement on — report ' + (r.report_id || '')); initEnforcement(); }
+    catch (e) { toast(e.message || 'Refused'); }
+  };
+
+  const off = $('#enf-disable');
+  if (off) off.onclick = async () => {
+    try { await api('/enforcement/disable', { method: 'POST', body: JSON.stringify({ reason: 'Switched off from the console' }) }); toast('Enforcement off'); initEnforcement(); }
+    catch (e) { toast(e.message || 'Could not switch off'); }
+  };
+
+}
+
+// Attached once, at load. wireEnforcement() runs on every refresh and #enf-body
+// survives the innerHTML swap, so binding there would stack listeners and make
+// one click fire N requests.
+$('#enf-body').addEventListener('click', async (e) => {
+  const r = e.target.closest('[data-enf-resolve]');
+  if (!r) return;
+  try { await api('/enforcement/audit-event/' + r.dataset.enfResolve + '/resolve', { method: 'POST' }); initEnforcement(); }
+  catch (err) { toast(err.message || 'Could not update'); }
+});
+
 $('#pol-rows').addEventListener('click', async (e) => {
   const edit = e.target.closest('[data-pol-edit]');
   if (edit) {
@@ -5342,7 +5799,7 @@ function prSetRange(from, to) { $('#pr-from').value = from; $('#pr-to').value = 
 function isoDate(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 async function loadProductivity() {
   const from = $('#pr-from').value || today(), to = $('#pr-to').value || today();
-  $('#pr-rows').innerHTML = '<tr><td colspan="21" class="mut">Loading…</td></tr>';
+  $('#pr-rows').innerHTML = '<tr><td colspan="24" class="mut">Loading…</td></tr>';
   try {
     const r = await api('/reports/productivity?from=' + from + '&to=' + to);
     PROD_ROWS = r.data || [];
@@ -5369,25 +5826,37 @@ async function loadProductivity() {
       '<td data-sort="' + (x.net_working_seconds||0) + '" title="Actual Present − Allotted break (' + hms(x.allotted_break_seconds||0) + ')"><b>' + hms(x.net_working_seconds||0) + '</b></td>' +
       '<td data-sort="' + x.timeouts + '">' + x.timeouts + '</td>' +
       '<td data-sort="' + x.violations + '">' + (x.violations ? '<span class="tag t-danger">' + x.violations + '</span>' : '0') + '</td>' +
-      '<td data-sort="' + (x.productivity==null?-1:x.productivity) + '"><b>' + pct(x.productivity) + '</b></td></tr>'
-    ).join('') : '<tr><td colspan="21" class="mut">No activity in this range.</td></tr>';
-    $('#pr-note').textContent = PROD_ROWS.length + ' rows · ' + from + ' → ' + to + ' · Actual Present = Logged out − Logged in (for today, the current time is used as logout so the % is live) · Productive = Working + Meeting · Non-Productive = Idle + Break Exceed · Net Hrs = Actual Present − Allotted break · Productive % = Productive ÷ Net Hrs. Allotted break = shift allowance, pro-rated on early logout. An extract of today uses the same current-time-as-logout values.';
+      '<td data-sort="' + (x.productivity==null?-1:x.productivity) + '"><b>' + pct(x.productivity) + '</b></td>' +
+      '<td data-sort="' + (x.late_minutes||0) + '">' + (x.late_minutes ? '<span class="tag t-warn">' + x.late_minutes + '</span>' : '0') + '</td>' +
+      // Signed value: + is time nothing was recorded for, − is overlapping records. Anything
+      // inside a minute is per-event rounding and reads as a clean dash.
+      '<td data-sort="' + (x.unaccounted_seconds||0) + '">' + prUnacc(x.unaccounted_seconds) + '</td>' +
+      '<td class="mut" style="font-size:10px">' + esc(x.data_issue_text || '') + '</td></tr>'
+    ).join('') : '<tr><td colspan="24" class="mut">No activity in this range.</td></tr>';
+    $('#pr-note').textContent = PROD_ROWS.length + ' rows · ' + from + ' → ' + to + ' · Actual Present = Logged out − Logged in (for today, the current time is used as logout so the % is live) · Productive = Working + Meeting · Non-Productive = Idle + Break Exceed · Net Hrs = Actual Present − Allotted break · Productive % = Productive ÷ Net Hrs. Allotted break = shift allowance, pro-rated on early logout. An extract of today uses the same current-time-as-logout values. Unaccounted = Actual Present − (Working + Idle + Break): + means signed-in time nothing was recorded for, − means overlapping records counting the same minutes twice — a blank column is a day that reconciles exactly.';
     attachTableFilter($('#pr-q'), '#pr-rows');
-  } catch (e) { $('#pr-rows').innerHTML = '<tr><td colspan="21" class="mut">' + esc(e.message) + '</td></tr>'; }
+  } catch (e) { $('#pr-rows').innerHTML = '<tr><td colspan="24" class="mut">' + esc(e.message) + '</td></tr>'; }
+}
+// Reconciliation cell: ±hh:mm, dash when the day balances to within a minute.
+function prUnacc(sec) {
+  const s = Number(sec || 0);
+  if (Math.abs(s) <= 60) return '<span class="mut">—</span>';
+  const cls = s > 0 ? 't-warn' : 't-danger';
+  return '<span class="tag ' + cls + '">' + (s > 0 ? '+' : '−') + hms(Math.abs(s)) + '</span>';
 }
 // R4 item 6: extracted reports use hh:mm, not raw seconds/minutes.
 const hhmm = (sec) => { const m = Math.max(0, Math.round((sec || 0) / 60)); return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
 function prCSV() {
   // Exact headers from the client's Productivity Excel template (RAW sheet), kept verbatim.
-  const head = ['Emp. ID','Employee','Department','Reporting Manager','Date','Logged in','Logged out','Actual Present Hrs (Logged out - Logged in)','Working (hh:mm)','Idle (hh:mm)','Number of Breaks','Break time Availed  (hh:mm)','Allotted break (hh:mm)','Meeting Time','Break Exceed Mins (Break Time - Allotted Time)','Productive Hrs (Working + Meeting)','Non Productive Hrs (Idle + Break Exceed)','Net Hrs (Actual Logged Hours-Allotted Break)','Productive% [ Productive Hrs/ Net Hrs]'];
-  const rows = PROD_ROWS.map((x) => [x.employee_code,x.name,x.department,x.reporting_manager,x.work_date,x.first_in,x.last_out,hhmm(x.present_seconds),hhmm(x.work_seconds),hhmm(x.idle_seconds),x.break_count,hhmm(x.break_seconds),hhmm(x.allotted_break_seconds),hhmm(x.meeting_seconds),hhmm(x.break_exceed_seconds),hhmm(x.productive_seconds),hhmm(x.non_productive_seconds),hhmm(x.net_working_seconds),(x.productivity==null?'':x.productivity+'%')]);
+  const head = ['Emp. ID','Employee','Department','Reporting Manager','Date','Logged in','Logged out','Actual Present Hrs (Logged out - Logged in)','Working (hh:mm)','Idle (hh:mm)','Number of Breaks','Break time Availed  (hh:mm)','Allotted break (hh:mm)','Meeting Time','Break Exceed Mins (Break Time - Allotted Time)','Productive Hrs (Working + Meeting)','Non Productive Hrs (Idle + Break Exceed)','Net Hrs (Actual Logged Hours-Allotted Break)','Productive% [ Productive Hrs/ Net Hrs]','Late Login (mins)','Unaccounted Mins (Present − Working − Idle − Break)','Data Issue'];
+  const rows = PROD_ROWS.map((x) => [x.employee_code,x.name,x.department,x.reporting_manager,x.work_date,x.first_in,x.last_out,hhmm(x.present_seconds),hhmm(x.work_seconds),hhmm(x.idle_seconds),x.break_count,hhmm(x.break_seconds),hhmm(x.allotted_break_seconds),hhmm(x.meeting_seconds),hhmm(x.break_exceed_seconds),hhmm(x.productive_seconds),hhmm(x.non_productive_seconds),hhmm(x.net_working_seconds),(x.productivity==null?'':x.productivity+'%'),(x.late_minutes||0),Math.round((x.unaccounted_seconds||0)/60),(x.data_issue_text||'')]);
   const csv = [head, ...rows].map((r) => r.map((c) => '"' + String(c==null?'':c).replace(/"/g,'""') + '"').join(',')).join('\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
   a.download = 'SmartEPT-Productivity-Report-' + $('#pr-from').value + '_' + $('#pr-to').value + '.csv'; a.click(); URL.revokeObjectURL(a.href);
 }
 function prPDF() {
   const from = $('#pr-from').value, to = $('#pr-to').value;
-  const rowsHtml = PROD_ROWS.map((x) => '<tr><td>' + esc(x.work_date) + '</td><td>' + esc(x.employee_code||'') + '</td><td>' + esc(x.name) + '</td><td>' + esc(x.department||'') + '</td><td>' + esc(x.reporting_manager||'—') + '</td><td>' + esc(x.first_in||'—') + '</td><td>' + esc(x.last_out||'—') + '</td><td>' + hhmm(x.present_seconds) + '</td><td>' + hhmm(x.work_seconds) + '</td><td>' + hhmm(x.idle_seconds) + '</td><td>' + x.break_count + '</td><td>' + hhmm(x.break_seconds) + '</td><td>' + hhmm(x.allotted_break_seconds) + '</td><td>' + hhmm(x.meeting_seconds) + '</td><td>' + hhmm(x.break_exceed_seconds) + '</td><td>' + hhmm(x.productive_seconds) + '</td><td>' + hhmm(x.non_productive_seconds) + '</td><td>' + hhmm(x.net_working_seconds) + '</td><td>' + (x.productivity==null?'—':Number(x.productivity).toFixed(0)+'%') + '</td></tr>').join('');
+  const rowsHtml = PROD_ROWS.map((x) => '<tr><td>' + esc(x.work_date) + '</td><td>' + esc(x.employee_code||'') + '</td><td>' + esc(x.name) + '</td><td>' + esc(x.department||'') + '</td><td>' + esc(x.reporting_manager||'—') + '</td><td>' + esc(x.first_in||'—') + '</td><td>' + esc(x.last_out||'—') + '</td><td>' + hhmm(x.present_seconds) + '</td><td>' + hhmm(x.work_seconds) + '</td><td>' + hhmm(x.idle_seconds) + '</td><td>' + x.break_count + '</td><td>' + hhmm(x.break_seconds) + '</td><td>' + hhmm(x.allotted_break_seconds) + '</td><td>' + hhmm(x.meeting_seconds) + '</td><td>' + hhmm(x.break_exceed_seconds) + '</td><td>' + hhmm(x.productive_seconds) + '</td><td>' + hhmm(x.non_productive_seconds) + '</td><td>' + hhmm(x.net_working_seconds) + '</td><td>' + (x.productivity==null?'—':Number(x.productivity).toFixed(0)+'%') + '</td><td>' + (x.late_minutes||0) + '</td><td>' + (Math.abs(x.unaccounted_seconds||0) <= 60 ? '—' : (x.unaccounted_seconds > 0 ? '+' : '−') + hhmm(Math.abs(x.unaccounted_seconds))) + '</td><td>' + esc(x.data_issue_text||'') + '</td></tr>').join('');
   const co = ($('#company-name') ? $('#company-name').textContent : 'Company');
   const w = window.open('', '_blank');
   w.document.write('<html><head><title>SmartEPT Productivity ' + from + ' to ' + to + '</title><style>'
@@ -5399,7 +5868,7 @@ function prPDF() {
     + '@media print{.np{display:none}}</style></head><body>'
     + '<div class="hd"><div><h1>Productivity Report</h1><div class="sub">' + esc(co) + ' · ' + from + ' → ' + to + ' · SmartEPT by Ametecs</div></div>'
     + '<button class="np" onclick="window.print()" style="padding:8px 14px;background:#0E7C8F;color:#fff;border:none;border-radius:7px;cursor:pointer">Print / Save PDF</button></div>'
-    + '<table><thead><tr><th>Date</th><th>Code</th><th>Employee</th><th>Dept</th><th>Manager</th><th>In</th><th>Out</th><th>Actual Present</th><th>Working</th><th>Idle</th><th>Breaks</th><th>Break Availed</th><th>Allotted</th><th>Meeting</th><th>Break Exceed</th><th>Productive</th><th>Non-Prod.</th><th>Net Hrs</th><th>Prod.%</th></tr></thead><tbody>'
+    + '<table><thead><tr><th>Date</th><th>Code</th><th>Employee</th><th>Dept</th><th>Manager</th><th>In</th><th>Out</th><th>Actual Present</th><th>Working</th><th>Idle</th><th>Breaks</th><th>Break Availed</th><th>Allotted</th><th>Meeting</th><th>Break Exceed</th><th>Productive</th><th>Non-Prod.</th><th>Net Hrs</th><th>Prod.%</th><th>Late (min)</th><th>Unaccounted</th><th>Data Issue</th></tr></thead><tbody>'
     + (rowsHtml || '<tr><td colspan="19">No data</td></tr>') + '</tbody></table>'
     + '<p style="margin-top:14px;color:#878C99;font-size:10px">Generated ' + new Date().toLocaleString() + ' · SmartEPT — Employee Productivity Tracking & Intelligence</p>'
     + '</body></html>');
@@ -5907,7 +6376,7 @@ async function loadHolidays() {
       + '<td style="text-align:right"><button class="btn danger" data-hol-del="' + h.id + '" data-hol-name="' + esc(h.name) + '">✕</button></td></tr>').join('')
       || '<tr><td colspan="4" class="mut">No holidays for ' + esc(y) + ' — add them below so nobody is marked late or absent on those days.</td></tr>';
   } catch (e) {
-    $('#hol-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="4" class="mut">' + esc(e.message) + '</td></tr>';
+    $('#hol-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="5" class="mut">' + esc(e.message) + '</td></tr>';
   }
 }
 $('#hol-add').onclick = async () => {

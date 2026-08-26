@@ -72,7 +72,7 @@ class EmployeeController extends Controller
             ], 409);
         }
 
-        $data = $this->stampGateGrantor($request, $this->validated($request, true));
+        $data = $this->stampEnforcementGrantor($request, $this->stampGateGrantor($request, $this->validated($request, true)));
         $employee = Employee::create($data); // company_id auto-filled
         $this->audit($request, 'CREATE', Employee::class, $employee->id, $data);
 
@@ -119,7 +119,7 @@ class EmployeeController extends Controller
     {
         $this->assertEmployeeVisible($request, $employee->id);
 
-        $data = $this->stampGateGrantor($request, $this->validated($request, false, $employee));
+        $data = $this->stampEnforcementGrantor($request, $this->stampGateGrantor($request, $this->validated($request, false, $employee)));
 
         // 14-Aug-2026: bringing a relieved employee back takes a seat, exactly
         // like creating one — otherwise relieve-then-reactivate walks the cap.
@@ -452,6 +452,14 @@ class EmployeeController extends Controller
             'tracking_mode'        => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
             // Gate-to-PC exclusion override (null = inherit from team/dept/branch), with an
             // optional validity window — "her fingerprint won't read, 18–25 Aug".
+            // Per-employee enforcement. Same shape as tracking_mode and the gate
+            // exclusion, because it resolves through the same six levels — a
+            // third way of expressing "this person is different" would be one
+            // too many for anyone to hold in their head.
+            'enforcement_mode'         => ['nullable', 'in:ENFORCED,EXEMPT'],
+            'enforcement_exempt_from'  => ['nullable', 'date'],
+            'enforcement_exempt_until' => ['nullable', 'date', 'after_or_equal:enforcement_exempt_from'],
+            'enforcement_exempt_reason' => ['nullable', 'string', 'max:191'],
             'gate_mode'            => ['nullable', 'in:REQUIRED,EXCLUDED'],
             'gate_mode_from'       => ['nullable', 'date'],
             'gate_mode_until'      => ['nullable', 'date', 'after_or_equal:gate_mode_from'],
@@ -824,6 +832,48 @@ class EmployeeController extends Controller
      * authorised it, and clearing gate_mode clears the attribution with it. (18-Aug-2026:
      * Ejaz — exclusions must be traceable to the admin who allowed them.)
      */
+    /**
+     * Stamp WHO let this person out of enforcement.
+     *
+     * The same rule as the gate exclusion above, and for a stronger reason: an
+     * exemption from blocking is a security decision. One nobody can attribute
+     * is one nobody owns, and the first question after an incident is always
+     * "who allowed this?".
+     *
+     * Any touch re-attributes, including a PUT that only moves the end date —
+     * otherwise extending somebody's expiring exemption leaves the ORIGINAL
+     * admin's name on a decision they did not make.
+     */
+    private function stampEnforcementGrantor(Request $request, array $data): array
+    {
+        $keys = [
+            'enforcement_mode',
+            'enforcement_exempt_from',
+            'enforcement_exempt_until',
+            'enforcement_exempt_reason',
+        ];
+
+        if (! array_intersect($keys, array_keys($data))) {
+            return $data;
+        }
+
+        // Back to Inherit clears the window and the attribution with it. Only an
+        // explicit null does that; a partial PUT that never mentions the field
+        // must leave an existing exemption alone.
+        if (array_key_exists('enforcement_mode', $data) && ! $data['enforcement_mode']) {
+            return array_merge($data, [
+                'enforcement_exempt_from'       => null,
+                'enforcement_exempt_until'      => null,
+                'enforcement_exempt_reason'     => null,
+                'enforcement_exempt_by_user_id' => null,
+            ]);
+        }
+
+        $data['enforcement_exempt_by_user_id'] = $request->user()?->id;
+
+        return $data;
+    }
+
     private function stampGateGrantor(Request $request, array $data): array
     {
         $keys = ['gate_mode', 'gate_mode_from', 'gate_mode_until', 'gate_mode_reason'];

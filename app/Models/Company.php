@@ -9,6 +9,20 @@ class Company extends Model
 {
     use SoftDeletes;
 
+    /**
+     * The app clock is taken from this row at boot (AppServiceProvider::applyOrganisationTimezone).
+     * Drop the cached value whenever the Organisation record is saved or removed, so changing the
+     * timezone in the Organisation tab takes effect on the next request instead of up to an hour
+     * later. Booted here rather than in the controller so every write path is covered.
+     */
+    protected static function booted(): void
+    {
+        $forget = fn () => \Illuminate\Support\Facades\Cache::forget('smartept:org_timezone');
+        static::saved($forget);
+        static::deleted($forget);
+    }
+
+
     protected $guarded = ['id'];
 
     protected $casts = [

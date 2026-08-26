@@ -71,7 +71,10 @@ class ProductivityController extends Controller
         $employees = Employee::where('company_id', $companyId)
             ->when($empId, fn ($q) => $q->where('id', $empId))
             ->when($visible !== null, fn ($q) => $q->whereIn('id', $visible))
-            ->with(['department:id,name', 'team:id,name', 'reportingManager:id,name', 'shift:id,start_time,end_time,break_minutes_allowed'])
+            // 26-Aug-2026: crosses_midnight + post_shift_auto_logout_minutes are needed by row()
+            // to bound a day that has no recorded sign-out (see the shift-end cap below).
+            ->with(['department:id,name', 'team:id,name', 'reportingManager:id,name',
+                'shift:id,start_time,end_time,break_minutes_allowed,crosses_midnight,post_shift_auto_logout_minutes'])
             ->get()->keyBy('id');
 
         // Break counts + timeouts, grouped employee|date, for the whole range.
@@ -111,7 +114,20 @@ class ProductivityController extends Controller
         foreach ($summaries as $s) {
             $emp = $employees[$s->employee_id] ?? null;
             if (! $emp) continue;
-            $d = (string) $s->work_date;
+            // 26-Aug-2026 — THE bug behind "Date = FALSE", "Number of Breaks = 0" and
+            // "Meeting Time = 0" on every historical row. EmployeeDailySummary casts
+            // work_date to a date, so (string) $s->work_date is "2026-08-25 00:00:00",
+            // not "2026-08-25". That string was used for two things and broke both:
+            //   * the $breaks / $timeouts / $meetings lookup keys, which are built from
+            //     MySQL DATE(...) and are therefore plain "2026-08-25" — every lookup
+            //     missed, so the counts printed as zero while the seconds (read straight
+            //     off the summary row) printed correctly. That mismatch is exactly what
+            //     the client's sheet shows: Break time Availed 1:15 with 0 breaks.
+            //   * the Excel Date cell, which did strtotime($d . ' 00:00:00') → the
+            //     doubled time makes strtotime() return false, PHPToExcel(false) returns
+            //     false, and the cell was written as the boolean FALSE.
+            // TODAY's rows were never affected because they key off a plain Y-m-d string.
+            $d = Carbon::parse($s->work_date)->toDateString();
             $bk = $breaks[$s->employee_id . '|' . $d] ?? null;
             $rows[] = $this->row($emp, $d, [
                 'first_in' => $s->first_login_at, 'last_out' => $s->last_logout_at,
@@ -120,6 +136,7 @@ class ProductivityController extends Controller
                 'break_count' => $bk?->cnt ?? 0, 'timeouts' => ($timeouts[$s->employee_id . '|' . $d]->cnt ?? 0),
                 'non_productive' => $s->non_productive_seconds, 'violations' => $s->violation_count,
                 'meeting' => (int) ($meetings[$s->employee_id . '|' . $d]->secs ?? 0),
+                'late_min' => (int) ($s->late_minutes ?? 0),
                 'score' => (float) $s->productivity_score, 'live' => false,
             ]);
         }
@@ -168,6 +185,7 @@ class ProductivityController extends Controller
                     'timeouts' => ($timeouts[$emp->id . '|' . $today]->cnt ?? 0),
                     'non_productive' => 0, 'violations' => (int) ($viol[$emp->id]->c ?? 0),
                     'meeting' => (int) ($meetings[$emp->id . '|' . $today]->secs ?? 0),
+                    'late_min' => (int) ($a->late_minutes ?? 0),
                     'score' => $present > 0 ? round($work / max($present, 1) * 100, 1) : 0, 'live' => true,
                 ]);
             }
@@ -205,10 +223,12 @@ class ProductivityController extends Controller
             'Allotted break (hh:mm)', 'Meeting Time', 'Break Exceed Mins (Break Time - Allotted Time)',
             'Productive Hrs (Working + Meeting)', 'Non Productive Hrs (Idle + Break Exceed)',
             'Net Hrs (Actual Logged Hours-Allotted Break)', 'Productive% [ Productive Hrs/ Net Hrs]',
-            // 19-Aug: column T is OURS, not the client template's — it names the rows where the
-            // recorded sign-out was earlier than the last tracked activity, so Actual Present had
-            // to be floored at the tracked span. Blank on a healthy row.
-            'Data Issue',
+            // Columns T–V are OURS, not the client template's, so A–S still line up 1:1 with
+            // their sheet. T added 26-Aug (Ejaz): minutes past the shift start, straight from
+            // the attendance sheet. U is the reconciliation cell — signed-in span minus
+            // everything recorded inside it, so a missing (+) or double-counted (−) minute is
+            // visible instead of quietly moving Productive %. V names why a row was repaired.
+            'Late Login (mins)', 'Unaccounted Mins (Present − Working − Idle − Break)', 'Data Issue',
         ];
 
         $ss = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
@@ -218,10 +238,10 @@ class ProductivityController extends Controller
         foreach ($headers as $i => $h) {
             $sheet->setCellValue($this->col($i + 1) . '1', $h);
         }
-        $sheet->getStyle('A1:T1')->getFont()->setBold(true);
-        $sheet->getStyle('A1:T1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+        $sheet->getStyle('A1:V1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:V1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
             ->getStartColor()->setRGB('E3F4F7');
-        $sheet->getStyle('A1:T1')->getAlignment()->setWrapText(true);
+        $sheet->getStyle('A1:V1')->getAlignment()->setWrapText(true);
 
         $DUR = '[h]:mm';   // duration — Excel-compatible, valid past 24h, never a date
         $CLK = 'h:mm';     // clock time for login/logout
@@ -232,9 +252,20 @@ class ProductivityController extends Controller
             $sheet->setCellValue('B' . $r, $x['name'] ?? '');
             $sheet->setCellValue('C' . $r, $x['department'] ?? '');
             $sheet->setCellValue('D' . $r, $x['reporting_manager'] ?? '');
+            // The date cell is built from a DateTime, not strtotime() on a concatenated
+            // string: the old form silently produced boolean FALSE in every Date cell the
+            // moment work_date arrived carrying a time component (26-Aug-2026). If a date
+            // ever fails to parse, write the text rather than a stray FALSE.
             if (! empty($x['work_date'])) {
-                $sheet->setCellValue('E' . $r, \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel(strtotime($x['work_date'] . ' 00:00:00')));
-                $this->fmt($sheet, 5, $r, 'mm-dd-yy');
+                try {
+                    $sheet->setCellValue('E' . $r, \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel(
+                        new \DateTime(Carbon::parse($x['work_date'])->toDateString() . ' 00:00:00')
+                    ));
+                    $this->fmt($sheet, 5, $r, 'mm-dd-yy');
+                } catch (\Throwable $e) {
+                    $sheet->setCellValueExplicit('E' . $r, (string) $x['work_date'],
+                        \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                }
             }
             $this->putTime($sheet, 6, $r, $x['first_in'] ?? null, $CLK);
             $this->putTime($sheet, 7, $r, $x['last_out'] ?? null, $CLK);
@@ -254,15 +285,18 @@ class ProductivityController extends Controller
                 $sheet->setCellValue('S' . $r, round(((float) $x['productivity']) / 100, 4));
                 $this->fmt($sheet, 19, $r, '0%');
             }
-            if (! empty($x['data_issue'])) {                                          // Data Issue (ours, col T)
-                $sheet->setCellValueExplicit('T' . $r,
-                    'No sign-out recorded — present time floored to tracked activity',
+            $sheet->setCellValue('T' . $r, (int) ($x['late_minutes'] ?? 0));       // Late Login (mins)
+            $this->fmt($sheet, 20, $r, '0');
+            $sheet->setCellValue('U' . $r, (int) round(($x['unaccounted_seconds'] ?? 0) / 60)); // Unaccounted (signed)
+            $this->fmt($sheet, 21, $r, '0;-0');
+            if (! empty($x['data_issue_text'])) {                                   // Data Issue (ours, col V)
+                $sheet->setCellValueExplicit('V' . $r, (string) $x['data_issue_text'],
                     \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
             }
             $r++;
         }
 
-        foreach (range(1, 20) as $c) {
+        foreach (range(1, 22) as $c) {
             $sheet->getColumnDimension($this->col($c))->setAutoSize(true);
         }
         $sheet->freezePane('A2');
@@ -686,6 +720,29 @@ class ProductivityController extends Controller
         // evidence of a missing sign-out that the post-shift auto-logout should have caught.
         $clockGapSeconds = max(0, $trackedFloor - $clockPresent);
 
+        // 26-Aug-2026 (Ejaz, AI0040 on 25-Aug): the floor above is right when a sign-out is
+        // merely EARLY, but wrong when there is no sign-out at all. AI0040 signed in 12:42,
+        // never signed out, and the agent went on logging idle time all night — so the floor
+        // credited 11:18 of "present" for a day that ended at shift end. When the sign-out is
+        // missing, bound the day at the instant the server WOULD have signed them out
+        // (shift end + the configured post-shift minutes, 0 when unset). Active work and
+        // breaks are never cut away by the bound — only the idle tail that ran past the shift.
+        $shiftEndCap = $lastOut ? null : $this->shiftEndSeconds($emp, $date, $firstIn);
+        $cappedAtShiftEnd = false;
+        if ($shiftEndCap !== null && $shiftEndCap < $actualPresent) {
+            $actualPresent = max($work + $breakSecs, $shiftEndCap);
+            $cappedAtShiftEnd = $actualPresent < $trackedFloor;
+        }
+
+        // Section 2.vii/2.viii (Ejaz, 26-Aug): the signed-in span must reconcile, to the
+        // minute, against the buckets it is made of. A positive delta is time inside the
+        // span that nothing was recorded for (agent stopped, PC asleep, sync gap); a
+        // negative delta means the buckets OVERLAP and are double-counting the same wall
+        // clock. Either way it is now a number on the row instead of a silent distortion
+        // of Productive %.
+        $accountedFor = $work + $idle + $breakSecs;
+        $unaccountedSeconds = $actualPresent - $accountedFor;
+
         $allotted = ScoringService::allottedBreakSeconds($emp->shift, $actualPresent);
         $breakExceed = max(0, $breakSecs - $allotted);
         $productive = $work + $meeting;
@@ -694,6 +751,14 @@ class ProductivityController extends Controller
         // Hard cap at 100%: Productive Hrs can still nudge past Net Hrs when the allotted break
         // is pro-rated away, and a >100% cell reads as a broken report to the client.
         $productivity = $netHrs > 0 ? min(100.0, round($productive / $netHrs * 100, 1)) : null; // null => N/A (shown as —)
+
+        $issue = $this->describeIssue(
+            hasSignOut: (bool) $lastOut,
+            cappedAtShiftEnd: $cappedAtShiftEnd,
+            clockGapSeconds: $clockGapSeconds,
+            unaccountedSeconds: $unaccountedSeconds,
+            actualPresent: $actualPresent,
+        );
 
         return [
             'work_date' => $date,
@@ -710,7 +775,10 @@ class ProductivityController extends Controller
             // Raw logout − login before the stale-logout floor, plus the gap that was repaired.
             'clock_present_seconds' => $clockPresent,
             'clock_gap_seconds' => $clockGapSeconds,
-            'data_issue' => $clockGapSeconds > 0 ? 'MISSING_LOGOUT' : null,
+            'unaccounted_seconds' => $unaccountedSeconds,
+            'late_minutes' => (int) ($m['late_min'] ?? 0),
+            'data_issue' => $issue['code'],
+            'data_issue_text' => $issue['text'],
             'work_seconds' => $work,
             'idle_seconds' => $idle,
             'break_seconds' => $breakSecs,
@@ -727,5 +795,87 @@ class ProductivityController extends Controller
             'productivity' => $productivity,
             'live' => (bool) $m['live'],
         ];
+    }
+
+    /**
+     * Seconds from sign-in to the instant the server would have signed this employee out —
+     * shift end (crossing midnight where the shift does) plus the configured post-shift
+     * auto-logout minutes. Returns null when there is no shift end to measure from, or when
+     * the sign-in already sits past it, so the caller simply does not apply a bound.
+     */
+    private function shiftEndSeconds(Employee $emp, string $date, $firstIn): ?int
+    {
+        $shift = $emp->shift;
+        if (! $firstIn || ! $shift || ! $shift->end_time) {
+            return null;
+        }
+
+        $end = Carbon::parse($date . ' ' . $shift->end_time);
+        if ($shift->start_time) {
+            $start = Carbon::parse($date . ' ' . $shift->start_time);
+            if ($shift->crosses_midnight || $end->lessThanOrEqualTo($start)) {
+                $end->addDay();
+            }
+        }
+        $end->addMinutes((int) ($shift->post_shift_auto_logout_minutes ?? 0));
+
+        $in = Carbon::parse($firstIn);
+        if ($end->lessThanOrEqualTo($in)) {
+            return null;   // signed in after their own shift ended — no meaningful bound
+        }
+
+        return (int) $end->diffInSeconds($in, true);
+    }
+
+    /**
+     * Plain-English explanation of why a row's Actual Present is not simply
+     * (sign-out − sign-in). Returns ['code' => ..., 'text' => ...]; both null on a clean row.
+     *
+     * 26-Aug-2026: the previous version emitted one hard-coded sentence — "No sign-out
+     * recorded" — for every repaired row, including rows like AI0050 that DO have both a
+     * sign-in and a sign-out and were repaired for an entirely different reason (tracked
+     * activity ran past the recorded sign-out). Saying "no sign-out recorded" next to a
+     * printed sign-out time destroys trust in the whole report, so each cause now names
+     * itself.
+     */
+    private function describeIssue(
+        bool $hasSignOut,
+        bool $cappedAtShiftEnd,
+        int $clockGapSeconds,
+        int $unaccountedSeconds,
+        int $actualPresent,
+    ): array {
+        $hm = fn (int $s) => sprintf('%d:%02d', intdiv(abs($s), 3600), intdiv(abs($s) % 3600, 60));
+        $none = ['code' => null, 'text' => null];
+
+        if (! $hasSignOut) {
+            return $cappedAtShiftEnd
+                ? ['code' => 'NO_SIGN_OUT_CAPPED',
+                   'text' => 'No sign-out recorded — present time capped at shift end (' . $hm($actualPresent)
+                           . '); tracking continued past the shift and was not credited']
+                : ['code' => 'NO_SIGN_OUT',
+                   'text' => 'No sign-out recorded — present time taken from tracked activity'];
+        }
+
+        if ($clockGapSeconds > 0) {
+            return ['code' => 'ACTIVITY_AFTER_SIGN_OUT',
+                    'text' => 'Tracked activity exceeds the sign-in→sign-out span by ' . $hm($clockGapSeconds)
+                            . ' — present time raised to the tracked total (agent kept running after sign-out)'];
+        }
+
+        // A minute is "missing" when the signed-in span is larger than everything recorded
+        // inside it, and "double counted" when the buckets overlap. 60s of slack absorbs
+        // ordinary per-event rounding; anything more is a real gap and must be visible.
+        if ($unaccountedSeconds > 60) {
+            return ['code' => 'UNACCOUNTED_TIME',
+                    'text' => $hm($unaccountedSeconds) . ' of the signed-in span is not recorded as working, idle or break'];
+        }
+        if ($unaccountedSeconds < -60) {
+            return ['code' => 'OVERLAPPING_TIME',
+                    'text' => 'Working + idle + break exceed the signed-in span by ' . $hm($unaccountedSeconds)
+                            . ' — overlapping or duplicated activity records'];
+        }
+
+        return $none;
     }
 }

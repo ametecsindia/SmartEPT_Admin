@@ -7,6 +7,7 @@ use App\Models\EmployeeAttendanceLog;
 use App\Models\EmployeeDevice;
 use App\Models\EmployeeLoginSession;
 use App\Services\PolicyResolver;
+use App\Support\ResolvesLocalNow;
 use App\Services\StatusService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
@@ -39,8 +40,11 @@ use Illuminate\Support\Carbon;
  */
 class AutoLogoutPostShift extends Command
 {
+    use ResolvesLocalNow;
+
     protected $signature = 'smartept:auto-logout
         {--dry-run : List what would be closed, change nothing}
+        {--explain : Print EVERY open session with the reason it was or was not signed out}
         {--now= : Treat this instant as "now" (Y-m-d H:i:s) — for testing}';
 
     protected $description = 'Sign out agents that never signed out, N minutes after their shift ends';
@@ -53,10 +57,19 @@ class AutoLogoutPostShift extends Command
 
     public function handle(PolicyResolver $resolver, StatusService $status): int
     {
-        $now = $this->option('now') ? Carbon::parse($this->option('now')) : now();
+        // Wall-clock now, not UTC now — the agent stores local times. `--now=` is already a
+        // local clock face. See ResolvesLocalNow; the per-company value is resolved below,
+        // this one only bounds the "last 3 days" query.
+        $now = $this->option('now') ? Carbon::parse($this->option('now')) : $this->localNow(null);
         $dry = (bool) $this->option('dry-run');
+        $explain = (bool) $this->option('explain');
         $closed = 0;
-        $skipped = 0;
+        $open = 0;
+        // 26-Aug-2026: the old counters said only "N not configured", which is the same
+        // number whether the feature is switched off, the employee has no shift, or the
+        // attendance policy was never ASSIGNED to anyone. Those need different fixes, so
+        // the reasons are counted separately and --explain prints them per session.
+        $reasons = [];
 
         EmployeeLoginSession::withoutGlobalScopes()
             ->with('employee.shift')
@@ -65,29 +78,50 @@ class AutoLogoutPostShift extends Command
             // Nothing older than 3 days: those belong to the nightly sweep, and reaching
             // further back would rewrite months of settled history on first deploy.
             ->where('login_at', '>=', $now->copy()->subDays(3))
-            ->chunkById(200, function ($sessions) use ($resolver, $status, $now, $dry, &$closed, &$skipped) {
+            ->chunkById(200, function ($sessions) use ($resolver, $status, $now, $dry, $explain, &$closed, &$open, &$reasons) {
                 foreach ($sessions as $session) {
+                    $open++;
                     $employee = $session->employee;
+                    $who = $employee
+                        ? $employee->employee_code . ' (' . trim($employee->first_name . ' ' . $employee->last_name) . ')'
+                        : 'session #' . $session->id;
+                    $since = $session->login_at->format('Y-m-d H:i');
+
+                    $note = function (string $reason) use (&$reasons, $explain, $who, $since) {
+                        $reasons[$reason] = ($reasons[$reason] ?? 0) + 1;
+                        if ($explain) {
+                            $this->line(sprintf('  <fg=yellow>skip</> %-34s open since %s — %s', $who, $since, $reason));
+                        }
+                    };
+
                     if (! $employee) {
-                        $skipped++;
+                        $note('session has no employee record');
                         continue;
                     }
 
                     $minutes = $this->autoLogoutMinutes($employee, $resolver);
                     if ($minutes === null) {
-                        $skipped++;
-                        continue;   // not configured for this employee — leave the session alone
+                        $note($employee->shift_id
+                            ? 'auto sign-out minutes not set on the shift, and no Attendance policy with a value is assigned'
+                            : 'employee has no shift assigned, and no Attendance policy with a value is assigned');
+                        continue;
                     }
 
                     $cutoff = $this->cutoffFor($session, $employee, $minutes);
-                    if (! $cutoff || $now->lessThan($cutoff)) {
+                    if (! $cutoff) {
+                        $note('no shift end and no login day to measure from');
+                        continue;
+                    }
+                    // The employee's OWN wall clock decides whether their shift has ended.
+                    $empNow = $this->option('now') ? $now : $this->localNow($employee->company_id);
+                    if ($empNow->lessThan($cutoff)) {
+                        $note('shift ends ' . $cutoff->format('Y-m-d H:i') . ' — not due yet');
                         continue;   // shift has not ended (plus the grace) yet
                     }
 
                     $this->line(sprintf(
-                        '  %s (%s) — session #%d open since %s → sign out at %s (+%dm)',
-                        $employee->employee_code, trim($employee->first_name . ' ' . $employee->last_name),
-                        $session->id, $session->login_at->format('Y-m-d H:i'), $cutoff->format('Y-m-d H:i'), $minutes
+                        '  <fg=green>close</> %-34s open since %s → sign out at %s (+%dm)',
+                        $who, $since, $cutoff->format('Y-m-d H:i'), $minutes
                     ));
 
                     if (! $dry) {
@@ -97,7 +131,14 @@ class AutoLogoutPostShift extends Command
                 }
             });
 
-        $this->info(($dry ? '[dry-run] ' : '') . "Post-shift auto logout: {$closed} closed, {$skipped} not configured.");
+        $this->info(($dry ? '[dry-run] ' : '') . "Post-shift auto logout: {$closed} of {$open} open sessions signed out.");
+
+        foreach ($reasons as $reason => $count) {
+            $this->line("  <fg=yellow>{$count}</> left open — {$reason}");
+        }
+        if ($reasons && ! $explain) {
+            $this->line('  Run with --explain to see which employees.');
+        }
 
         return self::SUCCESS;
     }
@@ -129,26 +170,32 @@ class AutoLogoutPostShift extends Command
      */
     private function cutoffFor(EmployeeLoginSession $session, Employee $employee, int $minutes): ?Carbon
     {
+        $loginDay = $session->login_at->toDateString();
         $shift = $employee->shift;
-        if (! $shift || ! $shift->start_time || ! $shift->end_time) {
-            return null;
+
+        // 26-Aug-2026: an employee with no shift, or a shift saved without times, used to
+        // return null here and could therefore NEVER be signed out by this command — while
+        // the nightly sweep would not reach them until the following night either, so their
+        // agent tracked idle time straight through. Fall back to the end of the login day,
+        // which is exactly the boundary `smartept:mark-attendance` already uses for them.
+        if (! $shift || ! $shift->end_time) {
+            return Carbon::parse($loginDay . ' 23:59:59')->addMinutes($minutes);
         }
 
-        $loginDay = $session->login_at->toDateString();
         $end = Carbon::parse($loginDay . ' ' . $shift->end_time);
-        $start = Carbon::parse($loginDay . ' ' . $shift->start_time);
 
         // Night shift: the shift's end belongs to the NEXT calendar day.
-        if ($shift->crosses_midnight || $end->lessThanOrEqualTo($start)) {
+        if ($shift->crosses_midnight
+            || ($shift->start_time && $end->lessThanOrEqualTo(Carbon::parse($loginDay . ' ' . $shift->start_time)))) {
             $end->addDay();
         }
 
-        // A login after that end (someone clocked in during the tail of a night shift, or
-        // simply worked late) would give a cutoff already behind them — push it a day on so
-        // the session gets its own shift-length window rather than being closed instantly.
-        if ($end->lessThanOrEqualTo($session->login_at)) {
-            $end->addDay();
-        }
+        // A login AFTER the shift end is NOT given a fresh window (Ejaz, 26-Aug-2026:
+        // "irrespective of the re-login ... it should consider the post shift logout time and
+        // sign out the agent"). This used to `addDay()`, which handed such a session the whole
+        // of the next day. The cutoff stays at THIS login day's shift end + N, so signing back
+        // in after the shift is over is closed on the very next pass. A genuine night shift is
+        // already moved forward by the crosses_midnight branch above and is unaffected.
 
         return $end->addMinutes($minutes);
     }
@@ -156,14 +203,20 @@ class AutoLogoutPostShift extends Command
     /** Close the session, advance the attendance sheet, clear live status, and kick the agent. */
     private function closeSession(EmployeeLoginSession $session, Employee $employee, Carbon $cutoff, int $minutes, StatusService $status): void
     {
+        // A session that STARTED after the shift end has a cutoff behind its own login. Stamp
+        // the login instant instead of a logout that precedes it (which would read as a
+        // negative session and, through diffInSeconds' absolute value, a bogus duration).
+        $logoutAt = $cutoff->lessThan($session->login_at) ? $session->login_at->copy() : $cutoff;
+
         $session->update([
-            'logout_at'        => $cutoff,
+            'logout_at'        => $logoutAt,
             'duration_seconds' => min(
-                (int) $cutoff->diffInSeconds($session->login_at, true),
+                (int) $logoutAt->diffInSeconds($session->login_at, true),
                 self::MAX_AUTO_SESSION_SECONDS
             ),
             'logout_reason'    => 'POST_SHIFT_AUTO',
         ]);
+        $cutoff = $logoutAt;
 
         // Attendance sheet: only ever move check-out FORWARD. A real punch-out or a manual
         // HR correction that is already later than the cutoff must win.
@@ -197,16 +250,20 @@ class AutoLogoutPostShift extends Command
 
         // Kick the agent: revoke this device's token so it 401s on the next heartbeat and
         // drops back to the login screen instead of tracking through the night.
+        // NOT filtered to session_status = ACTIVE. A device whose row had already moved to
+        // LOGGED_OUT / FORCE_LOGOUT was skipped entirely, so its token was never revoked and
+        // the agent carried on tracking against a closed session (26-Aug-2026). Revoking a
+        // token that is already gone costs one query and is always safe.
         $devices = EmployeeDevice::withoutGlobalScopes()
             ->where('employee_id', $employee->id)
-            ->where('session_status', 'ACTIVE')
+            ->whereNull('unbound_at')
             ->get();
 
         foreach ($devices as $device) {
-            $employee->user?->tokens()->where('name', 'device:' . $device->device_uuid)->delete();
+            $device->revokeAgentToken();
             $device->update([
                 'session_status'  => 'FORCE_LOGOUT',
-                'force_logout_at' => now(),
+                'force_logout_at' => $this->localNow($employee->company_id),
                 'current_status'  => 'OFFLINE',
             ]);
         }

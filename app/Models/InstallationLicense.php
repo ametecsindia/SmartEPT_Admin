@@ -26,12 +26,15 @@ class InstallationLicense extends Model
 
     protected $table = 'installation_licenses';
 
-    protected $fillable = ['company_id', 'license_key', 'status', 'bundle', 'last_checked_at', 'unreachable_since', 'last_error'];
+    protected $fillable = ['company_id', 'license_key', 'status', 'bundle', 'last_checked_at', 'unreachable_since', 'last_error', 'key_saved_at'];
 
     protected $casts = [
         'bundle' => 'array',
         'last_checked_at' => 'datetime',
         'unreachable_since' => 'datetime',
+        // When the key was ENTERED. Never moved by a validation attempt — see
+        // unverifiedGraceOpen().
+        'key_saved_at' => 'datetime',
     ];
 
     /** Install-level singleton (company_id NULL) — creates the empty row on first use. */
@@ -121,10 +124,28 @@ class InstallationLicense extends Model
         return ($this->created_at ?? now())->copy()->addDays(self::EVALUATION_DAYS)->endOfDay();
     }
 
-    /** How long an as-yet-unconfirmed key stays usable, measured from when it was saved. */
+    /**
+     * How long an as-yet-unconfirmed key stays usable, measured from when it was
+     * SAVED — not from when we last tried to check it.
+     *
+     * This window used to be anchored on last_checked_at, which the unreachable
+     * branch of LicenseClient::validate() sets to now() on EVERY failure. On an
+     * air-gapped server the nightly phone-home therefore failed, bumped the
+     * anchor, and reopened the window — for ever. Typing any string into the
+     * Licence screen bought permanent, uncapped access, which is exactly the
+     * bypass the 19-Aug-2026 fix was written to close.
+     *
+     * The existing regression test passed because it never runs a phone-home
+     * between its two assertions. Production does, nightly.
+     *
+     * key_saved_at is written only where a key is actually entered, so nothing
+     * a failed validation does can move it. The fallbacks are for rows written
+     * before the column existed; updated_at is deliberately LAST, because any
+     * save() moves it.
+     */
     private function unverifiedGraceOpen(): bool
     {
-        $since = $this->last_checked_at ?? $this->updated_at ?? $this->created_at ?? now();
+        $since = $this->key_saved_at ?? $this->created_at ?? $this->updated_at ?? now();
 
         return now()->lte($since->copy()->addDays(self::EVALUATION_DAYS)->endOfDay());
     }

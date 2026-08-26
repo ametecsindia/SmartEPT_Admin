@@ -47,7 +47,16 @@ class PolicyController extends Controller
     public function index(string $type): JsonResponse
     {
         $model = $this->model($type);
-        return response()->json(['data' => $model::query()->latest('id')->get()]);
+        $query = $model::query()->latest('id');
+
+        // Application and website policies carry per-item rules in their own
+        // table. The Rules screen needs them in the same payload, or it has
+        // nothing to restore each row's action from.
+        if (in_array($type, ['application', 'website'], true)) {
+            $query->with('rules');
+        }
+
+        return response()->json(['data' => $query->get()]);
     }
 
     /** POST /api/policies/{type} */

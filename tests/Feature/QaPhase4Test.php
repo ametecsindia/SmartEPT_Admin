@@ -42,6 +42,8 @@ class QaPhase4Test extends TestCase
             'start_at'        => now()->addDay()->setTime(11, 0)->toDateTimeString(),
             'end_at'          => now()->addDay()->setTime(12, 0)->toDateTimeString(),
             'participant_ids' => [$participantId],
+            'meeting_mode'    => 'offline',
+            'venue'           => 'Board room',
         ];
     }
 
