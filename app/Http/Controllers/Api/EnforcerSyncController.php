@@ -117,7 +117,10 @@ class EnforcerSyncController extends Controller
         // which is every machine in the field the moment this shipped. Older
         // endpoints keep the behaviour they had; only an endpoint that
         // explicitly reports 0 is saying the desk is empty.
-        $mode = $state->mode;
+        // effectiveMode(), not ->mode. On an installation with no learning period a stored
+        // AUDIT is answered OFF, so an endpoint never restarts the would-have-blocked
+        // collection that was deliberately removed. Everywhere else the two are identical.
+        $mode = $state->effectiveMode();
         $reportsSessions = array_key_exists('employee_id', $data);
         $signedIn = $reportsSessions
             ? $this->signedInEmployeeById($machine, $data['employee_id'])
@@ -165,7 +168,12 @@ class EnforcerSyncController extends Controller
         $companyId = (int) $machine->company_id;
 
         $state = EnforcementState::forCompany($companyId);
-        if ($state->mode === EnforcementState::OFF) {
+        // effectiveMode() throughout this method: a stored AUDIT on an installation with no
+        // learning period is OFF, and every spec below must carry the same mode the heartbeat
+        // reported thirty seconds ago — an endpoint told OFF and then handed an AUDIT spec is
+        // exactly the disagreement that leaves a PC applying a policy nobody thinks it has.
+        $mode = $state->effectiveMode();
+        if ($mode === EnforcementState::OFF) {
             // Not the same as "remove everything" — the heartbeat's kill switch
             // says that. This says there is nothing to apply.
             return response()->json(['ok' => true, 'data' => []]);
@@ -192,7 +200,7 @@ class EnforcerSyncController extends Controller
         if ($baseline !== [] || $sites !== []) {
             $specs[] = [
                 'version'   => $version,
-                'mode'      => $state->mode,
+                'mode'      => $mode,
                 'scope'     => 'MACHINE',
                 'tenant_id' => (string) $companyId,
                 'clearance' => $this->clearance($state),
@@ -219,7 +227,7 @@ class EnforcerSyncController extends Controller
             if ($rules !== []) {
                 $specs[] = [
                     'version'   => $version,
-                    'mode'      => $state->mode,
+                    'mode'      => $mode,
                     'scope'     => 'EMPLOYEE',
                     'tenant_id' => (string) $companyId,
                     'clearance' => $this->clearance($state),

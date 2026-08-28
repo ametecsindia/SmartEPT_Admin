@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\EmployeeDevice;
 use App\Models\EnforcementAuditEvent;
+use App\Models\EnforcementMachine;
 use App\Models\EnforcementState;
 use App\Models\PolicyRule;
 use Illuminate\Http\JsonResponse;
@@ -117,11 +118,34 @@ class EnforcementController extends Controller
         return response()->json([
             'ok'   => true,
             'data' => [
-                'mode'             => $state->mode,
+                // What the console must draw. On an installation with no learning period a
+                // stored AUDIT reads OFF — there is no third state to show, and "learning"
+                // would be a stage the admin can neither enter nor leave.
+                'mode'             => $state->effectiveMode(),
+                'stored_mode'      => $state->mode,
+                'learning_enabled' => EnforcementState::learningEnabled(),
                 'audit_started_at' => $state->audit_started_at?->toIso8601String(),
                 'audit_days'       => $state->auditDays(),
                 'audit_minutes'    => $state->auditMinutes(),
                 'min_audit_minutes' => EnforcementState::minAuditMinutes(),
+                // THREE different numbers, because they mean three different things and the
+                // console was conflating them (Ejaz, 27-Aug-2026: "one agent had already
+                // logged in to other PC, but the Enforcement section says 0 PCs").
+                //
+                //   enrolled   an enforcement service exists on that PC and has a credential
+                //   live       ...and it has checked in recently
+                //   reporting  ...and it has actually stopped something at least once
+                //
+                // Only the last one was shown, labelled "PC(s) reporting". So a site with no
+                // enforcement service anywhere and a site whose service is working perfectly
+                // but has had nothing to block both read "0 PC(s) reporting" — and those need
+                // completely different actions. Worse, the employee agent signing in changes
+                // none of these numbers, which is exactly the confusion that was reported.
+                'machines_enrolled' => EnforcementMachine::withoutGlobalScopes()
+                    ->where('company_id', $companyId)->whereNull('revoked_at')->count(),
+                'machines_live'     => EnforcementMachine::withoutGlobalScopes()
+                    ->where('company_id', $companyId)->whereNull('revoked_at')
+                    ->where('last_seen_at', '>=', now()->subMinutes(10))->count(),
                 'devices_reporting' => $rows->pluck('device_uuid')->filter()->unique()->count(),
                 'intended'         => $intended,
                 'unexpected'       => $unexpected,
@@ -136,6 +160,9 @@ class EnforcementController extends Controller
      */
     public function startAudit(Request $request): JsonResponse
     {
+        if ($refusal = $this->refuseWhenLearningRemoved()) {
+            return $refusal;
+        }
 
         $state = EnforcementState::forCompany((int) $request->user()->company_id);
         $state->fill([
@@ -157,6 +184,9 @@ class EnforcementController extends Controller
      */
     public function promote(Request $request): JsonResponse
     {
+        if ($refusal = $this->refuseWhenLearningRemoved()) {
+            return $refusal;
+        }
 
         $companyId = (int) $request->user()->company_id;
         $state = EnforcementState::forCompany($companyId);
@@ -189,6 +219,42 @@ class EnforcementController extends Controller
         ])->save();
 
         return response()->json(['ok' => true, 'data' => $state, 'report_id' => $reportId]);
+    }
+
+    /**
+     * Turn enforcement ON directly — no learning period.
+     *
+     * 27-Aug-2026 (Ejaz): "ensure there is Only Enforcement ON or OFF and no learn option."
+     * The learning period was there to discover which programs a client runs from outside
+     * %WINDIR% / %PROGRAMFILES%. That work is done, the catalogue ships with the package, and
+     * repeating it per site delays protection the client is paying for. His estate, his call.
+     *
+     * Distinct from promote(), which stays exactly as it was: promote() is the honest
+     * "a clean report cleared this" path and still refuses without one. This is the operator
+     * saying "arm it, I know this estate" — recorded as such, with the admin's own id, so the
+     * console can always tell which of the two happened.
+     *
+     * ⚠ What this skips is real: the first AppLocker deny rule turns the collection
+     * deny-by-default, so a program in %LOCALAPPDATA% that nobody allowed will not launch.
+     * The kill switch below is the recovery and is never gated.
+     */
+    public function enable(Request $request): JsonResponse
+    {
+        $state = EnforcementState::forCompany((int) $request->user()->company_id);
+
+        $state->fill([
+            'mode'               => EnforcementState::ENFORCE,
+            'cleared_report_id'  => 'ENABLED_DIRECTLY',
+            'cleared_at'         => now(),
+            'cleared_by_user_id' => $request->user()->id,
+            // Endpoints re-fetch only when this moves. Without it the console would say
+            // ENFORCE while every PC carried on with its previous policy.
+            'policy_version'     => (int) $state->policy_version + 1,
+            'disabled_at'        => null,
+            'disabled_reason'    => null,
+        ])->save();
+
+        return response()->json(['ok' => true, 'data' => $state]);
     }
 
     /**
@@ -230,6 +296,35 @@ class EnforcementController extends Controller
         $row->forceFill(['resolved_at' => now()])->save();
 
         return response()->json(['ok' => true, 'data' => $row]);
+    }
+
+    /**
+     * The two learning-period endpoints, on an installation that has no learning period.
+     *
+     * 27-Aug-2026 (Ejaz): "there should be no learning mechanism in the client."
+     *
+     * Refused rather than quietly redirected to enable(). start-audit and promote are the two
+     * routes that WRITE AUDIT, so leaving them live would let an old console build, a bookmarked
+     * URL or a stale cached asset put a client site back into learning — which is precisely
+     * what was removed. They are refused with the one path that does exist, named, so nobody is
+     * left guessing which button to press instead.
+     *
+     * 422, not 404: the route exists and the request was understood. It is the installation
+     * that has no such state.
+     */
+    private function refuseWhenLearningRemoved(): ?JsonResponse
+    {
+        if (EnforcementState::learningEnabled()) {
+            return null;
+        }
+
+        return response()->json([
+            'ok'      => false,
+            'message' => 'There is no learning period on this installation. The application '
+                . 'catalogue ships with SmartEPT, so there is nothing left for this site to '
+                . 'discover. Enforcement has two states: turn it on, or leave it off.',
+            'data'    => ['learning_enabled' => false, 'use_instead' => 'POST /api/enforcement/enable'],
+        ], 422);
     }
 
     /**

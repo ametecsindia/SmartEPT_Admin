@@ -83,6 +83,11 @@ class OrgController extends Controller
                 'country' => ['nullable', 'string'], 'public_ip_whitelist' => ['nullable', 'array'],
                 'timezone' => ['nullable', 'timezone'],   // EPT-20: per-branch override of company timezone
                 'tracking_mode' => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
+                // Enforcement at this level (27-Aug-2026, Ejaz). ENFORCED = these people's PCs
+                // apply the blocking rules; EXEMPT = they are outside enforcement; null =
+                // inherit from the level above. Resolved most-specific-wins in
+                // PolicyResolver::effectiveEnforcementMode(); see EnforcementMode.
+                'enforcement_mode' => ['nullable', 'in:ENFORCED,EXEMPT'],
                 // Gate-to-PC exclusion (18-Aug-2026): EXCLUDED = no door punch needed here,
                 // REQUIRED = claw back an exclusion granted higher up. null = inherit.
                 // The from/until window is what makes "the reader is dead this week" safe:
@@ -95,6 +100,11 @@ class OrgController extends Controller
             'departments' => $base + [
                 'branch_id' => ['nullable', 'integer', Rule::exists('branches', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
                 'tracking_mode' => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
+                // Enforcement at this level (27-Aug-2026, Ejaz). ENFORCED = these people's PCs
+                // apply the blocking rules; EXEMPT = they are outside enforcement; null =
+                // inherit from the level above. Resolved most-specific-wins in
+                // PolicyResolver::effectiveEnforcementMode(); see EnforcementMode.
+                'enforcement_mode' => ['nullable', 'in:ENFORCED,EXEMPT'],
                 // Gate-to-PC exclusion (18-Aug-2026): EXCLUDED = no door punch needed here,
                 // REQUIRED = claw back an exclusion granted higher up. null = inherit.
                 // The from/until window is what makes "the reader is dead this week" safe:
@@ -109,6 +119,11 @@ class OrgController extends Controller
                 'manager_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
                 'team_leader_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
                 'tracking_mode' => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
+                // Enforcement at this level (27-Aug-2026, Ejaz). ENFORCED = these people's PCs
+                // apply the blocking rules; EXEMPT = they are outside enforcement; null =
+                // inherit from the level above. Resolved most-specific-wins in
+                // PolicyResolver::effectiveEnforcementMode(); see EnforcementMode.
+                'enforcement_mode' => ['nullable', 'in:ENFORCED,EXEMPT'],
                 // Gate-to-PC exclusion (18-Aug-2026): EXCLUDED = no door punch needed here,
                 // REQUIRED = claw back an exclusion granted higher up. null = inherit.
                 // The from/until window is what makes "the reader is dead this week" safe:
@@ -132,6 +147,11 @@ class OrgController extends Controller
                 // 26-Aug-2026: refuse AGENT sign-in outside [start_time, end_time + the
                 // minutes above]. Agent only — the admin console does not use this path.
                 'restrict_login_to_shift' => ['nullable', 'boolean'],
+                // Enforcement at this level (27-Aug-2026, Ejaz). ENFORCED = these people's PCs
+                // apply the blocking rules; EXEMPT = they are outside enforcement; null =
+                // inherit from the level above. Resolved most-specific-wins in
+                // PolicyResolver::effectiveEnforcementMode(); see EnforcementMode.
+                'enforcement_mode' => ['nullable', 'in:ENFORCED,EXEMPT'],
             ],
             default => $base,
         };

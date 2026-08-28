@@ -455,13 +455,21 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
         Route::put('policies/{type}/{policy}/rules', [PolicyRuleController::class, 'replace']);
     });
 
-    // ---- Enforcement: the audit gate + who is enforced and why ----
-    // Enforcement is never switched straight on: a tenant runs in AUDIT, endpoints report what
-    // they WOULD have blocked, and only a clean report can promote to ENFORCE. 'disable' is the
-    // kill switch and is never gated.
+    // ---- Enforcement: on, off, and who is enforced and why ----
+    // 27-Aug-2026 (Ejaz): there is no learning period on a client installation. The application
+    // catalogue ships with the package, so a site has nothing left to discover; enforcement has
+    // two states and 'enable' is the way in. 'disable' is the kill switch and is never gated.
+    //
+    // start-audit and promote are kept and still routed — they are refused with an explanation
+    // while SMARTEPT_ENFORCEMENT_LEARNING is false, and work as they always did when it is true
+    // (our own lab, surveying an estate nobody knows). Removing the routes instead would turn
+    // an old cached console asset into a 404 nobody can interpret.
     Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,COMPLIANCE_OFFICER')->group(function () {
         Route::get('enforcement/audit-report', [EnforcementController::class, 'auditReport']);
         Route::get('enforcement/diagnostics', [EnforcementDiagnosticsController::class, 'index']);
+        // 27-Aug-2026: arm directly, no learning period (Ejaz). promote() is untouched and
+        // still refuses without a clean report — this is the deliberate operator path.
+        Route::post('enforcement/enable', [EnforcementController::class, 'enable']);
         Route::post('enforcement/start-audit', [EnforcementController::class, 'startAudit']);
         Route::post('enforcement/promote', [EnforcementController::class, 'promote']);
         Route::post('enforcement/disable', [EnforcementController::class, 'disable']);

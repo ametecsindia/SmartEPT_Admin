@@ -56,8 +56,56 @@ return [
     // which is what the auditor documentation describes.
     'min_audit_minutes' => (int) env('SMARTEPT_MIN_AUDIT_MINUTES', 20),
 
-    // Policy resolution precedence (most specific first).
+    // The mode a company starts in the FIRST time enforcement is touched (Ejaz, 26-Aug-2026:
+    // "in the client package, the enforcement should be ON by default, no learning again on
+    // client side"). The catalogue work — which apps to block, Store vs desktop identifiers,
+    // the website categories, the BANKING profile — is already done and ships with the
+    // package, so re-running it per client is pure delay.
+    //
+    // Default OFF, so an UPGRADE still never turns enforcement on for anybody (decision 4).
+    // Only the client package's .env sets ENFORCE, and only for a brand-new install.
+    //
+    // ⚠ What starting at ENFORCE trades away: the learning report is what discovers the
+    // programs THIS client runs from outside %WINDIR% and %PROGRAMFILES%. The first AppLocker
+    // deny rule flips the collection to deny-by-default, so a business application living in
+    // %LOCALAPPDATA% (Teams, VS Code, Slack, or the client's own CRM) will not launch until it
+    // is allowed. Ship ENFORCE only where that estate is known.
+    //
+    // Recovery, if a program stops opening: Enforcement -> Disable in the console. It is the
+    // kill switch, it is never gated, and endpoints drop their policy on the next heartbeat.
+    'enforcement_default_mode' => env('SMARTEPT_ENFORCEMENT_DEFAULT', 'OFF'),
+
+    // Is the LEARNING period (AUDIT mode) part of this installation at all?
+    //
+    // 27-Aug-2026 (Ejaz): "there should be no learning mechanism in the client. Whatever you
+    // have learnt so far, implement that." Learning existed to discover which programs a given
+    // client runs from outside %WINDIR% / %PROGRAMFILES%. That discovery is done, it ships in
+    // the catalogue, and repeating it at each site produces the same answer a fortnight later.
+    //
+    // FALSE (the default, and what every client package ships with) means:
+    //   - enforcement has exactly two states, ON and OFF — the console shows no third one;
+    //   - `start-audit` and `promote` are refused, so nothing can write AUDIT;
+    //   - a tenant found sitting in AUDIT (an older install) is answered OFF, because AUDIT
+    //     blocks nothing and saying "learning" to an endpoint would restart the collection.
+    //
+    // TRUE restores the full OFF -> AUDIT -> ENFORCE gate. Keep it on Ametecs' own lab box
+    // when surveying a NEW estate whose applications are genuinely unknown — that is the one
+    // situation where the report tells you something the catalogue cannot.
+    'enforcement_learning_enabled' => filter_var(
+        env('SMARTEPT_ENFORCEMENT_LEARNING', false), FILTER_VALIDATE_BOOLEAN
+    ),
+
+    // Policy ASSIGNMENT precedence (most specific first). Documentation only — the chain
+    // itself lives in PolicyResolver::assignableChain(), against the assignable_type enum.
     'policy_precedence' => ['DEVICE', 'EMPLOYEE', 'TEAM', 'DEPARTMENT', 'BRANCH', 'COMPANY'],
+
+    // ENFORCEMENT precedence (most specific first) — a separate, shorter chain that decides
+    // only whether a person is inside enforcement, and one level longer than the assignment
+    // chain above. SHIFT sits between EMPLOYEE and TEAM (27-Aug-2026): a shift is chosen per
+    // person, so it is more specific than the team they belong to, and "the night shift may
+    // use the remote-support tool" has to beat "the support team is enforced", not lose to it.
+    // Documentation only; PolicyResolver::effectiveEnforcementMode() is the implementation.
+    'enforcement_precedence' => ['DEVICE', 'EMPLOYEE', 'SHIFT', 'TEAM', 'DEPARTMENT', 'BRANCH', 'COMPANY'],
 
     // Policy types the engine knows how to compose into the agent bundle.
     'policy_types' => [

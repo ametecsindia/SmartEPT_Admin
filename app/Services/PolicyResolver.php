@@ -19,6 +19,7 @@ use App\Models\NetworkPolicy;
 use App\Models\PolicyAssignment;
 use App\Models\PolicyRule;
 use App\Models\ScreenshotPolicy;
+use App\Models\Shift;
 use App\Models\UsbPolicy;
 use App\Models\VpnProxyPolicy;
 use App\Models\WebcamPolicy;
@@ -124,7 +125,9 @@ class PolicyResolver
             'device_uuid'     => $device?->device_uuid,
             'company_id'      => $employee->company_id,
             'enforcement'     => [
-                'mode'            => $enforcement->mode ?? EnforcementState::OFF,
+                // effectiveMode(): on an installation with no learning period a stored AUDIT
+                // is OFF, so the agent is never told "learning" about a state it cannot leave.
+                'mode'            => $enforcement?->effectiveMode() ?? EnforcementState::OFF,
                 'policy_version'  => (int) ($enforcement->policy_version ?? 1),
                 'audit_started_at' => $enforcement?->audit_started_at?->toIso8601String(),
                 // Per-employee. ENFORCED or EXEMPT, already resolved through the
@@ -261,7 +264,18 @@ class PolicyResolver
      * resolve differently is how a console ends up with a rule nobody can
      * predict.
      *
-     *     device -> employee -> team -> department -> branch -> company
+     *     device -> employee -> SHIFT -> team -> department -> branch -> company
+     *
+     * SHIFT joined the chain on 27-Aug-2026 (Ejaz), between EMPLOYEE and TEAM. A shift is
+     * chosen per person, so it is more specific than the team they belong to — and the request
+     * it exists to serve is "the night shift may use the remote-support tool", which has to
+     * beat "the support team is enforced" rather than lose to it. It is also the only level
+     * where the SAME person is legitimately enforced at one hour and exempt at another, so
+     * putting it below team would make the setting unusable for the case it was asked for.
+     *
+     * It sits BELOW the employee row on purpose: an exemption granted to one named person is
+     * a deliberate act about that person, and must not be overridden by whichever shift they
+     * are rostered onto next week.
      *
      * A dated exemption on the employee row beats everything, because that is
      * what a dated exemption is for: "Priya covers client calls this week" must
@@ -269,8 +283,7 @@ class PolicyResolver
      * remove is an exemption that becomes permanent.
      *
      * Returning ENFORCED is NOT the same as blocking. The tenant-wide
-     * EnforcementState still has to be ENFORCE, against a clean learning report,
-     * before anything on any PC is refused.
+     * EnforcementState still has to be ENFORCE before anything on any PC is refused.
      */
     public function effectiveEnforcementMode(Employee $employee, ?EmployeeDevice $device = null, ?Company $company = null): string
     {
@@ -282,6 +295,7 @@ class PolicyResolver
         $candidates = [];
         if ($device) { $candidates[] = $device->enforcement_mode ?? null; }
         $candidates[] = $employee->enforcement_mode ?? null;
+        if ($employee->shift_id)      { $candidates[] = optional(Shift::withoutGlobalScopes()->find($employee->shift_id))->enforcement_mode; }
         if ($employee->team_id)       { $candidates[] = optional(Team::withoutGlobalScopes()->find($employee->team_id))->enforcement_mode; }
         if ($employee->department_id) { $candidates[] = optional(Department::withoutGlobalScopes()->find($employee->department_id))->enforcement_mode; }
         if ($employee->branch_id)     { $candidates[] = optional(Branch::withoutGlobalScopes()->find($employee->branch_id))->enforcement_mode; }

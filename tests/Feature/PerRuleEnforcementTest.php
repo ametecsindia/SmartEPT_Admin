@@ -28,6 +28,13 @@ class PerRuleEnforcementTest extends TestCase
     {
         parent::setUp();
         $this->seed(DatabaseSeeder::class);
+
+        // The learning gate is half of what this class covers, and since 27-Aug-2026 it is
+        // switched OFF on every client installation (Ejaz: "no learning mechanism in the
+        // client"). Switched on here so these tests keep exercising the gate itself — that it
+        // is REFUSED when learning is removed is a separate claim, tested in
+        // EnforcementLearningRemovedTest rather than smuggled in as a passing 422 here.
+        config(['smartept.enforcement_learning_enabled' => true]);
     }
 
     // --- migration: existing tenants keep today's behaviour ----------------

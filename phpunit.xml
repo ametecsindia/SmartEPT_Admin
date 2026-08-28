@@ -12,7 +12,15 @@
             <directory>tests/Feature</directory>
         </testsuite>
     </testsuites>
-    <source>
+    <!-- restrictDeprecations: only report deprecations triggered by OUR code (the <include>
+         below), not by vendor.
+
+         27-Aug-2026, PHP 8.5: `PDO::MYSQL_ATTR_SSL_CA` is deprecated and is referenced by
+         vendor\laravel\framework\config\database.php and config\database.php. Every one of the
+         ~330 tests printed four DEPR lines about it, which is not a finding — it is the same
+         framework notice 1,300 times — and it buried three real failures so thoroughly that
+         the run looked like a wall of red. Deprecations in OUR code still report. -->
+    <source restrictDeprecations="true">
         <include>
             <directory>app</directory>
         </include>

@@ -247,8 +247,13 @@ class EnforcerEnrollmentTest extends TestCase
             ['company_id' => $company, 'label' => 'youtube', 'status' => 'BLOCKED', 'action' => 'WARN'],
         );
 
+        // ENFORCE, not AUDIT (27-Aug-2026). The mode is a fixture detail here — this test is
+        // about a blocked website reaching the endpoint — and ENFORCE is the state a client
+        // installation is actually in now that there is no learning period. AUDIT would be
+        // answered OFF on such an installation, so the endpoint would receive no spec at all
+        // and this test would fail for a reason that has nothing to do with website rules.
         \App\Models\EnforcementState::forCompany($company)
-            ->forceFill(['mode' => \App\Models\EnforcementState::AUDIT])->save();
+            ->forceFill(['mode' => \App\Models\EnforcementState::ENFORCE])->save();
 
         $specs = $this->withToken($token)
             ->getJson('/api/enforcer/policy?device_uuid=MACHINE-A')

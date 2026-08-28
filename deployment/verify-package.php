@@ -278,7 +278,7 @@ function checkVendorAgainstComposerCache(string $app, array &$problems, array &$
             continue;
         }
 
-        $archive = newestCachedArchive($cacheDir, $name);
+        $archive = cachedArchiveFor($cacheDir, $name, $pkg);
         if ($archive === null) {
             $uncached++;
             continue;
@@ -595,6 +595,58 @@ function composerFilesCacheDir(): ?string
 }
 
 /** Newest cached dist archive for a package, or null. */
+/**
+ * The cached archive for the INSTALLED version of a package — or null.
+ *
+ * 26-Aug-2026. This used to be newestCachedArchive(), which returned whichever file in the
+ * package's cache folder had the newest mtime. Composer keeps one file per version it has ever
+ * downloaded, so after an upgrade the folder holds several, and "newest mtime" is not "the one
+ * we installed". The result was a confident, wholly wrong FAIL:
+ *
+ *   vendor/phpoffice/phpspreadsheet is INCOMPLETE — 11 file(s) ... missing on disk:
+ *   src/PhpSpreadsheet/Calculation/Database.php, DateTime.php, Engineering.php ...
+ *
+ * PhpSpreadsheet 2.x deletes those shim classes and ships Database/, DateTimeExcel/ and
+ * Engineering/ DIRECTORIES instead. The tree on disk was correct for the locked 2.4.7; the diff
+ * was against a leftover 1.x archive. Guzzle, psysh and phpunit were flagged the same way.
+ *
+ * A gate that cries wolf is worse than no gate: the next real damage gets waved through as
+ * "that verifier is always wrong". So match on the installed version and its dist reference —
+ * Composer names cache files "<version>-<reference>.<ext>" — and when nothing matches, report
+ * the package as UNCACHED rather than diffing something else and calling it missing.
+ */
+function cachedArchiveFor(string $cacheDir, string $package, array $pkg): ?string
+{
+    $dir = $cacheDir . '/' . $package;
+    if (! is_dir($dir)) {
+        return null;
+    }
+
+    $files = array_values(array_filter(glob($dir . '/*') ?: [], 'is_file'));
+    if (! $files) {
+        return null;
+    }
+
+    // Composer sanitises these the same way it does when writing the cache file name.
+    $version   = (string) ($pkg['version'] ?? '');
+    $reference = (string) ($pkg['dist']['reference'] ?? '');
+    $keys = array_filter([
+        $version !== '' && $reference !== '' ? preg_replace('{[^a-z0-9_./-]}i', '-', $version . '-' . $reference) : null,
+        $reference !== '' ? preg_replace('{[^a-z0-9_./-]}i', '-', $reference) : null,
+    ]);
+
+    foreach ($keys as $key) {
+        foreach ($files as $f) {
+            if (str_contains(basename($f), $key)) {
+                return $f;
+            }
+        }
+    }
+
+    // Exactly one cached file and nothing to contradict it: it is the installed one.
+    return count($files) === 1 ? $files[0] : null;
+}
+
 function newestCachedArchive(string $cacheDir, string $package): ?string
 {
     $dir = $cacheDir . '/' . $package;

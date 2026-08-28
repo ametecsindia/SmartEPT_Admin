@@ -10,6 +10,7 @@ use App\Models\Employee;
 use App\Models\EnforcementMachine;
 use App\Models\EnforcementState;
 use App\Models\PolicyRule;
+use App\Models\Shift;
 use App\Models\Team;
 use App\Services\PolicyResolver;
 use App\Support\EnforcementMode;
@@ -145,14 +146,21 @@ class EnforcementDiagnosticsController extends Controller
     private function tenant(int $companyId): array
     {
         $state = EnforcementState::forCompany($companyId);
-        $mode = $state->mode ?: EnforcementState::OFF;
+        $mode = $state->effectiveMode() ?: EnforcementState::OFF;
+
+        // A site upgraded mid-learning stores AUDIT and acts OFF. Say so here rather than
+        // showing a bare "Off" that contradicts what somebody can read in the database.
+        $stale = $state->mode === EnforcementState::AUDIT && ! EnforcementState::learningEnabled();
 
         return [
             'mode' => $mode,
-            'note' => match ($mode) {
-                'ENFORCE' => 'Rules are being applied on employee PCs.',
-                'AUDIT'   => 'Learning. Launches are logged; nothing is refused on any PC.',
-                default   => 'Off. Nothing is blocked for anybody, whatever the rules say.',
+            'note' => match (true) {
+                $mode === 'ENFORCE' => 'Rules are being applied on employee PCs.',
+                $mode === 'AUDIT'   => 'Learning. Launches are logged; nothing is refused on any PC.',
+                $stale => 'Off. This site was left mid-learning by an older build; learning has '
+                    . 'since been removed, so nothing is being collected and nothing is blocked. '
+                    . 'Turn enforcement on when you are ready.',
+                default => 'Off. Nothing is blocked for anybody, whatever the rules say.',
             },
         ];
     }
@@ -237,7 +245,7 @@ class EnforcementDiagnosticsController extends Controller
     }
 
     /**
-     * Walk the same six levels the resolver walks, and report where it stopped.
+     * Walk the same levels the resolver walks, in the same order, and report where it stopped.
      *
      * @return array{0:string,1:string}
      */
@@ -257,7 +265,11 @@ class EnforcementDiagnosticsController extends Controller
             return ['employee', 'Set on this person.'];
         }
 
+        // Same order as PolicyResolver::effectiveEnforcementMode(), shift included. If these
+        // two lists ever disagree the console explains a decision the server did not make,
+        // which is worse than explaining nothing.
         foreach ([
+            ['shift', $e->shift_id, Shift::class],
             ['team', $e->team_id, Team::class],
             ['department', $e->department_id, Department::class],
             ['branch', $e->branch_id, Branch::class],
@@ -273,7 +285,7 @@ class EnforcementDiagnosticsController extends Controller
 
         $company = Company::find($companyId);
         if ($company && EnforcementMode::clean($company->enforcement_mode)) {
-            return ['company', 'Set on the company. Nothing is set on the person, team, department or branch.'];
+            return ['company', 'Set on the company. Nothing is set on the person, shift, team, department or branch.'];
         }
 
         return ['default', 'Nothing set at any level. The default is ENFORCED.'];

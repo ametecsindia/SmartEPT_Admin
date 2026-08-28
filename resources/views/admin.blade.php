@@ -1795,7 +1795,7 @@
             <div style="flex:1;min-width:200px"><label style="font-size:11px">Reason</label><input id="f-enf-reason" maxlength="191" placeholder="e.g. covering client calls on WhatsApp this week"></div>
           </div>
           <div class="mut" style="font-size:11px;margin-top:5px">Dates make the exemption temporary and it ends by itself — an exemption someone has to remember to remove becomes permanent. Both dates included. Leave them blank and the dropdown above decides.</div>
-          <div class="mut" style="font-size:11px;margin-top:5px"><b>Nothing is blocked for anybody</b> until enforcement is switched on for the whole company in App &amp; Web Rules, after the learning period. This setting only decides who is inside that.</div>
+          <div class="mut" style="font-size:11px;margin-top:5px"><b>Nothing is blocked for anybody</b> until enforcement is switched on for the whole company in App &amp; Web Rules. This setting only decides who is inside that when it is — as do the same settings on the shift, team, department and branch. Most specific wins: this person’s own setting beats their shift, which beats their team, then department, then branch, then the company.</div>
           <div class="mut" style="font-size:11px;margin-top:5px;color:var(--warn)"><b>Websites are machine-wide.</b> Blocked sites are refused on the PC itself, so on a <i>shared</i> PC an exempt person still cannot reach them. Apps are per person and work as you expect.</div>
         </div>
         <div class="full"><label>Gate-to-PC exclusion <span style="font-weight:400;color:var(--ink-3)">— whether this person must punch in at the door before their PC starts working</span></label>
@@ -3877,15 +3877,15 @@ const TZ_LIST = ['UTC',
   'Australia/Perth','Australia/Sydney','Pacific/Auckland'];
 const ORG_DEFS = {
   branches:     { label: 'Branch',      cols: ['name','code','city','state','timezone'],
-                  fields: [['name','Name','text',1],['code','Code','text'],['city','City','text'],['state','State','text'],['timezone','Time zone (overrides company default)','tz'],['tracking_mode','Tracking mode for this branch','trackmode'],['gate_mode','Gate-to-PC exclusion for this branch','gatemode'],['gate_mode_from','… valid from (blank = immediately)','date'],['gate_mode_until','… valid until, inclusive (blank = permanent)','date'],['gate_mode_reason','… reason (e.g. door reader under repair)','text']] },
+                  fields: [['name','Name','text',1],['code','Code','text'],['city','City','text'],['state','State','text'],['timezone','Time zone (overrides company default)','tz'],['tracking_mode','Tracking mode for this branch','trackmode'],['enforcement_mode','App/Web enforcement for this branch','enfmode'],['gate_mode','Gate-to-PC exclusion for this branch','gatemode'],['gate_mode_from','… valid from (blank = immediately)','date'],['gate_mode_until','… valid until, inclusive (blank = permanent)','date'],['gate_mode_reason','… reason (e.g. door reader under repair)','text']] },
   departments:  { label: 'Department',  cols: ['name','code','branch'],
-                  fields: [['name','Name','text',1],['code','Code','text'],['branch_id','Branch','select:branches'],['tracking_mode','Tracking mode for this department','trackmode'],['gate_mode','Gate-to-PC exclusion for this department','gatemode'],['gate_mode_from','… valid from (blank = immediately)','date'],['gate_mode_until','… valid until, inclusive (blank = permanent)','date'],['gate_mode_reason','… reason (e.g. door reader under repair)','text']] },
+                  fields: [['name','Name','text',1],['code','Code','text'],['branch_id','Branch','select:branches'],['tracking_mode','Tracking mode for this department','trackmode'],['enforcement_mode','App/Web enforcement for this department','enfmode'],['gate_mode','Gate-to-PC exclusion for this department','gatemode'],['gate_mode_from','… valid from (blank = immediately)','date'],['gate_mode_until','… valid until, inclusive (blank = permanent)','date'],['gate_mode_reason','… reason (e.g. door reader under repair)','text']] },
   teams:        { label: 'Team',        cols: ['name','code','department'],
-                  fields: [['name','Name','text',1],['code','Code','text'],['department_id','Department','select:departments'],['tracking_mode','Tracking mode for this team','trackmode'],['gate_mode','Gate-to-PC exclusion for this team','gatemode'],['gate_mode_from','… valid from (blank = immediately)','date'],['gate_mode_until','… valid until, inclusive (blank = permanent)','date'],['gate_mode_reason','… reason (e.g. door reader under repair)','text']] },
+                  fields: [['name','Name','text',1],['code','Code','text'],['department_id','Department','select:departments'],['tracking_mode','Tracking mode for this team','trackmode'],['enforcement_mode','App/Web enforcement for this team','enfmode'],['gate_mode','Gate-to-PC exclusion for this team','gatemode'],['gate_mode_from','… valid from (blank = immediately)','date'],['gate_mode_until','… valid until, inclusive (blank = permanent)','date'],['gate_mode_reason','… reason (e.g. door reader under repair)','text']] },
   designations: { label: 'Designation', cols: ['name','code','level'],
                   fields: [['name','Name','text',1],['code','Code','text'],['level','Level (0=junior)','num']] },
   shifts:       { label: 'Shift',       cols: ['name','code','timing'],
-                  fields: [['name','Name','text',1],['code','Code','text'],['start_time','Start (HH:MM)','time'],['end_time','End (HH:MM)','time'],['grace_minutes','Grace (min)','num'],['break_minutes_allowed','Break allowed (min)','num'],['post_shift_auto_logout_minutes','Auto sign-out after shift end (min) — blank = never','num'],['restrict_login_to_shift','Block agent sign-in outside these hours (the SmartEPT agent only — never the admin console)','yesno',1]] },
+                  fields: [['name','Name','text',1],['code','Code','text'],['start_time','Start (HH:MM)','time'],['end_time','End (HH:MM)','time'],['grace_minutes','Grace (min)','num'],['break_minutes_allowed','Break allowed (min)','num'],['post_shift_auto_logout_minutes','Auto sign-out after shift end (min) — blank = never','num'],['restrict_login_to_shift','Block agent sign-in outside these hours (the SmartEPT agent only — never the admin console)','yesno',1],['enforcement_mode','App/Web enforcement for this shift','enfmode',1]] },
 };
 let ORG_TAB = 'branches';
 async function initOrg() {
@@ -4023,6 +4023,16 @@ function orgField(f, val) {
     const cur = (val === true || val === 1 || val === '1') ? '1' : '0';
     return '<label>' + label + star + '</label><select data-k="' + k + '">'
       + opts.map((o) => '<option value="' + o[0] + '"' + (cur === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>';
+  }
+  if (type === 'enfmode') {
+    // Three options, and "Inherit" first because it is what almost every row should stay on.
+    // ENFORCED here does NOT mean anything is blocked — the company switch in App & Web Rules
+    // still has to be on. This only decides who is inside that when it is.
+    const opts = [['', 'Inherit (from the level above)'],
+      ['ENFORCED', 'Enforced — blocking rules apply to these people'],
+      ['EXEMPT', 'Exempt — nothing is blocked for them, even when enforcement is on']];
+    return '<label>' + label + star + '</label><select data-k="' + k + '">'
+      + opts.map((o) => '<option value="' + o[0] + '"' + ((val || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>';
   }
   if (type === 'trackmode') {
     const opts = [['', 'Inherit (from parent / company)'], ['FULL', 'Full — capture everything'],
@@ -4878,8 +4888,11 @@ async function initEnforcement() {
     if (!ENF) { body.textContent = 'Unavailable.'; return; }
 
     const mode = ENF.mode || 'OFF';
-    tag.textContent = { OFF: 'Off', AUDIT: 'Learning', ENFORCE: 'Enforcing' }[mode] || mode;
-    tag.className = 'tag ' + ({ OFF: 't-info', AUDIT: 't-warn', ENFORCE: 't-ok' }[mode] || 't-info');
+    // Two states on screen. A tenant sitting in the legacy AUDIT mode reads as Off,
+    // because from the client's point of view nothing is being prevented.
+    const isOn = mode === 'ENFORCE';
+    tag.textContent = isOn ? 'Enforcing' : 'Off';
+    tag.className = 'tag ' + (isOn ? 't-ok' : 't-info');
 
     body.innerHTML = enfMarkup(mode);
     wireEnforcement();
@@ -4899,67 +4912,77 @@ function enfDuration(mins) {
 }
 
 function enfMarkup(mode) {
-  if (mode === 'OFF') {
-    return '<p>Nothing is being prevented. Rules set to <b>Close / block</b> are recorded as violations '
-      + 'and the employee is warned, exactly as before.</p>'
-      + '<p class="mut">Before anything can actually be blocked, SmartEPT watches for '
-      + enfDuration(ENF.min_audit_minutes || 0) + ' and reports '
-      + 'what it <i>would</i> have blocked. That list almost always contains programs your staff genuinely use — '
-      + 'Teams, Zoom and VS Code install themselves somewhere Windows treats as untrusted. '
-      + 'Finding them now is the difference between a quiet rollout and a very loud morning.</p>'
-      + '<button class="btn solid" id="enf-start" type="button">Start learning</button>';
-  }
+  // 27-Aug-2026 (Ejaz): "Only Enforcement ON or OFF and no learn option." The learning period
+  // existed to discover which programs a client runs from outside %WINDIR% / %PROGRAMFILES%.
+  // That work is done and the catalogue ships with the package, so a client repeating it
+  // discovers nothing and only delays protection. AUDIT is still a valid state in the
+  // database (older tenants sit in it) — it is presented here as simply "not on yet", never
+  // as a stage the admin has to pass through.
+  const on = mode === 'ENFORCE';
 
-  const p = ENF.promotion || {};
   const rows = (list, empty) => (list && list.length)
     ? '<div style="overflow-x:auto"><table><thead><tr><th>Program</th><th>Times seen</th><th>PC</th><th></th></tr></thead><tbody>'
       + list.map((r) => '<tr><td>' + esc(r.target) + '</td><td>' + (r.occurrences || 1) + '</td>'
-        + '<td class="mut">' + esc(r.device_uuid || '—') + '</td>'
+        + '<td class="mut">' + esc(r.device_uuid || '\u2014') + '</td>'
         + '<td>' + (r.expected ? '' : '<button class="btn" data-enf-resolve="' + r.id + '" type="button">Allow / dismiss</button>') + '</td></tr>').join('')
       + '</tbody></table></div>'
     : '<p class="mut">' + empty + '</p>';
 
-  let html = '<p><b>' + (mode === 'AUDIT' ? 'Learning' : 'Enforcing') + '</b> for '
-    + enfDuration(ENF.audit_minutes || 0)
-    + (mode === 'AUDIT' ? ' of ' + enfDuration(ENF.min_audit_minutes || 0) : '')
-    + ' \u00b7 ' + (ENF.devices_reporting || 0) + ' PC(s) reporting.</p>';
-
-  if (mode === 'AUDIT') {
-    html += '<p class="mut">Nothing is blocked yet.</p>';
+  if (! on) {
+    return '<p><b>Enforcement is off.</b> Rules set to <b>Close / block</b> are recorded as '
+      + 'violations and the employee is warned, but nothing is actually prevented.</p>'
+      + '<p class="mut">Turning it on applies your rules to every PC within about 30 seconds. '
+      + 'Programs your staff genuinely use that Windows treats as untrusted \u2014 anything '
+      + 'installed under the user profile rather than Program Files \u2014 will also stop opening '
+      + 'unless they are on your rules. If that happens, switch it off again here; every PC '
+      + 'releases within ~30 seconds.</p>'
+      + '<button class="btn solid" id="enf-enable" type="button">Turn enforcement on</button>';
   }
 
-  html += '<h4 style="margin:14px 0 6px">Would be blocked — intended</h4>'
-    + rows(ENF.intended, 'Nothing yet. Open a blocked app on a PC that has the agent, then refresh. '
-      + 'If <b>Violations</b> is showing that app but this stays empty, the agent reached the server '
-      + 'but this report did not \u2014 check the agent window for a line starting <code>[smartept] DROPPED</code>.')
-    + '<h4 style="margin:14px 0 6px">Would be blocked — <span style="color:var(--danger)">not on your rules</span></h4>'
-    + rows(ENF.unexpected, 'Nothing. Every program the policy would stop is one you asked for.');
+  // Three numbers, not one (Ejaz, 27-Aug-2026: "one agent had already logged in to other PC,
+  // but the Enforcement section says 0 PCs"). "0 PC(s) reporting" was shown both when no
+  // enforcement service existed anywhere AND when the service was working perfectly and had
+  // simply had nothing to stop. Those need opposite actions, so the card has to say which.
+  //
+  // The employee agent moves none of these numbers, and that is correct \u2014 it is a different
+  // program. Saying so once, here, is cheaper than the support call.
+  const enrolled = Number(ENF.machines_enrolled || 0);
+  const live = Number(ENF.machines_live || 0);
+  const reporting = Number(ENF.devices_reporting || 0);
 
-  if (mode === 'AUDIT') {
-    html += '<div style="margin-top:14px">'
-      + (p.allowed
-        ? '<button class="btn solid" id="enf-promote" type="button">Turn enforcement on</button>'
-        // A disabled button that looks clickable reads as a broken button. It is
-        // refusing on purpose, so it has to LOOK like it is refusing, and say why
-        // where the eye already is rather than only in a tooltip.
-        : '<button class="btn" disabled title="' + esc(p.reason || '') + '"'
-          + ' style="opacity:.5;cursor:not-allowed">\uD83D\uDD12 Turn enforcement on</button>'
-          + '<div style="margin-top:6px;font-size:11.5px;color:var(--danger)"><b>Not yet:</b> '
-          + esc(p.reason || 'the learning report is not clear.') + '</div>')
-      + '</div>';
+  let health;
+  if (!enrolled) {
+    health = '<div style="border:1px solid var(--danger);background:var(--danger-soft);'
+      + 'border-radius:8px;padding:12px 14px;margin-bottom:12px">'
+      + '<b style="color:var(--danger)">No PC has the enforcement service.</b> '
+      + 'Enforcement is switched on here and nothing can be blocked anywhere, because the part '
+      + 'that does the blocking is not installed on any computer yet.<br>'
+      + '<span style="font-size:12px">On each employee PC, open the SmartEPT client package and '
+      + 'run <code>INSTALL-ON-THIS-PC.bat</code> as administrator. The employee agent is a '
+      + 'different program \u2014 signing in to it does not put a PC on this list.</span></div>';
+  } else if (!live) {
+    health = '<div style="border:1px solid var(--warn);border-radius:8px;padding:12px 14px;'
+      + 'margin-bottom:12px"><b>' + enrolled + ' PC(s) have the service, none checked in recently.</b>'
+      + '<br><span style="font-size:12px">A protected PC checks in about every 30 seconds. '
+      + 'Switched off, asleep, or cannot reach this server.</span></div>';
+  } else {
+    health = '<p><b>' + live + ' of ' + enrolled + ' PC(s) protected right now.</b> '
+      + '<span class="mut">' + reporting + ' ' + (reporting === 1 ? 'has' : 'have')
+      + ' had to stop something.</span></p>';
   }
 
-  // The kill switch is always available and never gated. A machine that cannot
-  // be un-blocked is the failure mode this whole design refuses to ship.
-  html += '<div style="margin-top:14px"><button class="btn danger" id="enf-disable" type="button">'
-    + (mode === 'AUDIT' ? 'Stop learning' : 'Switch enforcement off') + '</button>'
+  return '<p><b>Enforcing</b></p>' + health
+    + '<h4 style="margin:14px 0 6px">Blocked \u2014 on your rules</h4>'
+    + rows(ENF.intended, enrolled
+      ? 'Nothing stopped yet. A PC appears here the first time its enforcement service refuses '
+        + 'something. On a quiet estate that is a good sign, not a fault.'
+      : 'Nothing can be reported until the enforcement service is installed \u2014 see above.')
+    + '<h4 style="margin:14px 0 6px">Blocked \u2014 <span style="color:var(--danger)">not on your rules</span></h4>'
+    + rows(ENF.unexpected, 'Nothing. Every program the policy stopped is one you asked for.')
+    + '<div style="margin-top:14px"><button class="btn danger" id="enf-disable" type="button">'
+    + 'Switch enforcement off</button>'
     + '<span class="mut" style="margin-left:8px;font-size:11.5px">'
-    + (mode === 'AUDIT'
-      ? 'Goes back to Off. Nothing was being blocked, so nothing changes on any PC.'
-      : 'Takes effect on every PC within ~30 seconds.')
-    + '</span></div>';
-
-  return html;
+    + 'Takes effect on every PC within ~30 seconds.</span></div>';
 }
 
 // "Why is this person blocked and that one not?"
@@ -5079,17 +5102,14 @@ async function initEnforcementDiagnostics() {
 }
 
 function wireEnforcement() {
-  const start = $('#enf-start');
-  if (start) start.onclick = async () => {
-    try { await api('/enforcement/start-audit', { method: 'POST' }); toast('Learning started — nothing is blocked'); initEnforcement(); }
-    catch (e) { toast(e.message || 'Could not start'); }
-  };
-
-  const promote = $('#enf-promote');
-  if (promote) promote.onclick = async () => {
-    if (!confirm('Turn enforcement on?\n\nBlocked apps will stop opening on employee PCs. You can switch it off again at any time.')) return;
-    try { const r = await api('/enforcement/promote', { method: 'POST' }); toast('Enforcement on — report ' + (r.report_id || '')); initEnforcement(); }
-    catch (e) { toast(e.message || 'Refused'); }
+  // One button on, one button off. The learning period and its promotion gate are gone from
+  // this screen (Ejaz, 27-Aug-2026) — the catalogue ships with the package, so there is
+  // nothing for a client to discover and nothing to wait for.
+  const enable = $('#enf-enable');
+  if (enable) enable.onclick = async () => {
+    if (!confirm('Turn enforcement on?\n\nBlocked apps will stop opening on employee PCs within about 30 seconds.\n\nIf a program your staff need stops opening, switch it off again here.')) return;
+    try { await api('/enforcement/enable', { method: 'POST' }); toast('Enforcement on'); initEnforcement(); }
+    catch (e) { toast(e.message || 'Could not turn on'); }
   };
 
   const off = $('#enf-disable');
