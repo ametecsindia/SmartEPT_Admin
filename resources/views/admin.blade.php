@@ -4691,6 +4691,26 @@ const RULE_CONFIRM_ENFORCE = ['cmd', 'powershell', 'pwsh', 'taskmgr', 'regedit',
 const ruleBase = (item) => String(item || '').toLowerCase().replace(/\.exe$/, '').trim();
 const ruleBlocks = (r) => r.status === 'BLOCKED' || r.status === 'VIOLATION';
 
+// A website rule only blocks if the endpoint can turn it into a real domain.
+// Mirrors internal/sites/sites.go `known` in smartept-enforcer — the ONLY names
+// that work without a full address. Keep the two in step.
+const RULE_KNOWN_SITE_NAMES = ['whatsapp', 'telegram', 'signal', 'messenger', 'skype', 'viber',
+  'wechat', 'line', 'slack', 'facebook', 'instagram', 'twitter', 'x', 'tiktok', 'snapchat',
+  'reddit', 'linkedin', 'pinterest', 'tumblr', 'discord', 'youtube', 'netflix', 'primevideo',
+  'hotstar', 'spotify', 'twitch', 'torrent', 'thepiratebay', 'anydesk', 'teamviewer'];
+// What the admin typed, as the endpoint will see it: no scheme, no www., no path.
+const siteHost = (v) => String(v || '').toLowerCase().trim()
+  .replace(/^https?:\/\//, '').replace(/^www\./, '').split(/[\/?#]/)[0].replace(/:\d+$/, '').replace(/^\.+|\.+$/g, '');
+// True when a website rule will actually be enforced. A bare word is only
+// blockable when it is one of the built-in names above; everything else needs a
+// real domain, because a browser policy and the hosts file take hosts, not words.
+const siteBlockable = (item) => {
+  const h = siteHost(item);
+  if (!h) return false;
+  if (RULE_KNOWN_SITE_NAMES.includes(h)) return true;
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(h);
+};
+
 function rulesFromPolicy(pol, kind) {
   if (!pol) return [];
   const allowed = (kind === 'app' ? pol.allowed_apps : pol.allowed_sites) || [];
@@ -4739,7 +4759,12 @@ function renderRules() {
   const q = ($('#rule-q').value || '').toLowerCase();
   const list = RULES.map((r, i) => ({ r, i })).filter(({ r }) => !q || r.item.toLowerCase().includes(q));
   $('#rule-rows').innerHTML = list.map(({ r, i }) => '<tr>'
-    + '<td><b>' + esc(r.item) + '</b></td>'
+    + '<td><b>' + esc(r.item) + '</b>'
+    + ((r.kind === 'site' && ruleBlocks(r) && !siteBlockable(r.item))
+      ? '<div style="font-size:11px;color:var(--danger,#b42318);margin-top:2px">'
+        + 'Not blocked — enter the full address, e.g. <b>' + esc(siteHost(r.item) || 'example') + '.com</b></div>'
+      : '')
+    + '</td>'
     + '<td>' + (r.kind === 'app' ? 'Application' : 'Website') + '</td>'
     + '<td><select data-rule-status="' + i + '" class="rst rst-' + r.status + '">'
     + RULE_ORDER.map((sx) => '<option value="' + sx + '"' + (sx === r.status ? ' selected' : '') + '>' + RULE_LABEL[sx] + '</option>').join('')
@@ -4777,9 +4802,18 @@ function ruleActionCell(r, i) {
 }
 
 function addRule() {
-  const item = ($('#rule-add-item').value || '').trim().toLowerCase();
+  let item = ($('#rule-add-item').value || '').trim().toLowerCase();
   if (!item) return;
   const kind = $('#rule-add-type').value, status = $('#rule-add-status').value;
+  if (kind === 'site') {
+    // Store the host, not the pasted URL: the endpoint blocks a host, and
+    // "https://gaana.com/old-songs" would otherwise be saved and silently skipped.
+    item = siteHost(item) || item;
+    if (!siteBlockable(item)) {
+      toast('Enter the full website address, e.g. ' + item + '.com — a name on its own cannot be blocked');
+      return;
+    }
+  }
   if (RULES.some((r) => r.item.toLowerCase() === item && r.kind === kind)) { toast('Already in the list'); return; }
   // New rules start at WARN, never at CLOSE. Nothing this screen creates should
   // ever start preventing something the moment it is saved.
