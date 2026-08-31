@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\BiometricDevice;
+use App\Services\Biometric\EsslProvider;
+use App\Services\Biometric\ProviderRegistry;
+use App\Services\Biometric\PunchDirectionResolver;
 use App\Services\BiometricCloudSync;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,15 +14,24 @@ use Illuminate\Validation\Rule;
 
 /**
  * Biometric device registry. A "device" is either a physical punch reader
- * (middleware push / CSV) or — since 17-Jul — a CLOUD ATTENDANCE API
- * (eTimeOffice-style) that SmartEPT polls every few minutes for punches.
+ * (middleware push / CSV) or — since 17-Jul — an ATTENDANCE API that SmartEPT polls
+ * every few minutes for punches. Since 28-Aug there is more than one such API
+ * (eTimeOffice, eSSL eTimeTrackLite); the vendor is chosen per device with
+ * provider_key and the list itself comes from ProviderRegistry, so adding a provider
+ * needs no change in this controller or in the console.
+ *
+ * ONE ROW = ONE PHYSICAL READER. Each row carries its own branch, floor/location and
+ * punch direction, which is how a company with several branches, several floors per
+ * branch and several readers per floor is modelled. Readers that live on the same
+ * vendor server simply repeat the same URL and login.
  */
 class BiometricDeviceController extends Controller
 {
     /** GET /api/integrations/biometric/devices */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, ProviderRegistry $providers): JsonResponse
     {
         $devices = BiometricDevice::withCount('logs')
+            ->with('branch:id,name')
             ->orderBy('name')
             ->get()
             ->map(fn ($d) => [
@@ -27,6 +39,10 @@ class BiometricDeviceController extends Controller
                 'name'                 => $d->name,
                 'device_serial'        => $d->device_serial,
                 'location'             => $d->location,
+                'floor'                => $d->floor,
+                'branch_name'          => $d->branch?->name,
+                'provider_key'         => $providers->keyFor($d),
+                'punch_direction_mode' => PunchDirectionResolver::mode($d),
                 'ip_address'           => $d->ip_address,
                 'integration_method'   => $d->integration_method,
                 'vendor'               => $d->vendor,
@@ -54,7 +70,13 @@ class BiometricDeviceController extends Controller
                 'out_machine_id'       => $d->out_machine_id,
             ]);
 
-        return response()->json(['data' => $devices]);
+        // The console builds its provider dropdown and its direction dropdown from these,
+        // so a new provider appears in the UI the moment it is registered.
+        return response()->json([
+            'data'      => $devices,
+            'providers' => $providers->options(),
+            'direction_modes' => PunchDirectionResolver::MODES,
+        ]);
     }
 
     /** POST /api/integrations/biometric/devices */
@@ -127,11 +149,16 @@ class BiometricDeviceController extends Controller
     private function validated(Request $request): array
     {
         $companyId = $request->user()->company_id;
+        $providerKeys = app(ProviderRegistry::class)->keys();
 
         $data = $request->validate([
             'name'                 => ['nullable', 'string', 'max:120', 'required_without:provider'],
-            'device_serial'        => ['nullable', 'string', 'max:120'],
+            // eSSL filters GetTransactionsLog by SerialNumber, so the serial is that
+            // provider's device identity and cannot be blank.
+            'device_serial'        => ['nullable', 'string', 'max:120', 'required_if:provider_key,' . EsslProvider::KEY],
             'location'             => ['nullable', 'string', 'max:190'],
+            // Floor / area within the branch — Company → Branch → Floor → Device.
+            'floor'                => ['nullable', 'string', 'max:120'],
             'ip_address'           => ['nullable', 'string', 'max:64'],
             'integration_method'   => ['nullable', Rule::in(['DIRECT_PULL', 'MIDDLEWARE_PUSH', 'CSV_IMPORT', 'HRMS_API'])],
             'vendor'               => ['nullable', 'string', 'max:120'],
@@ -148,7 +175,12 @@ class BiometricDeviceController extends Controller
             'sync_times'           => ['nullable', 'array', 'max:24'],
             'sync_times.*'         => ['string', 'regex:/^\d{1,2}:\d{2}$/'],
             'provider'             => ['nullable', 'string', 'max:120'],
-            'api_base_url'         => ['nullable', 'string', 'max:500'],
+            // Which vendor API this reader speaks. Blank = eTimeOffice, which is what
+            // every device saved before 28-Aug-2026 is.
+            'provider_key'         => ['nullable', Rule::in($providerKeys)],
+            // IN only / OUT only / IN+OUT on one reader / AUTO (the historical rule).
+            'punch_direction_mode' => ['nullable', Rule::in(PunchDirectionResolver::MODES)],
+            'api_base_url'         => ['nullable', 'string', 'max:500', 'required_if:provider_key,' . EsslProvider::KEY],
             'api_endpoint'         => ['nullable', 'string', 'max:190'],
             'corporate_id'         => ['nullable', 'string', 'max:120'],
             'api_username'         => ['nullable', 'string', 'max:190'],
@@ -162,6 +194,12 @@ class BiometricDeviceController extends Controller
         // The setup form has no separate name field — the provider doubles as the name.
         if (blank($data['name'] ?? null) && filled($data['provider'] ?? null)) {
             $data['name'] = $data['provider'];
+        }
+
+        // Never store a blank provider_key: a NULL would send the device down the
+        // registry's "guess from the provider text" path on every read.
+        if (blank($data['provider_key'] ?? null)) {
+            unset($data['provider_key']);
         }
 
         // A blank password on edit means "keep the saved one" — never overwrite with null.

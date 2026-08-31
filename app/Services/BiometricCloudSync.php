@@ -7,34 +7,49 @@ use App\Models\BiometricDevice;
 use App\Models\BiometricEmployeeMapping;
 use App\Models\BiometricLog;
 use App\Models\Employee;
+use App\Services\Biometric\ProviderRegistry;
+use App\Services\Biometric\PunchDirectionResolver;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Http;
-use RuntimeException;
 
 /**
- * Cloud biometric punch import (Ejaz 17-Jul): pulls punches from a cloud
- * attendance API (eTimeOffice-style: Basic auth over corporate:user:password,
- * GET {base}/{endpoint}?Empcode=ALL&FromDate=..&ToDate=..) and feeds them into
- * the SAME pipeline as middleware push / CSV import: BiometricLog rows +
- * attendance merge — so imported punches mark PRESENT, feed payroll and open
- * the Gate-to-PC wall exactly like a locally-pushed punch.
+ * Cloud/on-prem biometric punch import (Ejaz 17-Jul-2026; second provider 28-Aug-2026).
  *
- * IN/OUT resolution (per the console form): the configured IN/OUT machine
- * numbers OVERRIDE the feed's own flag; otherwise the feed's IN/OUT flag is
- * used; with neither, punches alternate IN → OUT per employee per day.
+ * Pulls punches from a biometric attendance API and feeds them into the SAME pipeline as
+ * middleware push / CSV import: BiometricLog rows + attendance merge — so imported
+ * punches mark PRESENT, feed payroll and open the Gate-to-PC wall exactly like a
+ * locally-pushed punch.
+ *
+ * Talking to the vendor is NOT this class's job any more. Each provider
+ * (App\Services\Biometric\*Provider) knows its own protocol and hands back normalized
+ * rows; this class does the vendor-independent half: employee resolution, dedupe,
+ * direction policy, storage and the fan-out into attendance, gate and derivation.
+ * Adding a third vendor touches one new class and one line of ProviderRegistry.
+ *
+ * IN/OUT resolution, in order:
+ *   1. the reader's punch_direction_mode when it is not AUTO (IN only / OUT only /
+ *      IN+OUT alternating) — see PunchDirectionResolver;
+ *   2. otherwise the historical rule: configured IN/OUT machine numbers override the
+ *      feed's own flag, then the feed's flag;
+ *   3. anything still undecided alternates IN → OUT per employee per day.
  */
 class BiometricCloudSync
 {
     /** First 1500 chars of the last provider response body (for zero-parse debugging). */
     private ?string $lastRaw = null;
 
+    public function __construct(
+        private ProviderRegistry $providers,
+        private PunchDirectionResolver $directions,
+    ) {
+    }
+
     /** Test connection: fetch today's punches, store NOTHING. */
     public function probe(BiometricDevice $d): array
     {
         try {
-            $rows = $this->fetch($d, now()->subDay(), now());
+            $rows = $this->collect($d, now()->subDay(), now());
         } catch (\Throwable $e) {
-            return ['ok' => false, 'message' => $e->getMessage(), 'sample' => []];
+            return ['ok' => false, 'message' => $e->getMessage(), 'sample' => [], 'raw' => $this->lastRaw];
         }
 
         $resolve = $this->employeeResolver($d);
@@ -54,7 +69,7 @@ class BiometricCloudSync
         })->values()->all();
 
         $msg = 'Connected — ' . count($rows) . ' punch(es) parsed in the last 24h'
-            . ($mcs->isNotEmpty() ? ('. MC numbers seen: ' . $mcs->implode(', ')) : '');
+            . ($mcs->isNotEmpty() ? ('. Device/MC numbers seen: ' . $mcs->implode(', ')) : '');
 
         // Show the raw body when nothing parsed OR when no punch carried a machine
         // number — either way a field-mapping gap must be visible instantly.
@@ -74,7 +89,7 @@ class BiometricCloudSync
         $from = now()->subDays(max(0, $daysBack - 1))->startOfDay();
 
         try {
-            $rows = $this->fetch($d, $from, now());
+            $rows = $this->collect($d, $from, now());
         } catch (\Throwable $e) {
             $d->forceFill([
                 'last_sync_at'     => now(),
@@ -149,6 +164,16 @@ class BiometricCloudSync
                 BiometricLog::insert($chunk);
             }
         }
+
+        // A single reader used for BOTH directions decides IN/OUT from the employee's
+        // punch sequence for that day — and that sequence lives in the database, not in
+        // this batch, so it is settled after the rows are stored. Re-running it is safe:
+        // the same day always produces the same answer.
+        $resequenced = 0;
+        if ($inserts && PunchDirectionResolver::mode($d) === 'IN_OUT') {
+            [$inserts, $corrections, $resequenced] = $this->applyDaySequence($d, $inserts, $corrections);
+        }
+
         if ($inserts || $corrections) {
             $touched = array_merge($inserts, $corrections);
             BiometricController::mergeIntoAttendance($d->company_id, $touched);
@@ -161,6 +186,7 @@ class BiometricCloudSync
 
         $codes = array_slice(array_keys($unmatchedCodes), 0, 15);
         $msg = sprintf('OK — %d fetched, %d new, %d duplicate, %d corrected, %d unmapped', count($rows), count($inserts), $dupes, $corrected, $unmapped)
+            . ($resequenced ? sprintf(', %d re-sequenced IN/OUT', $resequenced) : '')
             . ($codes ? ('. Unmatched: ' . implode(', ', $codes)) : '');
         $d->forceFill(['last_sync_at' => now(), 'last_sync_result' => mb_substr($msg, 0, 490)])->save();
 
@@ -171,81 +197,41 @@ class BiometricCloudSync
             'stored'          => count($inserts),
             'duplicate'       => $dupes,
             'corrected'       => $corrected,
+            'resequenced'     => $resequenced,
             'unmapped'        => $unmapped,
             'unmatched_codes' => $codes,
         ];
     }
 
-    /** Call the provider and return normalized punch rows (code, punched_at, mc, direction). */
-    private function fetch(BiometricDevice $d, Carbon $from, Carbon $to): array
+    /**
+     * Ask the device's provider for punches, then apply the direction policy.
+     * Probe and sync both go through here, so what Test connection previews is exactly
+     * what a sync would store.
+     */
+    private function collect(BiometricDevice $d, Carbon $from, Carbon $to): array
     {
-        if (blank($d->api_base_url) || blank($d->api_endpoint)) {
-            throw new RuntimeException('API base URL and endpoint are required.');
+        $provider = $this->providers->for($d);
+
+        $this->lastRaw = null;
+        try {
+            $rows = $provider->fetch($d, $from, $to);
+        } finally {
+            $this->lastRaw = $provider->lastRaw();
         }
 
-        $url = rtrim($d->api_base_url, '/') . '/' . ltrim($d->api_endpoint, '/');
+        // IN only / OUT only / IN+OUT. AUTO leaves the provider's own answer alone.
+        $rows = $this->directions->applyDeviceMode($d, $rows);
 
-        // eTimeOffice vendor quirk (SmartPRS rev156-173g, production-proven):
-        // HTTP Basic auth where the USERNAME is the whole "CorpID:Username:Password:true"
-        // string and the password is the password again.
-        $basicUser = filled($d->corporate_id)
-            ? ($d->corporate_id . ':' . $d->api_username . ':' . $d->api_password . ':true')
-            : (string) $d->api_username;
+        return $this->alternateUndecided($rows);
+    }
 
-        // eTimeOffice's ParseExact wants dd/MM/yyyy_HH:mm — underscore, NO seconds
-        // (SmartPRS-proven). Fall back automatically on a provider DateTime parse error.
-        $list = null;
-        $lastEx = null;
-        foreach (['d/m/Y_H:i', 'd/m/Y_H:i:s', 'd/m/Y'] as $fmt) {
-            try {
-                $list = $this->requestPunchList($d, $url, $basicUser, $from->format($fmt), $to->format($fmt));
-                break;
-            } catch (RuntimeException $e) {
-                $lastEx = $e;
-                if (! preg_match('/DateTime|ParseExact|FormatException/i', $e->getMessage())) {
-                    throw $e;
-                }
-            }
-        }
-        if ($list === null) {
-            throw new RuntimeException(($lastEx ? $lastEx->getMessage() : 'Provider request failed.')
-                . ' [tried FromDate as ' . $from->format('d/m/Y_H:i') . ', with seconds, and date-only]');
-        }
-
-        $rows = [];
-        foreach ($list as $p) {
-            if (! is_array($p)) {
-                continue;
-            }
-            if (array_is_list($p)) {
-                // Positional row: [emp, name, datetime, inout, machineNo] (SmartPRS-proven).
-                $p = ['Empcode' => $p[0] ?? null, 'Name' => $p[1] ?? null, 'DateTime' => $p[2] ?? null,
-                      'INOUT' => $p[3] ?? null, 'MachineNo' => $p[4] ?? null];
-            }
-            $code = trim((string) $this->pick($p, ['Empcode', 'EmpCode', 'empcode', 'Code', 'EmployeeCode', 'employee_code', 'EmpId']));
-            $dtRaw = $this->pick($p, ['DateTime', 'PunchDateTime', 'PunchDate', 'punched_at', 'punch_time', 'DateTimeStr']);
-            if ($code === '' || blank($dtRaw)) {
-                continue;
-            }
-            $when = $this->parseWhen(trim((string) $dtRaw));
-            if (! $when) {
-                continue;
-            }
-            $mc = $this->pick($p, ['MC', 'MCID', 'MCNo', 'MC_No', 'McId', 'MachineNo', 'MachineNumber', 'MachineId', 'machine_no', 'DeviceId']);
-            $mc = ($mc === null || $mc === '') ? null : trim((string) $mc);
-            $flag = $this->pick($p, ['INOUT', 'InOut', 'PunchDirection', 'Direction', 'IO', 'Status']);
-            $name = $this->pick($p, ['Name', 'EmpName', 'EmployeeName', 'FullName']);
-
-            $rows[] = [
-                'code'       => $code,
-                'name'       => is_string($name) ? trim($name) : null,
-                'punched_at' => $when,
-                'mc'         => $mc,
-                'direction'  => $this->direction($d, $mc, $flag),
-            ];
-        }
-
-        // Undecided punches alternate IN → OUT per employee per day, in time order.
+    /**
+     * Undecided punches alternate IN → OUT per employee per day, in time order.
+     * (Historically this lived at the end of the eTimeOffice fetch; it now runs for
+     * every provider, which is what makes a reader that reports no direction usable.)
+     */
+    private function alternateUndecided(array $rows): array
+    {
         $undecided = [];
         foreach ($rows as $i => $r) {
             if ($r['direction'] === null) {
@@ -262,65 +248,54 @@ class BiometricCloudSync
         return $rows;
     }
 
-    /** One provider call with a specific FromDate/ToDate string; returns the raw punch list. */
-    private function requestPunchList(BiometricDevice $d, string $url, string $basicUser, string $fromStr, string $toStr): array
+    /**
+     * Settle an IN+OUT reader's directions against the employee's whole stored day, then
+     * fold the result back into the in-memory batch so attendance, the gate and the
+     * derivation all see the final answer. A punch that was already stored and only had
+     * its direction flipped rides the existing "correction" path.
+     *
+     * @return array{0: array, 1: array, 2: int}  [inserts, corrections, changedCount]
+     */
+    private function applyDaySequence(BiometricDevice $d, array $inserts, array $corrections): array
     {
-        $this->lastRaw = null;
-        $res = Http::timeout(60)
-            ->withBasicAuth($basicUser, (string) $d->api_password)
-            ->withHeaders(['Accept' => 'application/json'])
-            ->get($url, [
-                'Empcode'  => filled($d->employee_code_filter) ? $d->employee_code_filter : 'ALL',
-                'FromDate' => $fromStr,
-                'ToDate'   => $toStr,
-            ]);
-
-        if ($res->failed()) {
-            throw new RuntimeException('HTTP ' . $res->status() . ' from provider: ' . mb_substr($res->body(), 0, 300));
+        $changed = $this->directions->resequenceForRows($d->company_id, $inserts);
+        if (! $changed) {
+            return [$inserts, $corrections, 0];
         }
 
-        $this->lastRaw = mb_substr((string) $res->body(), 0, 1500);
-        $json = $res->json();
-        if (! is_array($json)) {
-            throw new RuntimeException('Provider did not return JSON: ' . mb_substr((string) $res->body(), 0, 200));
+        $byKey = [];
+        foreach ($changed as $c) {
+            $byKey[$c['employee_id'] . '|' . $c['punched_at']->format('Y-m-d H:i:s')] = $c['punch_type'];
         }
 
-        // eTimeOffice signals failure as Error:true + Msg, or Error:"text".
-        $err = $json['Error'] ?? null;
-        if ($err === true || $err === 'true' || (is_string($err) && trim($err) !== '')) {
-            $msg = $json['Msg'] ?? $json['Message'] ?? $json['msg'] ?? (is_string($err) ? $err : null);
-            throw new RuntimeException('Provider rejected the request: '
-                . (is_string($msg) && $msg !== '' ? $msg : json_encode($json)));
+        foreach ($inserts as &$row) {
+            if (($row['employee_id'] ?? null) === null) {
+                continue;
+            }
+            $at = $row['punched_at'] instanceof Carbon ? $row['punched_at'] : Carbon::parse($row['punched_at']);
+            $k = $row['employee_id'] . '|' . $at->format('Y-m-d H:i:s');
+            if (isset($byKey[$k])) {
+                $row['punch_type'] = $byKey[$k];
+                unset($byKey[$k]);
+            }
         }
+        unset($row);
 
-        foreach (['PunchData', 'InOutPunchData', 'Data', 'data', 'punches', 'logs'] as $k) {
-            if (isset($json[$k]) && is_array($json[$k])) {
-                return $json[$k];
+        // Anything still in $byKey is an EARLIER punch whose direction moved because this
+        // batch changed the day's sequence — attendance has to be told about those too.
+        foreach ($changed as $c) {
+            $k = $c['employee_id'] . '|' . $c['punched_at']->format('Y-m-d H:i:s');
+            if (isset($byKey[$k])) {
+                $corrections[] = [
+                    'employee_id' => (int) $c['employee_id'],
+                    'punch_type'  => $c['punch_type'],
+                    'punched_at'  => $c['punched_at'],
+                ];
+                unset($byKey[$k]);
             }
         }
 
-        return array_is_list($json) ? $json : [];
-    }
-
-    /** Machine number overrides the feed flag; feed flag next; null = decide later. */
-    private function direction(BiometricDevice $d, ?string $mc, $flag): ?string
-    {
-        if ($mc !== null && filled($d->in_machine_id) && strcasecmp($mc, trim($d->in_machine_id)) === 0) {
-            return 'IN';
-        }
-        if ($mc !== null && filled($d->out_machine_id) && strcasecmp($mc, trim($d->out_machine_id)) === 0) {
-            return 'OUT';
-        }
-
-        $f = strtoupper(trim((string) $flag));
-        if (in_array($f, ['IN', 'I', '0'], true)) {
-            return 'IN';
-        }
-        if (in_array($f, ['OUT', 'O', '1'], true)) {
-            return 'OUT';
-        }
-
-        return null;
+        return [$inserts, $corrections, count($changed)];
     }
 
     /** Maps a feed employee code → SmartEPT employee, honouring the configured prefix. */
@@ -359,45 +334,5 @@ class BiometricCloudSync
 
             return ['employee_id' => null, 'bio_id' => $candidates[0] ?? $code];
         };
-    }
-
-    private function pick(array $row, array $keys)
-    {
-        foreach ($keys as $k) {
-            if (isset($row[$k]) && $row[$k] !== '') {
-                return $row[$k];
-            }
-        }
-
-        // Case-insensitive fallback — vendors vary key casing (MCID/McId/mcid...).
-        $lower = [];
-        foreach ($row as $k => $v) {
-            $lower[strtolower((string) $k)] = $v;
-        }
-        foreach ($keys as $k) {
-            $lk = strtolower($k);
-            if (isset($lower[$lk]) && $lower[$lk] !== '') {
-                return $lower[$lk];
-            }
-        }
-
-        return null;
-    }
-
-    /** Providers send dd/MM/yyyy most often — try day-first formats before anything else. */
-    private function parseWhen(string $s): ?Carbon
-    {
-        foreach (['d/m/Y H:i:s', 'd/m/Y H:i', 'j/n/Y H:i:s', 'j/n/Y H:i', 'd-m-Y H:i:s', 'd-m-Y H:i', 'Y-m-d H:i:s', 'Y-m-d\TH:i:s'] as $fmt) {
-            try {
-                return Carbon::createFromFormat($fmt, $s);
-            } catch (\Throwable) {
-                // try next format
-            }
-        }
-        try {
-            return Carbon::parse(str_replace('/', '-', $s)); // dd-mm-yyyy parses day-first
-        } catch (\Throwable) {
-            return null;
-        }
     }
 }

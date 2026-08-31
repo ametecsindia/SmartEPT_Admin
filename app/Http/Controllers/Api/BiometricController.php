@@ -9,6 +9,7 @@ use App\Models\BiometricLog;
 use App\Models\Employee;
 use App\Models\EmployeeAttendanceLog;
 use App\Models\EmployeeLoginSession;
+use App\Services\Biometric\PunchDirectionResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -276,8 +277,15 @@ class BiometricController extends Controller
                 'updated_at'           => $now,
             ];
         }
+        // 28-Aug-2026: a reader registered as IN-only / OUT-only overrides whatever the
+        // pushing middleware claimed; an IN+OUT reader is settled from the stored day
+        // just below. Devices left on AUTO — every device that existed before this —
+        // are untouched, so the push API and CSV import behave exactly as they did.
+        $rows = $this->applyDeviceDirection($companyId, $rows);
+
         if ($rows) {
             BiometricLog::insert($rows);
+            $rows = $this->resequenceAlternatingDevices($companyId, $rows);
             self::mergeIntoAttendance($companyId, $rows);
 
             // Biometric Gate (Doc 11 v1.1): every mapped punch drives the gate engine
@@ -291,6 +299,97 @@ class BiometricController extends Controller
             self::deriveAttendance($companyId, $rows);
         }
         return count($rows);
+    }
+
+    /**
+     * Force IN/OUT for punches that arrived from a reader configured as IN-only or
+     * OUT-only. BREAK punches are never rewritten, and a device on AUTO (the default,
+     * and what every pre-28-Aug device is) returns the rows unchanged.
+     */
+    private function applyDeviceDirection(int $companyId, array $rows): array
+    {
+        $modes = $this->deviceModes($companyId, $rows);
+        if (! $modes) {
+            return $rows;
+        }
+
+        foreach ($rows as &$r) {
+            $mode = $modes[$r['biometric_device_id'] ?? null] ?? PunchDirectionResolver::DEFAULT_MODE;
+            if (! in_array($r['punch_type'], ['IN', 'OUT'], true)) {
+                continue; // BREAK_IN / BREAK_OUT keep their meaning
+            }
+            if ($mode === 'IN_ONLY') {
+                $r['punch_type'] = 'IN';
+            } elseif ($mode === 'OUT_ONLY') {
+                $r['punch_type'] = 'OUT';
+            }
+        }
+        unset($r);
+
+        return $rows;
+    }
+
+    /**
+     * Re-derive IN/OUT for punches from a reader that handles BOTH directions, using the
+     * employee's punch sequence for that day, and hand the corrected rows back so the
+     * attendance merge / gate / derivation see the final direction.
+     */
+    private function resequenceAlternatingDevices(int $companyId, array $rows): array
+    {
+        $modes = $this->deviceModes($companyId, $rows);
+        $alternating = array_values(array_filter(
+            $rows,
+            fn ($r) => ($modes[$r['biometric_device_id'] ?? null] ?? null) === 'IN_OUT'
+        ));
+        if (! $alternating) {
+            return $rows;
+        }
+
+        $changed = app(PunchDirectionResolver::class)->resequenceForRows($companyId, $alternating);
+        if (! $changed) {
+            return $rows;
+        }
+
+        $byKey = [];
+        foreach ($changed as $c) {
+            $byKey[$c['employee_id'] . '|' . $c['punched_at']->format('Y-m-d H:i:s')] = $c['punch_type'];
+        }
+        foreach ($rows as &$r) {
+            if (($r['employee_id'] ?? null) === null) {
+                continue;
+            }
+            $k = $r['employee_id'] . '|' . $r['punched_at']->format('Y-m-d H:i:s');
+            if (isset($byKey[$k])) {
+                $r['punch_type'] = $byKey[$k];
+            }
+        }
+        unset($r);
+
+        return $rows;
+    }
+
+    /**
+     * punch_direction_mode of every device referenced by this batch, or [] when the batch
+     * names no device at all (the common middleware-push case) — the cheap early exit.
+     *
+     * @return array<int, string>
+     */
+    private function deviceModes(int $companyId, array $rows): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map(
+            fn ($r) => $r['biometric_device_id'] ?? null,
+            $rows
+        ))));
+        if (! $ids) {
+            return [];
+        }
+
+        return \App\Models\BiometricDevice::withoutGlobalScopes()
+            ->where('company_id', $companyId)
+            ->whereIn('id', $ids)
+            ->get(['id', 'punch_direction_mode'])
+            ->mapWithKeys(fn ($d) => [(int) $d->id => PunchDirectionResolver::mode($d)])
+            ->all();
     }
 
     /**

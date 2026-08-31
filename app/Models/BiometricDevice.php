@@ -25,4 +25,7 @@ class BiometricDevice extends Model
     ];
 
     public function logs() { return $this->hasMany(BiometricLog::class); }
+
+    /** Company → Branch → Floor → Device: the branch this reader stands in. */
+    public function branch() { return $this->belongsTo(Branch::class); }
 }

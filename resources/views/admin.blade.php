@@ -862,7 +862,7 @@
       </div>
       <div class="card">
         <h3>Biometric Device Setup <span class="hint">connect a cloud attendance API — punches sync continuously (every 5 minutes) into Attendance, payroll and the Biometric Gate</span></h3>
-        <table><thead><tr><th>Provider</th><th>API</th><th>Auto sync</th><th>Status</th><th>Last sync</th><th>Last result</th><th>Punches</th><th></th></tr></thead><tbody id="biodev-rows"></tbody></table>
+        <table><thead><tr><th>Reader</th><th>Where</th><th>Direction</th><th>API</th><th>Auto sync</th><th>Status</th><th>Last sync</th><th>Last result</th><th>Punches</th><th></th></tr></thead><tbody id="biodev-rows"></tbody></table>
         <div id="bio-livesync" style="margin-top:14px;padding:12px 14px;border:1px solid var(--border-2);border-radius:10px;background:var(--card-2)">
           <label style="margin:0">Live auto-sync <span class="hint">calls the API and syncs on a timer while this page is open — no scheduler needed</span></label>
           <div class="row" style="align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">
@@ -886,22 +886,49 @@
             <div><label>Interval (minutes)</label><input id="bd-interval" type="number" min="1" max="1440" value="5"></div>
             <div><label>Scheduled times <span class="mut" style="font-weight:400">(24h, comma-separated)</span></label><input id="bd-times" placeholder="09:00, 13:30"></div>
           </div>
-          <label>Provider</label><input id="bd-provider" placeholder="etimeoffice">
-          <div class="mut" style="font-size:11.5px;margin:2px 0 8px">Cloud attendance provider name.</div>
-          <label>API base URL</label><input id="bd-base" placeholder="https://api.etimeoffice.com/api">
-          <label>Endpoint</label><input id="bd-endpoint" placeholder="DownloadPunchDataMCID">
-          <label>Corporate ID</label><input id="bd-corp" placeholder="Your eTimeOffice corporate ID">
+          <label>Biometric API provider</label>
+          <select id="bd-providerkey"></select>
+          <div class="mut" style="font-size:11.5px;margin:2px 0 8px">Choose the vendor API this reader talks to — only that provider's fields are shown below. Devices you saved earlier stay on eTimeOffice and keep working exactly as before.</div>
+          <div class="grid2">
+            <div><label>Reader name</label><input id="bd-name" placeholder="e.g. HO — 3rd floor main gate"></div>
+            <div><label>Branch</label><select id="bd-branch"></select></div>
+          </div>
+          <div class="grid2">
+            <div><label>Floor / location</label><input id="bd-floor" placeholder="e.g. 3rd floor — main gate"></div>
+            <div><label>Punch direction</label><select id="bd-dir">
+              <option value="AUTO">Automatic — use the feed's IN/OUT flag and the machine IDs</option>
+              <option value="IN_OUT">IN + OUT on this one reader — 1st punch IN, 2nd OUT, 3rd IN…</option>
+              <option value="IN_ONLY">IN only — entry reader</option>
+              <option value="OUT_ONLY">OUT only — exit reader</option>
+            </select></div>
+          </div>
+          <div class="mut" style="font-size:11.5px;margin:2px 0 10px">A company can have many branches, a branch many floors, and a floor many readers — add <b>one entry per physical reader</b> and give each its own branch, floor and direction. Pick <b>IN + OUT</b> when a location has a single reader used both ways: SmartEPT reads the employee's punch sequence for that day (09:05 IN, 13:10 OUT, 14:00 IN, 18:15 OUT). Pick <b>IN only</b> / <b>OUT only</b> when entry and exit have separate readers.</div>
+          <label id="bd-base-label">API base URL</label><input id="bd-base" placeholder="https://api.etimeoffice.com/api">
+          <div class="mut" data-prov="ESSL" style="font-size:11.5px;margin:2px 0 8px">The eTimeTrackLite Web API address — e.g. <code>http://192.168.1.140:81/iclock/WebAPIService.asmx</code>. Host and port alone also work; <code>/iclock/WebAPIService.asmx</code> is appended for you.</div>
+          <div data-prov="ETIMEOFFICE">
+            <label>Endpoint</label><input id="bd-endpoint" placeholder="DownloadPunchDataMCID">
+            <label>Corporate ID</label><input id="bd-corp" placeholder="Your eTimeOffice corporate ID">
+          </div>
+          <div data-prov="ESSL">
+            <label>Device serial number</label><input id="bd-serial" placeholder="e.g. CUB7244600978">
+            <div class="mut" style="font-size:11.5px;margin:2px 0 8px">Printed on the reader and listed in eTimeTrackLite. Punches are pulled for this serial only — that is why each reader gets its own entry here.</div>
+          </div>
           <label>Username</label><input id="bd-user" placeholder="API username">
+          <div class="mut" data-prov="ESSL" style="font-size:11.5px;margin:2px 0 8px">The eTimeTrackLite <b>Web API</b> login — not the login you use for the application itself.</div>
           <label>Password</label><input id="bd-pass" type="password" autocomplete="new-password" placeholder="••••••••">
-          <label>Employee code filter</label><input id="bd-filter" placeholder="ALL">
-          <div class="mut" style="font-size:11.5px;margin:2px 0 8px">Usually ALL.</div>
+          <div data-prov="ETIMEOFFICE">
+            <label>Employee code filter</label><input id="bd-filter" placeholder="ALL">
+            <div class="mut" style="font-size:11.5px;margin:2px 0 8px">Usually ALL.</div>
+          </div>
           <label>Employee ID prefix</label><input id="bd-prefix" placeholder="e.g. A">
           <div class="mut" style="font-size:11.5px;margin:2px 0 8px">If the device returns 12345 and your employees are A12345, enter A. Leave blank when codes match exactly.</div>
-          <div class="grid2">
-            <div><label>IN machine ID</label><input id="bd-inmc" placeholder="e.g. 1"><div class="mut" style="font-size:11.5px;margin:2px 0 8px">Machine number of the ENTRY device — its punches are marked IN.</div></div>
-            <div><label>OUT machine ID</label><input id="bd-outmc" placeholder="e.g. 2"><div class="mut" style="font-size:11.5px;margin:2px 0 8px">Machine number of the EXIT device — its punches are marked OUT.</div></div>
+          <div data-prov="ETIMEOFFICE">
+            <div class="grid2">
+              <div><label>IN machine ID</label><input id="bd-inmc" placeholder="e.g. 1"><div class="mut" style="font-size:11.5px;margin:2px 0 8px">Machine number of the ENTRY device — its punches are marked IN.</div></div>
+              <div><label>OUT machine ID</label><input id="bd-outmc" placeholder="e.g. 2"><div class="mut" style="font-size:11.5px;margin:2px 0 8px">Machine number of the EXIT device — its punches are marked OUT.</div></div>
+            </div>
+            <div class="mut" style="font-size:11.5px;margin:2px 0 8px">Use these when separate devices handle entry and exit and the feed reports which machine each punch came from: the machine number decides the punch direction, overriding the feed's IN/OUT flag. Leave BOTH blank if one device reports direction itself. Run Test connection to see each punch's MC number.</div>
           </div>
-          <div class="mut" style="font-size:11.5px;margin:2px 0 8px">Use these when separate devices handle entry and exit: the machine number decides the punch direction, overriding the feed's IN/OUT flag. Leave BOTH blank if one device reports direction itself. Run Test connection to see each punch's MC number.</div>
           <div class="row" style="margin-top:12px">
             <button class="btn solid" id="bd-save">Save</button>
             <button class="btn acc" id="bd-test">✓ Test connection</button>
@@ -5229,6 +5256,14 @@ function initBiometric() {
   loadBiometric();
   loadMappings(); // Section 9: existing mappings + unmapped-ID picker
   employeesList().then((emps) => fillEmpPicker($('#bio-map-emp'), emps)).catch(() => {});
+  // Company -> Branch -> Floor -> Device: the branch picker on the reader form.
+  orgLists().then((org) => {
+    const prev = $('#bd-branch').value;
+    fillSelect($('#bd-branch'), org.branches || [], (b) => b.name, (b) => b.id, '— no branch —');
+    if (prev) $('#bd-branch').value = prev;
+  }).catch(() => {});
+  if (!$('#bd-providerkey').options.length) bdFillProviders(null);
+  $('#bd-providerkey').onchange = bdApplyProvider;
 }
 let GATE_COMPANY_ID = null;
 async function loadGatePolicy() {
@@ -5254,12 +5289,52 @@ async function saveGatePolicy() {
 }
 let bdEditId = null;
 let bdDevices = [];
+// The provider list comes from the API (ProviderRegistry), so a vendor added on the
+// server appears in this dropdown without touching the console. The fallback keeps the
+// form usable if an older backend answers without the list.
+let BD_PROVIDERS = [];
+const BD_PROVIDER_FALLBACK = [
+  { key: 'ETIMEOFFICE', label: 'eTimeOffice (cloud attendance API)' },
+  { key: 'ESSL', label: 'eSSL — eTimeTrackLite Web API' },
+];
+const BD_DIR_LABEL = { AUTO: 'AUTO', IN_OUT: 'IN + OUT', IN_ONLY: 'IN ONLY', OUT_ONLY: 'OUT ONLY' };
+const BD_DIR_TAG = { AUTO: 't-off', IN_OUT: 't-warn', IN_ONLY: 't-ok', OUT_ONLY: 't-off' };
+function bdProvLabel(key) {
+  const hit = (BD_PROVIDERS.length ? BD_PROVIDERS : BD_PROVIDER_FALLBACK).find((p) => p.key === key);
+  return hit ? hit.label : (key || '');
+}
+function bdFillProviders(list) {
+  BD_PROVIDERS = (list && list.length) ? list : BD_PROVIDER_FALLBACK;
+  const sel = $('#bd-providerkey');
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = BD_PROVIDERS.map((p) => '<option value="' + esc(p.key) + '">' + esc(p.label) + '</option>').join('');
+  if (prev && BD_PROVIDERS.some((p) => p.key === prev)) sel.value = prev;
+  bdApplyProvider();
+}
+// Show only the fields the chosen provider actually needs.
+function bdApplyProvider() {
+  const k = $('#bd-providerkey') ? ($('#bd-providerkey').value || 'ETIMEOFFICE') : 'ETIMEOFFICE';
+  document.querySelectorAll('#v-biometric [data-prov]').forEach((el) => {
+    el.style.display = (el.dataset.prov === k) ? '' : 'none';
+  });
+  const essl = k === 'ESSL';
+  if ($('#bd-base-label')) $('#bd-base-label').textContent = essl ? 'eTimeTrackLite Web API URL' : 'API base URL';
+  if ($('#bd-base')) $('#bd-base').placeholder = essl ? 'http://192.168.1.140:81/iclock/WebAPIService.asmx' : 'https://api.etimeoffice.com/api';
+  if ($('#bd-user')) $('#bd-user').placeholder = essl ? 'Web API username' : 'API username';
+}
 async function loadBioDevices() {
   try {
     const d = await api('/integrations/biometric/devices');
     bdDevices = d.data || [];
+    bdFillProviders(d.providers);
     $('#biodev-rows').innerHTML = bdDevices.map((v) => '<tr>'
-      + '<td><span class="nm">' + esc(v.provider || v.name) + '</span></td>'
+      + '<td><span class="nm">' + esc(v.name || v.provider) + '</span>'
+        + '<div class="mut" style="font-size:10.5px">' + esc(bdProvLabel(v.provider_key) || v.provider || '')
+        + (v.device_serial ? ' · ' + esc(v.device_serial) : '') + '</div></td>'
+      + '<td class="mut">' + esc([v.branch_name, v.floor, v.location].filter(Boolean).join(' · ') || '—') + '</td>'
+      + '<td><span class="tag ' + (BD_DIR_TAG[v.punch_direction_mode] || 't-off') + '">'
+        + esc(BD_DIR_LABEL[v.punch_direction_mode] || 'AUTO') + '</span></td>'
       + '<td class="mut" style="max-width:200px;overflow:hidden;text-overflow:ellipsis">' + esc(v.api_base_url ? (v.api_base_url + (v.api_endpoint ? '/' + v.api_endpoint : '')) : (v.integration_method || '—')) + '</td>'
       + '<td><span class="tag ' + (v.sync_mode === 'MANUAL' ? 't-off' : 't-ok') + '">'
         + (v.sync_mode === 'INTERVAL' ? ('EVERY ' + (v.sync_interval_minutes || 5) + 'M')
@@ -5272,14 +5347,18 @@ async function loadBioDevices() {
       + '<td class="mut" style="max-width:220px">' + esc(v.last_sync_result || '—') + '</td>'
       + '<td>' + (v.logs_count ?? 0) + '</td>'
       + '<td><button class="btn" data-bd-edit="' + v.id + '">Edit</button> <button class="btn" data-bd-del="' + v.id + '">Delete</button></td></tr>').join('')
-      || '<tr><td colspan="8" class="mut">No biometric device connected yet — fill the form below and press Save. Punches can also arrive via middleware push or CSV import.</td></tr>';
+      || '<tr><td colspan="10" class="mut">No biometric reader connected yet — fill the form below and press Save. Add one entry per physical reader; punches can also arrive via middleware push or CSV import.</td></tr>';
   } catch (e) {
-    $('#biodev-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="8" class="mut">' + esc(e.message) + '</td></tr>';
+    $('#biodev-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="10" class="mut">' + esc(e.message) + '</td></tr>';
   }
 }
 function bdReset() {
   bdEditId = null;
-  ['#bd-provider', '#bd-base', '#bd-endpoint', '#bd-corp', '#bd-user', '#bd-pass', '#bd-filter', '#bd-prefix', '#bd-inmc', '#bd-outmc', '#bd-times'].forEach((q) => { $(q).value = ''; });
+  ['#bd-name', '#bd-floor', '#bd-serial', '#bd-base', '#bd-endpoint', '#bd-corp', '#bd-user', '#bd-pass', '#bd-filter', '#bd-prefix', '#bd-inmc', '#bd-outmc', '#bd-times'].forEach((q) => { $(q).value = ''; });
+  $('#bd-branch').value = '';
+  $('#bd-dir').value = 'AUTO';
+  if ($('#bd-providerkey').options.length) $('#bd-providerkey').selectedIndex = 0;
+  bdApplyProvider();
   $('#bd-mode').value = 'INTERVAL'; $('#bd-interval').value = '5';
   $('#bd-pass').placeholder = '••••••••';
   $('#bd-save').textContent = 'Save';
@@ -5289,20 +5368,30 @@ function bdReset() {
 function bdCollect() {
   const gv = (q) => ($(q).value.trim() || null);
   const editing = bdEditId ? bdDevices.find((x) => x.id === bdEditId) : null;
+  const key = $('#bd-providerkey').value || 'ETIMEOFFICE';
+  const essl = key === 'ESSL';
   const body = {
-    provider: gv('#bd-provider'),
-    name: gv('#bd-provider'),
+    provider_key: key,
+    // `provider` stays the human label it has always been — it is what the device list
+    // and older reports show.
+    provider: bdProvLabel(key),
+    name: gv('#bd-name') || bdProvLabel(key),
+    branch_id: $('#bd-branch').value ? Number($('#bd-branch').value) : null,
+    floor: gv('#bd-floor'),
+    punch_direction_mode: $('#bd-dir').value || 'AUTO',
+    // eSSL identifies a reader by its serial; for eTimeOffice keep whatever was stored.
+    device_serial: essl ? gv('#bd-serial') : (editing ? (editing.device_serial || null) : null),
     sync_mode: $('#bd-mode').value,
     sync_interval_minutes: Math.max(1, parseInt($('#bd-interval').value, 10) || 5),
     sync_times: ($('#bd-times').value || '').split(',').map((s) => s.trim()).filter((s) => /^\d{1,2}:\d{2}$/.test(s)),
     api_base_url: gv('#bd-base'),
-    api_endpoint: gv('#bd-endpoint'),
-    corporate_id: gv('#bd-corp'),
+    api_endpoint: essl ? null : gv('#bd-endpoint'),
+    corporate_id: essl ? null : gv('#bd-corp'),
     api_username: gv('#bd-user'),
-    employee_code_filter: gv('#bd-filter') || 'ALL',
+    employee_code_filter: essl ? null : (gv('#bd-filter') || 'ALL'),
     employee_id_prefix: gv('#bd-prefix'),
-    in_machine_id: gv('#bd-inmc'),
-    out_machine_id: gv('#bd-outmc'),
+    in_machine_id: essl ? null : gv('#bd-inmc'),
+    out_machine_id: essl ? null : gv('#bd-outmc'),
     integration_method: 'DIRECT_PULL',
     status: (editing && editing.status) || 'ACTIVE',
   };
@@ -5313,8 +5402,10 @@ function bdCollect() {
 $('#bd-reset').onclick = bdReset;
 $('#bd-save').onclick = async () => {
   const body = bdCollect();
-  if (!body.provider) { $('#bd-msg').textContent = 'Provider is required.'; return; }
-  if (!body.api_base_url || !body.api_endpoint) { $('#bd-msg').textContent = 'API base URL and endpoint are required.'; return; }
+  if (!body.api_base_url) { $('#bd-msg').textContent = body.provider_key === 'ESSL' ? 'The eTimeTrackLite Web API URL is required.' : 'API base URL and endpoint are required.'; return; }
+  if (body.provider_key === 'ESSL') {
+    if (!body.device_serial) { $('#bd-msg').textContent = 'The device serial number is required — eSSL pulls punches per reader serial.'; return; }
+  } else if (!body.api_endpoint) { $('#bd-msg').textContent = 'API base URL and endpoint are required.'; return; }
   try {
     if (bdEditId) await api('/integrations/biometric/devices/' + bdEditId, { method: 'PUT', body: JSON.stringify(body) });
     else await api('/integrations/biometric/devices', { method: 'POST', body: JSON.stringify(body) });
@@ -5417,7 +5508,13 @@ $('#biodev-rows').addEventListener('click', async (ev) => {
     const v = bdDevices.find((x) => x.id === Number(eBtn.dataset.bdEdit));
     if (!v) return;
     bdEditId = v.id;
-    $('#bd-provider').value = v.provider || v.name || '';
+    if ($('#bd-providerkey').options.length) $('#bd-providerkey').value = v.provider_key || 'ETIMEOFFICE';
+    bdApplyProvider();
+    $('#bd-name').value = v.name || v.provider || '';
+    $('#bd-branch').value = v.branch_id || '';
+    $('#bd-floor').value = v.floor || '';
+    $('#bd-dir').value = v.punch_direction_mode || 'AUTO';
+    $('#bd-serial').value = v.device_serial || '';
     $('#bd-base').value = v.api_base_url || '';
     $('#bd-endpoint').value = v.api_endpoint || '';
     $('#bd-corp').value = v.corporate_id || '';
@@ -5432,7 +5529,7 @@ $('#biodev-rows').addEventListener('click', async (ev) => {
     $('#bd-interval').value = v.sync_interval_minutes || 5;
     $('#bd-times').value = (v.sync_times || []).join(', ');
     $('#bd-save').textContent = 'Save changes';
-    $('#bd-msg').textContent = 'Editing "' + (v.provider || v.name) + '" — change the fields and press Save changes.';
+    $('#bd-msg').textContent = 'Editing "' + (v.name || v.provider) + '" — change the fields and press Save changes.';
   }
   if (dBtn) {
     if (!window.confirm('Delete this biometric device? Its punch history is kept.')) return;
@@ -6950,7 +7047,7 @@ const HELP = {
   users: ['Users', '<h5>What</h5>The login accounts for this console and the employee self-service — name, email, role, optional link to an employee record, status and last login.<h5>Why</h5>Accounts and employee records are different things: an auditor logs in but is not an employee, and an employee may exist without any login. Roles decide exactly what each account can see and do.<h5>How</h5>Add a user and SmartEPT generates a strong temporary password shown <b>exactly once</b> — copy it and hand it over; the user must change it at first sign-in. Reset password re-issues a one-time password and signs the user out everywhere. Disable blocks login immediately and kills active sessions; accounts are never hard-deleted because the audit trail references them.'],
   devices: ['Devices', '<h5>What</h5>Every PC where the SmartEPT agent is registered: hostname, OS, agent version, live status, compliance state, sync backlog and last heartbeat.<h5>Why</h5>A stopped or stale agent means a blind spot — this screen tells you whether the data you see elsewhere is complete.<h5>How</h5>Healthy agents heartbeat about every 30 seconds. A growing sync queue with an OFFLINE status usually just means the PC is off; DEGRADED or STOPPED health on an online device needs IT attention. <b>Unbind</b> a lost, replaced or misused PC to stop its agent instantly and free its licence seat — it stays blocked until you <b>Approve re-bind</b>, so nobody can quietly reconnect it.'],
   policies: ['Policies', '<h5>What</h5>The control room: 12 policy types (monitoring master switch, screenshots, webcam presence, app/site rules, network, USB, breaks, attendance, compliance scoring) with versioned edit forms and an assignment panel.<h5>Why</h5>Nothing is captured because the software can — everything is captured because a policy you wrote says so, and the version trail shows what applied when.<h5>How</h5>Pick a type, create or edit a policy (each save bumps the version; agents pick it up on the next heartbeat), then assign it to the company, a branch, department, team, employee or single device. More specific assignments win.'],
-  biometric: ['Biometric', '<h5>What</h5>Door-punch integration: connect a cloud attendance API (eTimeOffice-style — punches import into Attendance &amp; payroll automatically every hour), plus the punch log, CSV import, biometric-ID-to-employee mapping, and a daily reconciliation of first punch vs first agent login.<h5>Why</h5>The gap between "in the office" and "at the system" is invisible to either source alone — the mismatch report exposes it in minutes per employee.<h5>How</h5>Fill the Biometric Device Setup form (provider, API base URL, endpoint, corporate ID, credentials), press Test connection to preview punches and their MC machine numbers, then Save with hourly sync enabled — or press Sync now anytime. Separate entry/exit readers? Enter their IN/OUT machine IDs and the machine number decides direction. Employee codes match automatically by employee code or biometric ID (use the prefix field when the feed drops a letter); anything unmatched appears under Map biometric ID → employee, and old punches back-fill once mapped. The mismatch report reads: OK, MISMATCH over 15 minutes, or NO_BIOMETRIC.'],
+  biometric: ['Biometric', '<h5>What</h5>Door-punch integration: connect a biometric attendance API — <b>eTimeOffice</b> or <b>eSSL (eTimeTrackLite)</b> — and its punches import into Attendance &amp; payroll automatically, plus the punch log, CSV import, biometric-ID-to-employee mapping, and a daily reconciliation of first punch vs first agent login.<h5>Why</h5>The gap between "in the office" and "at the system" is invisible to either source alone — the mismatch report exposes it in minutes per employee.<h5>How</h5>In Biometric Device Setup, pick the <b>provider</b> first — the form then asks only for that vendor\'s fields. eTimeOffice needs the API base URL, endpoint, corporate ID and credentials; eSSL needs the eTimeTrackLite Web API URL, the reader\'s serial number and the Web API login. Press Test connection to preview punches, then Save with automatic sync on — or press Sync now anytime.<h5>Several branches, floors and readers</h5>Add <b>one entry per physical reader</b> and give each its own Branch, Floor/location and <b>Punch direction</b>. Use <b>IN only</b> / <b>OUT only</b> where entry and exit have separate readers. Use <b>IN + OUT</b> where one reader is used both ways: SmartEPT works the direction out from that employee\'s punch sequence for the day — 1st IN, 2nd OUT, 3rd IN, 4th OUT — and re-checks the whole day on every sync, so a late or repeated punch never leaves the sequence wrong. <b>Automatic</b> is the original behaviour: the IN/OUT machine IDs decide, then the feed\'s own flag. Employee codes match automatically by employee code or biometric ID (use the prefix field when the feed drops a letter); anything unmatched appears under Map biometric ID → employee, and old punches back-fill once mapped. The mismatch report reads: OK, MISMATCH over 15 minutes, or NO_BIOMETRIC.'],
   integrations: ['API & Integrations', '<h5>What</h5>SmartEPT as an integration hub: API keys let external devices/apps push attendance IN and read it OUT; outbound targets push attendance to SmartPRS or other systems automatically.<h5>Why</h5>No manual CSV shuffling between your gate devices, SmartPRS and SmartEPT — secure API keys in, HMAC-signed pushes out.<h5>How</h5>Create a key (shown once), give it ingest/read scope. Add an outbound target with its URL + shared secret; Test push sends a day now, the nightly job ships the previous day. The Integration guide card has the exact URLs, JSON and signature check for the other side.'],
   license: ['Licence', '<h5>What</h5>This server\'s SmartEPT licence: the key, the plan and company it belongs to, how many device seats are licensed vs registered, the expiry date with its grace window, and when the server last confirmed all of this with SmartEPT Central. A server with no key runs a <b>7-day free evaluation</b>, then monitoring stops until a key is entered.<h5>Why</h5>The licence is what ties your installation to what you purchased — seats, plan features and validity. Only licence metadata travels to Central: screenshots, activity and camera data never leave this server. If a paid renewal is missed, agents keep working through the grace days so a busy week never stops monitoring mid-shift; trials stop the moment they end.<h5>How</h5>Paste the key from your order email or the client portal and click "Save & validate" — the server confirms it with Central instantly and then re-checks once a day on its own. "Validate now" forces a fresh check after a renewal or seat upgrade. If the status shows EXPIRED, renew from the client portal; the seats line tells you when you\'re close to the licensed device limit.'],
   ops: ['Audit & Ops', '<h5>What</h5>Three operational views in one place: the full audit trail (every admin action, export, screenshot view and licence event with who, when and from which IP), storage consumed by screenshot/webcam evidence per company, and the state of your database backups.<h5>Why</h5>Monitoring software must itself be accountable — when an employee questions an action, the audit trail shows exactly who did what. Storage growth and backups are the two quiet things that sink servers: full disks and "we never had a backup".<h5>How</h5>Filter the trail by action text or date range. Backups run automatically every night at 01:30 (newest 14 kept in storage/app/backups — copy them off this PC for real safety); "Back up now" runs one immediately before risky changes. If a company\'s evidence storage grows fast, tighten its screenshot policy, shorten retention, or use \'Free up storage\' to bulk-delete old screenshots and logs by date range — violation evidence is kept unless you explicitly say otherwise, and every cleanup is itself audit-logged.'],
