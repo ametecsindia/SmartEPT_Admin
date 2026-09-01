@@ -439,7 +439,7 @@
   <div class="main">
     <div class="top">
       <div class="top-l"><button id="nav-toggle" class="ham" aria-label="Menu" title="Menu">☰</button><div><h2 id="page-title">Live Dashboard</h2><div class="sub" id="page-sub">Real-time workforce status</div></div></div>
-      <div class="who"><span id="company-name">Ametecs Pvt Ltd</span><button class="help-i" id="btn-refresh" title="Refresh this screen">⟳</button><button class="help-i" id="btn-help" title="About this screen">ⓘ</button></div>
+      <div class="who"><button id="btn-check-update" title="Check SmartEPT Central for a newer version of this server" style="display:none;align-items:center;gap:6px;background:#0C3B49;color:#fff;border:0;border-radius:8px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M12 16V4M7.5 8.5 12 4l4.5 4.5"/><path d="M4 20h16"/></svg>Check for Update</button><span id="company-name">Ametecs Pvt Ltd</span><button class="help-i" id="btn-refresh" title="Refresh this screen">⟳</button><button class="help-i" id="btn-help" title="About this screen">ⓘ</button></div>
     </div>
 
     <!-- 1. DASHBOARD -->
@@ -2474,6 +2474,7 @@ const TITLES = {
   help: ['Help & Troubleshooting', 'System health, common fixes & the application log'],
 };
 $$('.nav').forEach((n) => n.onclick = () => show(n.dataset.view));
+{ const ub = document.getElementById('btn-check-update'); if (ub) ub.onclick = updCheck; }
 (function(){ const a=document.getElementById('app'), t=document.getElementById('nav-toggle'), b=document.getElementById('nav-backdrop');
   if(t) t.onclick=()=>a.classList.toggle('nav-open'); if(b) b.onclick=()=>a.classList.remove('nav-open'); })();
 function show(v) {
@@ -2481,6 +2482,9 @@ function show(v) {
   $$('.view').forEach((el) => el.classList.remove('active'));
   $('#v-' + v).classList.add('active');
   $('#page-title').textContent = TITLES[v][0]; $('#page-sub').textContent = TITLES[v][1];
+  // The update button belongs to the Licence screen — this server's version
+  // and its licence are the same conversation with Central.
+  { const ub = document.getElementById('btn-check-update'); if (ub) ub.style.display = (v === 'license') ? 'inline-flex' : 'none'; }
   clearInterval(poll);
   if (v === 'tenants') loadTenants();
   if (v === 'dashboard') { initDashOrgFilter(); loadDashboard(); poll = setInterval(loadDashboard, 15000); }
@@ -6587,6 +6591,148 @@ $('#pw-save').onclick = async () => {
 $('#pw-signout').onclick = () => { $('#pwd-ovl').classList.remove('open'); $('#signout').click(); };
 
 // ---- licence (R2-1) ----
+/* =====================================================================
+ * SELF-UPDATE — "Check for Update" (Ejaz, 1-Sep-2026)
+ * Check → download (hash-verified) → install (standalone updater) → done.
+ * Once the updater starts, this console is in maintenance mode, so progress
+ * is polled from /update-status.php, which does not boot the application.
+ * ===================================================================== */
+let UPD_TIMER = null, UPD_POLL_URL = null, UPD_INFO = null;
+
+function updShell(bodyHtml) {
+  let ov = document.getElementById('upd-ov');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'upd-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(8,26,32,.55);display:flex;align-items:center;'
+      + 'justify-content:center;z-index:9999;padding:16px';
+    ov.innerHTML = '<div id="upd-box" style="background:#fff;border-radius:14px;max-width:620px;width:100%;'
+      + 'max-height:88vh;overflow:auto;padding:22px 24px;box-shadow:0 24px 60px rgba(0,0,0,.28)"></div>';
+    document.body.appendChild(ov);
+  }
+  document.getElementById('upd-box').innerHTML = bodyHtml;
+  ov.style.display = 'flex';
+}
+function updClose() {
+  const ov = document.getElementById('upd-ov');
+  if (ov) ov.style.display = 'none';
+  // Polling continues on purpose if an install is running — closing the window
+  // must never look like it cancelled an update that is still replacing files.
+}
+function updBtn(label, onclick, solid) {
+  return '<button onclick="' + onclick + '" style="' + (solid
+    ? 'background:#0C3B49;color:#fff;border:0;'
+    : 'background:#fff;color:#0C3B49;border:1px solid #cfdde1;')
+    + 'border-radius:8px;padding:9px 15px;font-size:13px;font-weight:700;cursor:pointer;margin-right:8px">' + label + '</button>';
+}
+function updHead(title) {
+  return '<h3 style="margin:0 0 4px;font-size:19px;color:#0C3B49">' + title + '</h3>';
+}
+function updBar(pct) {
+  return '<div style="height:9px;background:#e8eff1;border-radius:999px;overflow:hidden;margin:14px 0 8px">'
+    + '<div style="height:100%;width:' + Math.max(3, pct || 0) + '%;background:#12A5A5;transition:width .4s"></div></div>';
+}
+
+async function updCheck() {
+  updShell(updHead('Checking for updates') + '<div class="mut" style="margin-top:8px">Asking SmartEPT Central…</div>' + updBar(20));
+  let d;
+  try { d = await api('/update/check', { method: 'POST' }); }
+  catch (e) { updShell(updHead('Could not check for updates') + '<p style="margin:10px 0 16px">' + esc(e.message) + '</p>'
+    + updBtn('Close', 'updClose()')); return; }
+
+  if (!d.ok) {
+    updShell(updHead('Update check refused') + '<p style="margin:10px 0 16px">' + esc(d.message || 'SmartEPT Central declined the check.')
+      + '</p>' + updBtn('Close', 'updClose()'));
+    return;
+  }
+  if (!d.update_available) {
+    updShell(updHead('You are up to date')
+      + '<p style="margin:10px 0 4px">This server is running version <b>' + esc(d.current_version) + '</b>.</p>'
+      + '<p class="mut" style="margin:0 0 16px">' + esc(d.message || '') + '</p>' + updBtn('Close', 'updClose()', true));
+    return;
+  }
+
+  UPD_INFO = d.available || {};
+  const size = UPD_INFO.size_bytes ? (Math.round(UPD_INFO.size_bytes / 1048576) + ' MB') : '';
+  updShell(updHead('Version ' + esc(UPD_INFO.version) + ' is available')
+    + '<p style="margin:8px 0 2px">This server is on <b>' + esc(d.current_version) + '</b>'
+    + (size ? ' · download size ' + esc(size) : '') + '</p>'
+    + (UPD_INFO.notes ? '<div style="background:#f4f8f9;border-radius:10px;padding:12px 14px;margin:12px 0;'
+        + 'font-size:13px;white-space:pre-wrap;max-height:230px;overflow:auto">' + esc(UPD_INFO.notes) + '</div>' : '')
+    + '<p class="mut" style="margin:10px 0 4px;font-size:12.5px">SmartEPT will back itself up first, install the update, '
+    + 'update the database and come back on its own. If anything fails it restores the current version automatically. '
+    + 'People signed in will see a short maintenance message — install this outside working hours if you can.</p>'
+    + '<div style="margin-top:16px">' + updBtn('Download &amp; install', 'updDownload()', true) + updBtn('Not now', 'updClose()') + '</div>');
+}
+
+async function updDownload() {
+  updShell(updHead('Downloading version ' + esc(UPD_INFO.version))
+    + '<div class="mut" style="margin-top:8px">This can take a few minutes on a slow connection. Keep this window open.</div>'
+    + updBar(35));
+  let d;
+  try { d = await api('/update/download', { method: 'POST' }); }
+  catch (e) { updShell(updHead('Download failed') + '<p style="margin:10px 0 16px">' + esc(e.message) + '</p>'
+    + updBtn('Try again', 'updDownload()', true) + updBtn('Close', 'updClose()')); return; }
+
+  if (!d.ok) {
+    updShell(updHead('Download failed') + '<p style="margin:10px 0 16px">' + esc(d.message || 'The package could not be downloaded.')
+      + '</p>' + updBtn('Try again', 'updDownload()', true) + updBtn('Close', 'updClose()'));
+    return;
+  }
+  updShell(updHead('Ready to install version ' + esc(UPD_INFO.version))
+    + '<p style="margin:10px 0 2px">The package downloaded and passed its integrity check.</p>'
+    + '<p class="mut" style="margin:0 0 4px;font-size:12.5px">Installing takes a few minutes. SmartEPT will be unavailable '
+    + 'while it runs and will come back by itself.</p>'
+    + '<div style="margin-top:16px">' + updBtn('Install now', 'updInstall()', true) + updBtn('Later', 'updClose()') + '</div>');
+}
+
+async function updInstall() {
+  updShell(updHead('Installing version ' + esc(UPD_INFO.version)) + '<div class="mut" style="margin-top:8px">Starting the updater…</div>' + updBar(5));
+  let d;
+  try { d = await api('/update/install', { method: 'POST' }); }
+  catch (e) { updShell(updHead('Could not start the update') + '<p style="margin:10px 0 16px">' + esc(e.message) + '</p>'
+    + updBtn('Close', 'updClose()')); return; }
+
+  if (!d.ok) {
+    updShell(updHead('Could not start the update') + '<p style="margin:10px 0 16px">' + esc(d.message || 'The updater did not start.')
+      + '</p>' + updBtn('Close', 'updClose()'));
+    return;
+  }
+  UPD_POLL_URL = d.poll_url;
+  updProgress({ phase: 'installing', percent: 5, message: 'Starting the updater…', log: [] });
+  clearInterval(UPD_TIMER);
+  UPD_TIMER = setInterval(updPoll, 3000);
+}
+
+function updProgress(s) {
+  const done = s.phase === 'done', failed = s.phase === 'failed';
+  const log = (s.log || []).slice(-8).map((l) => esc(l)).join('<br>');
+  updShell(updHead(done ? 'Update complete' : (failed ? 'Update did not complete' : 'Installing version ' + esc((UPD_INFO || {}).version || '')))
+    + updBar(s.percent || 0)
+    + '<p style="margin:6px 0 2px"><b>' + esc(s.message || '') + '</b></p>'
+    + (log ? '<div style="background:#f4f8f9;border-radius:10px;padding:10px 12px;margin:12px 0;font-size:12px;'
+        + 'font-family:ui-monospace,Consolas,monospace;color:#456;max-height:180px;overflow:auto">' + log + '</div>' : '')
+    + (done ? '<div style="margin-top:14px">' + updBtn('Reload console', 'location.reload()', true) + '</div>'
+       : (failed ? '<p class="mut" style="margin:8px 0 14px;font-size:12.5px">Your previous version was restored automatically — '
+            + 'nothing was lost. Send this message to SmartEPT support if it keeps happening.</p>'
+            + updBtn('Close', 'updClose()')
+          : '<p class="mut" style="margin:8px 0 0;font-size:12.5px">Do not close the browser or restart the server while this runs.</p>')));
+}
+
+async function updPoll() {
+  if (!UPD_POLL_URL) { clearInterval(UPD_TIMER); return; }
+  try {
+    const r = await fetch(UPD_POLL_URL, { cache: 'no-store' });
+    if (!r.ok) return;                       // 403/404 mid-swap — try again next tick
+    const s = await r.json();
+    if (!s.ok) return;
+    updProgress(s);
+    if (s.phase === 'done' || s.phase === 'failed') { clearInterval(UPD_TIMER); UPD_TIMER = null; }
+  } catch (e) {
+    // The web server restarts during an install; a missed poll is normal.
+  }
+}
+
 async function loadLicense() {
   const box = $('#lic-status');
   try {

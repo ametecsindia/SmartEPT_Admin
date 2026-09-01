@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\DbMaintenanceController;
 use App\Http\Controllers\Api\DiagnosticsController;
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\LicenseController;
+use App\Http\Controllers\Api\UpdateController;
 use App\Http\Controllers\Api\MeetingController;
 use App\Http\Controllers\Api\AgentMeetingController;
 use App\Http\Controllers\Api\AgentOverrideController;
@@ -192,6 +193,17 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
         Route::post('license', [LicenseController::class, 'store']);
         Route::post('license/validate', [LicenseController::class, 'revalidate']);
         Route::post('license/import', [LicenseController::class, 'import']);
+    });
+
+    // ---- Self-update (1-Sep-2026): the "Check for Update" button on the Licence
+    // screen. Same admins as the licence itself, same phone-home identity. The
+    // install step only STARTS the standalone updater — progress is polled from
+    // public/update-status.php, because the app is in maintenance mode by then.
+    Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN')->group(function () {
+        Route::get('update', [UpdateController::class, 'status']);
+        Route::post('update/check', [UpdateController::class, 'check']);
+        Route::post('update/download', [UpdateController::class, 'download']);
+        Route::post('update/install', [UpdateController::class, 'install']);
     });
 
     // 'licensed' is inherited from the group above — no longer listed here.
