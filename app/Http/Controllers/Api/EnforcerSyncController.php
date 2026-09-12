@@ -197,15 +197,39 @@ class EnforcerSyncController extends Controller
         // overlay would be a promise nothing on the endpoint can keep.
         $sites = $this->sitesFor($companyId);
 
-        if ($baseline !== [] || $sites !== []) {
+        // Protections travel in their OWN list, never inside `rules`.
+        //
+        // Everything in `rules` becomes an AppLocker deny at the far end. A row
+        // that says "WhatsApp is allowed, but not for sending files" put in that
+        // list would stop WhatsApp opening at all — which is precisely the
+        // mistake the requirement calls out: a protection must never be
+        // implemented as killing the application. Separate list, separate
+        // handling, and an endpoint that does not understand the key simply
+        // enforces the full blocks as it always has.
+        $protections    = $this->protectionsFor($companyId);
+        // USB / removable-storage block: a company-level switch, machine-wide.
+        // A real Windows driver block, so it rides the machine baseline like the
+        // website rules do.
+        $device = (array) (\App\Models\Company::withoutGlobalScopes()->whereKey($companyId)
+            ->first(['block_removable_storage', 'block_camera_device', 'block_browser_uploads'])?->toArray() ?? []);
+        $webProtections = $this->webProtectionsFor($companyId, (bool) ($device['block_browser_uploads'] ?? false));
+        $blockRemovable = (bool) ($device['block_removable_storage'] ?? false);
+        // Camera device block: same shape, disables the camera hardware itself.
+        $blockCamera = (bool) ($device['block_camera_device'] ?? false);
+
+        if ($baseline !== [] || $sites !== [] || $protections !== [] || $webProtections !== null || $blockRemovable || $blockCamera) {
             $specs[] = [
-                'version'   => $version,
-                'mode'      => $mode,
-                'scope'     => 'MACHINE',
-                'tenant_id' => (string) $companyId,
-                'clearance' => $this->clearance($state),
-                'rules'     => $baseline,
-                'sites'     => $sites,
+                'version'                 => $version,
+                'mode'                    => $mode,
+                'scope'                   => 'MACHINE',
+                'tenant_id'               => (string) $companyId,
+                'clearance'               => $this->clearance($state),
+                'rules'                   => $baseline,
+                'sites'                   => $sites,
+                'protections'             => $protections,
+                'web_protections'         => $webProtections,
+                'block_removable_storage' => $blockRemovable,
+                'block_camera_device'     => $blockCamera,
             ];
         }
 
@@ -404,6 +428,145 @@ class EnforcerSyncController extends Controller
             ->get();
 
         return $this->toSpecRules($rules);
+    }
+
+    /**
+     * Application rules that restrict an ACTIVITY rather than the application.
+     *
+     * Deliberately not filtered by status or action. An ALLOWED row carrying
+     * File Sharing Block is the central case of this feature, and a row already
+     * set to Full Block & Close is skipped instead — there is nothing to
+     * protect inside a program that never starts, and sending both would have
+     * the endpoint doing redundant work on every sync for ever.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    private function protectionsFor(int $companyId): array
+    {
+        $policy = $this->primaryPolicy(ApplicationPolicy::class, $companyId, 'APPLICATION');
+        if (! $policy) {
+            return [];
+        }
+
+        $rules = PolicyRule::withoutGlobalScopes()
+            ->where('company_id', $companyId)
+            ->where('policy_type', 'APPLICATION')
+            ->where('policy_id', $policy->id)
+            ->withProtections()
+            ->get();
+
+        $out = [];
+        foreach ($rules as $rule) {
+            $list = $rule->protectionList();
+            if ($list === [] || $rule->isEnforcing()) {
+                continue;
+            }
+
+            $spec = $this->specRule(
+                (string) $rule->item,
+                (string) ($rule->label ?: $rule->item),
+                (array) ($rule->identifiers ?? []),
+                $rule->confirmed_at !== null,
+                $rule->catalog_app_id,
+            );
+            if (! $spec) {
+                continue;
+            }
+
+            // The action is what the endpoint must NOT do here. Overwriting the
+            // BLOCK that specRule() stamps on every rule is not cosmetic: an
+            // endpoint that read this list and saw BLOCK would deny the
+            // application, and the whole point is that it keeps running.
+            $spec['action']      = 'PROTECT';
+            $spec['protections'] = $list;
+
+            $out[] = $spec;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Website protections, collapsed to the levers a browser actually has.
+     *
+     * Browsers expose no per-site upload control and no per-site camera block —
+     * only a browser-level switch and, for the camera, an allow list. So the
+     * server sends the DECISION (uploads off; camera off except these sites)
+     * rather than a per-site list the endpoint could not honour. Sending the
+     * per-site list would be a promise nothing on the PC can keep, which is the
+     * same failure as a rule with no identifiers.
+     *
+     * @return array<string,mixed>|null
+     */
+    private function webProtectionsFor(int $companyId, bool $blockUploadsCompanyWide = false): ?array
+    {
+        $policy = $this->primaryPolicy(WebsitePolicy::class, $companyId, 'WEBSITE');
+        if (! $policy) {
+            // The company-wide switch needs no website rule to exist.
+            return $blockUploadsCompanyWide
+                ? ['block_uploads' => true, 'block_camera' => false, 'camera_allowed_urls' => [], 'requested_by' => []]
+                : null;
+        }
+
+        $rules = PolicyRule::withoutGlobalScopes()
+            ->where('company_id', $companyId)
+            ->where('policy_type', 'WEBSITE')
+            ->where('policy_id', $policy->id)
+            ->get();
+
+        // Device control "Block browser uploads": the same browser-wide lever,
+        // switched on for the company rather than asked for by a site rule.
+        $uploads = $blockUploadsCompanyWide;
+        $camera  = false;
+        $items   = [];
+
+        foreach ($rules as $rule) {
+            if ($rule->isEnforcing()) {
+                continue; // already a full site block; nothing to protect inside it
+            }
+            $list = $rule->protectionList();
+            if ($list === []) {
+                continue;
+            }
+            // A browser cannot tell an image upload from any other upload, so
+            // File and Image Sharing Block collapse to the same switch here.
+            // The console says so before the box is ticked.
+            if (in_array('file', $list, true) || in_array('image', $list, true)) {
+                $uploads = true;
+            }
+            if (in_array('camera', $list, true)) {
+                $camera = true;
+            }
+            $items[] = ['item' => (string) $rule->item, 'protections' => $list];
+        }
+
+        if (! $uploads && ! $camera) {
+            return null;
+        }
+
+        // Sites the admin explicitly marked Allowed become the camera exception
+        // list. Without this, switching the camera off for one site would take
+        // the company's own video-meeting tool down with it.
+        $allowed = PolicyRule::withoutGlobalScopes()
+            ->where('company_id', $companyId)
+            ->where('policy_type', 'WEBSITE')
+            ->where('policy_id', $policy->id)
+            ->where('status', 'ALLOWED')
+            ->pluck('item')
+            ->map(fn ($v) => trim((string) $v))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        return [
+            'block_uploads'       => $uploads,
+            'block_camera'        => $camera,
+            'camera_allowed_urls' => $allowed,
+            // Kept so the endpoint's audit report can name the rules that asked
+            // for this, rather than reporting an unexplained browser-wide change.
+            'requested_by'        => $items,
+        ];
     }
 
     /**

@@ -22,6 +22,13 @@ class AppServiceProvider extends ServiceProvider
         $this->applyOrganisationTimezone();
         $this->registerGcsDisk();
         $this->registerEvidenceDisk();
+
+        // 2-Sep-2026: if no cron / Task Scheduler job is beating, start `schedule:work`
+        // ourselves. Without this, a server whose install skipped the scheduled task runs NO
+        // background job at all — auto sign-out, meeting auto-close, biometric sync, nightly
+        // attendance — while every screen still looks correct. SchedulerKeepAlive is one cache
+        // read on a healthy server and can never throw.
+        \App\Support\SchedulerKeepAlive::ensure();
     }
 
     /**

@@ -60,19 +60,46 @@ if not defined PHP (
 if not exist "%SRC%\artisan" ( echo  [X] %SRC% is not the SmartEPT server. & pause & exit /b 1 )
 if not exist "%SRC%\vendor\autoload.php" ( echo  [X] vendor is missing. Run: composer install --no-dev & pause & exit /b 1 )
 
+REM ---------------------------------------------------------------
+REM  0b. VERSION - ONE number for the whole product (Ejaz, 1-Sep-2026).
+REM
+REM  version.json is the same file the installed server reports to SmartEPT
+REM  Central when a client presses "Check for Update". Naming the package from
+REM  anything else guarantees the two disagree: a package called 1.2 whose
+REM  version.json still says 1.1 is never offered as an update and never
+REM  reports that it installed. So the package name comes FROM that file, and
+REM  the file is bumped at the END - only after a build that actually worked.
+REM ---------------------------------------------------------------
+REM  Read via a temp file, NOT `for /f`: a backtick block runs cmd /c on the
+REM  string, and a quoted exe followed by a quoted argument is what produced
+REM  "The filename, directory name, or volume label syntax is incorrect."
+REM  The STAMP loop above survives only because it calls powershell unquoted.
+set "VERFILE=%TEMP%\smartept-version.txt"
+set "VER="
+"%PHP%" "%SRC%\deployment\version.php" read > "%VERFILE%"
+if exist "%VERFILE%" set /p VER=<"%VERFILE%"
+del "%VERFILE%" 2>nul
+if not defined VER (
+  echo  [X] version.json is missing or has no "version" - that file IS the product's
+  echo      version number. Fix %SRC%\version.json and run this again.
+  pause & exit /b 1
+)
+echo   Version : %VER%
+echo.
+
 REM ===========================================================================
 REM  1. SERVER
 REM ===========================================================================
 echo [1/6] Building the server package ...
 echo.
-call "%SRC%\deployment\rebuild-server-zip.bat" 1.1
+call "%SRC%\deployment\rebuild-server-zip.bat" %VER%
 if errorlevel 1 (
   echo.
   echo  [X] The server package failed to build. Nothing else was produced.
   pause & exit /b 1
 )
 
-set "SERVER_ZIP=C:\laragon\www\smartept-central\storage\app\downloads\SmartEPT-Admin-Server-Setup-1.1.zip"
+set "SERVER_ZIP=C:\laragon\www\smartept-central\storage\app\downloads\SmartEPT-Admin-Server-Setup-%VER%.zip"
 if not exist "%SERVER_ZIP%" (
   echo  [X] Expected %SERVER_ZIP% and it is not there.
   pause & exit /b 1
@@ -325,10 +352,26 @@ REM  6. DONE
 REM ===========================================================================
 echo.
 echo [6/6] Done.
+
+REM The bump happens HERE and nowhere earlier: a build that failed must not
+REM consume a version number, or the next package silently skips one.
+set "NEXTVER="
+"%PHP%" "%SRC%\deployment\version.php" bump > "%VERFILE%"
+if exist "%VERFILE%" set /p NEXTVER=<"%VERFILE%"
+del "%VERFILE%" 2>nul
+if not defined NEXTVER (
+  echo.
+  echo  [!] The package is fine, but version.json could not be bumped. Edit it by
+  echo      hand before the next build, or you will rebuild %VER% over itself.
+)
 echo.
 echo ===============================================================
-echo   PACKAGE READY
+echo   PACKAGE READY  -  version %VER%
 echo   %PKG%
+echo.
+echo   To release it to existing on-prem clients:
+echo     SmartEPT Central - Upload Update - version %VER% - Publish.
+if defined NEXTVER echo   The next build will be version %NEXTVER%.
 echo.
 echo   1-SERVER    the Laravel app + vendor + INSTALL.bat
 echo   2-AGENT     ONE file. The employee agent AND the service that blocks,

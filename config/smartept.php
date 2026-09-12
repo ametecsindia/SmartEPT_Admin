@@ -107,6 +107,14 @@ return [
     // Documentation only; PolicyResolver::effectiveEnforcementMode() is the implementation.
     'enforcement_precedence' => ['DEVICE', 'EMPLOYEE', 'SHIFT', 'TEAM', 'DEPARTMENT', 'BRANCH', 'COMPANY'],
 
+    // 2-Sep-2026: when no cron / Windows Task Scheduler job is running `artisan schedule:run`,
+    // the application starts `schedule:work` itself on the next page load, so a server whose
+    // install skipped that step is never silently running ZERO background jobs. Set
+    // SMARTEPT_SCHEDULER_KEEPALIVE=false on a server with a healthy scheduled task — although
+    // it costs nothing there either, since a fresh heartbeat short-circuits it.
+    // See App\Support\SchedulerKeepAlive.
+    'scheduler_keepalive' => env('SMARTEPT_SCHEDULER_KEEPALIVE', true),
+
     // Policy types the engine knows how to compose into the agent bundle.
     'policy_types' => [
         'MONITORING', 'SCREENSHOT', 'WEBCAM', 'APPLICATION', 'WEBSITE',

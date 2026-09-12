@@ -99,6 +99,11 @@ class PolicyResolver
         // below 0.14 reads the bundle it has always read and behaves identically.
         $this->attachRules($policies, $employee->company_id);
 
+        // Device control "Block browser uploads": the agent guards drag/paste
+        // into every browser while the service removes the file picker.
+        $policies['website']['block_browser_uploads'] = (bool) \App\Models\Company::withoutGlobalScopes()
+            ->whereKey($employee->company_id)->value('block_browser_uploads');
+
         // Whether this tenant's enforcement is off, learning, or actually blocking.
         // No row means OFF: running an upgrade must never start blocking for anybody.
         $enforcement = EnforcementState::withoutGlobalScopes()
@@ -188,7 +193,7 @@ class PolicyResolver
                 ->orderBy('item')
                 ->get([
                     'item', 'label', 'status', 'action', 'suggested_action',
-                    'catalog_app_id', 'identifiers', 'confirmed_at',
+                    'catalog_app_id', 'identifiers', 'protections', 'confirmed_at',
                 ])
                 ->map(static function (PolicyRule $r): array {
                     return [
@@ -202,6 +207,13 @@ class PolicyResolver
                         // True only for the actions that actually prevent something.
                         // The agent still warns on the rest, exactly as before.
                         'enforced'         => $r->isEnforcing(),
+                        // Activities blocked INSIDE an application that is
+                        // otherwise allowed to run — file, image, camera.
+                        // Sent as a plain list so the agent never has to guess
+                        // which JSON keys count; absent keys are simply not in
+                        // it. An agent that does not know the field ignores it
+                        // and behaves exactly as it did before.
+                        'protections'      => $r->protectionList(),
                         'confirmed'        => $r->confirmed_at !== null,
                     ];
                 })

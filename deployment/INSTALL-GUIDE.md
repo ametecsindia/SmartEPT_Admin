@@ -72,11 +72,21 @@ Use this instead of `START-SMARTEPT.bat` when the client wants the console serve
 
 **D. Background scheduler (required — attendance, reports, alerts)**
 
-12. Create a Task Scheduler job running **every minute** as SYSTEM:
+12. **`INSTALL.bat` step 8 now creates this automatically** (Windows); `install-linux.sh`
+    and `install-macos.sh` add the equivalent cron entry. Nothing to type on a fresh install.
+
+    Only if that step printed a WARN — or you are repairing an install that predates
+    2-Sep-2026 — create the job by hand from an **administrator** prompt:
     ```
-    schtasks /Create /TN "SmartEPT Scheduler" /SC MINUTE /MO 1 /RU SYSTEM ^
+    schtasks /Create /F /TN "SmartEPT Scheduler" /SC MINUTE /MO 1 /RU SYSTEM ^
       /TR "C:\PHP\php.exe C:\smartept\artisan schedule:run"
     ```
+
+    &#9888; **Without this every background job is dead while every screen still looks
+    correct.** Post-shift auto sign-out, meeting auto-close, biometric auto-sync, the
+    nightly attendance sheet, licence phone-home, backups and the retention purge all run
+    through it. Verify with Help &rarr; Troubleshooting &rarr; **Background scheduler**
+    (green), or `php artisan smartept:why-no-signout`.
 
 **E. Verify + license**
 

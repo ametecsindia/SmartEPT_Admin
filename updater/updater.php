@@ -189,13 +189,34 @@ if ($zip->open($package) !== true || ! $zip->extractTo($extract)) {
 }
 $zip->close();
 
+$payload = $extract;
+$entries = fn (string $d) => array_values(array_diff(scandir($d) ?: [], ['.', '..']));
+
+// A zip almost always wraps everything in ONE folder (SmartEPT-Admin-Server/…).
+// Descend through those wrappers first. Without this the updater "installs" a
+// new directory INTO the app root, replaces nothing, and still reports success
+// — exactly what happened on 1-Sep-2026 with the Setup zip.
+while (count($list = $entries($payload)) === 1 && is_dir($payload . '/' . $list[0])) {
+    $payload .= '/' . $list[0];
+}
+
 // The chart's package wraps the payload in app/ next to manifest.json; a plain
 // zip of the application root is accepted too, so both build styles install.
-$payload = (is_file($extract . '/manifest.json') && is_dir($extract . '/app'))
-    ? $extract . '/app'
-    : $extract;
+if (is_file($payload . '/manifest.json') && is_dir($payload . '/app')) {
+    $payload .= '/app';
+}
 
-$topLevel = array_values(array_diff(scandir($payload) ?: [], ['.', '..']));
+// Prove it IS a SmartEPT tree BEFORE anything is backed up, shut down or
+// stamped. Refusing here costs the client nothing; a wrong payload that gets
+// as far as "installed" leaves them believing they upgraded when they did not.
+if (! is_dir($payload . '/app') || ! is_dir($payload . '/config')) {
+    rrmdir($extract);
+    step('failed', 100, 'This package is not a SmartEPT update — it has no app/ and config/ folders at its root. '
+        . 'Nothing was changed. (An installer/Setup zip is not an update package.)');
+    exit(1);
+}
+
+$topLevel = $entries($payload);
 if (! $topLevel) {
     rrmdir($extract);
     step('failed', 100, 'The update package is empty.');

@@ -68,6 +68,25 @@ launchctl unload "$PLIST" 2>/dev/null || true
 launchctl load "$PLIST"
 echo "[ok] launch agent installed — the console starts automatically at login"
 
+# --- 5) background scheduler (cron, every minute) ----------------------------
+# 2-Sep-2026. Everything the product does in the background runs through
+# `artisan schedule:run`: post-shift auto sign-out, meeting auto-close, biometric
+# auto-sync, the nightly attendance sheet, licence phone-home, backups, retention
+# purge. This was a manual step in INSTALL-GUIDE.md and it was being skipped, so
+# all of them were dead while every screen still looked correct. Idempotent: the
+# grep -v drops any previous line before re-adding it.
+if command -v crontab >/dev/null 2>&1; then
+  ( crontab -l 2>/dev/null | grep -v '# smartept-scheduler' ; \
+    echo "* * * * * cd $APP_DIR && $(command -v php) artisan schedule:run >/dev/null 2>&1 # smartept-scheduler" ) \
+    | crontab - \
+    && echo "[ok] background scheduler registered in cron (every minute)" \
+    || echo "[WARN] could not write crontab — background jobs will NOT run until it is added"
+else
+  echo "[WARN] cron not found. Background jobs (auto sign-out, biometric sync, nightly"
+  echo "       attendance) will NOT run. Add this to a scheduler yourself:"
+  echo "       * * * * * cd $APP_DIR && php artisan schedule:run >/dev/null 2>&1"
+fi
+
 IP=$(ipconfig getifaddr en0 2>/dev/null || echo localhost)
 echo "============================================================"
 echo "  DONE. SmartEPT console:  http://$IP:8080/admin"

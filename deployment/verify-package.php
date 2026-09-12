@@ -267,6 +267,7 @@ function checkVendorAgainstComposerCache(string $app, array &$problems, array &$
 
     $checked = 0;
     $uncached = 0;
+    $stale = [];                // cached, but only at a version we do not have installed
     foreach ($packages as $pkg) {
         $name = $pkg['name'] ?? null;
         if (! $name) {
@@ -281,6 +282,9 @@ function checkVendorAgainstComposerCache(string $app, array &$problems, array &$
         $archive = cachedArchiveFor($cacheDir, $name, $pkg);
         if ($archive === null) {
             $uncached++;
+            if (glob($cacheDir . '/' . $name . '/*')) {
+                $stale[] = $name . ' ' . ($pkg['version'] ?? '?');
+            }
             continue;
         }
 
@@ -318,8 +322,18 @@ function checkVendorAgainstComposerCache(string $app, array &$problems, array &$
     echo "  Packages diffed against the cache: {$checked}"
         . ($uncached ? " ({$uncached} not in the cache — not verified)" : '') . "\n";
     if ($uncached > 0) {
-        $warnings[] = "{$uncached} package(s) had no cached archive, so their files were not "
-            . 'verified. `composer clear-cache` then `composer install` repopulates the cache.';
+        $warnings[] = "{$uncached} package(s) had no cached archive for the INSTALLED version, so "
+            . 'their files were not verified. `composer clear-cache` then `composer install` '
+            . 'repopulates the cache with exactly what the lock file installs.';
+    }
+    if ($stale) {
+        $shown = array_slice($stale, 0, 5);
+        $more  = count($stale) - count($shown);
+        echo '  ' . count($stale) . " package(s) are cached only at a DIFFERENT version than the one\n"
+            . "  installed here, so they were skipped rather than wrongly called incomplete:\n"
+            . '      ' . implode(', ', $shown) . ($more > 0 ? " (+{$more} more)" : '') . "\n"
+            . "  That is normal on a machine whose global Composer cache is shared with another\n"
+            . "  project. It is NOT damage.\n";
     }
 
     return max(1, $checked);
@@ -614,6 +628,24 @@ function composerFilesCacheDir(): ?string
  * "that verifier is always wrong". So match on the installed version and its dist reference —
  * Composer names cache files "<version>-<reference>.<ext>" — and when nothing matches, report
  * the package as UNCACHED rather than diffing something else and calling it missing.
+ *
+ * 8-Sep-2026. The 26-Aug fix above was INERT on the build machine and the wolf-crying came
+ * straight back, because of the "exactly one cached file" fallback that used to sit at the end
+ * of this function. Composer does not always name cache files after the reference — on this
+ * machine they are bare sha1s of the dist URL (monolog/monolog/055510b4….zip) — so no key ever
+ * matched, every single-file package fell through the fallback, and the diff ran against
+ * whatever version happened to be cached. The global cache is shared with smartept-central, so
+ * "whatever is cached" is regularly NEWER than what smartept's lock installs:
+ *
+ *   monolog/monolog     installed 3.10.0     cached 3.11.0 (2-Sep)
+ *     -> RedactingFormatter, FrankenPhpHandler, LogMonsterHandler reported "missing on disk"
+ *   laravel/framework   installed v11.55.0   cached a later 11.x
+ *     -> 157 files reported "missing", every one of them a class the newer version ADDS
+ *
+ * Nothing was damaged. Five healthy packages were called INCOMPLETE and a good 1.2 build was
+ * refused. So: the fallback is gone, and when the file name identifies nothing we look INSIDE
+ * the archive at the commit its root directory is named after. Identify the archive or report
+ * the package as not verified — never diff against an archive we have not identified.
  */
 function cachedArchiveFor(string $cacheDir, string $package, array $pkg): ?string
 {
@@ -643,8 +675,56 @@ function cachedArchiveFor(string $cacheDir, string $package, array $pkg): ?strin
         }
     }
 
-    // Exactly one cached file and nothing to contradict it: it is the installed one.
-    return count($files) === 1 ? $files[0] : null;
+    // The name told us nothing. Ask the archive itself which commit it was built from.
+    if ($reference !== '') {
+        foreach ($files as $f) {
+            $ref = archiveRootReference($f);
+            if ($ref !== null && str_starts_with(strtolower($reference), strtolower($ref))) {
+                return $f;
+            }
+        }
+    }
+
+    // Cached, but not the version that is installed. NOT something to diff against.
+    return null;
+}
+
+/**
+ * The commit an archive was built from, as GitHub and GitLab zipballs record it: one root
+ * directory named "<owner>-<repo>-<short sha>", e.g. "Seldaek-monolog-147f303" -> "147f303".
+ * Null when the archive has no single root directory or its name has no hex tail — in which
+ * case the caller must treat the package as not verified rather than guess.
+ */
+function archiveRootReference(string $archive): ?string
+{
+    $entries = zipEntries($archive);
+    if (! $entries) {
+        return null;
+    }
+
+    $root = null;
+    foreach ($entries as $entry) {
+        $seg = strtok(str_replace('\\', '/', $entry), '/');
+        if ($seg === false || $seg === '') {
+            continue;
+        }
+        if ($root === null) {
+            $root = $seg;
+        } elseif ($root !== $seg) {
+            return null;                        // more than one root: not a zipball
+        }
+    }
+    if ($root === null) {
+        return null;
+    }
+
+    $pos = strrpos($root, '-');
+    if ($pos === false) {
+        return null;
+    }
+    $tail = substr($root, $pos + 1);
+
+    return preg_match('/^[0-9a-f]{7,40}$/i', $tail) === 1 ? $tail : null;
 }
 
 function newestCachedArchive(string $cacheDir, string $package): ?string

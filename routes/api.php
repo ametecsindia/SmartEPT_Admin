@@ -465,6 +465,10 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
     Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,COMPLIANCE_OFFICER')->group(function () {
         Route::get('policies/{type}/{policy}/rules', [PolicyRuleController::class, 'index']);
         Route::put('policies/{type}/{policy}/rules', [PolicyRuleController::class, 'replace']);
+        // What File / Image / Camera protection can actually be enforced, per item.
+        // Declared BEFORE the {type}/{policy} pair above would ever be reached with
+        // these segments, and read-only, so it sits in the same permission group.
+        Route::get('policies/protection-capabilities', [PolicyRuleController::class, 'capabilities']);
     });
 
     // ---- Enforcement: on, off, and who is enforced and why ----
@@ -485,6 +489,7 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
         Route::post('enforcement/start-audit', [EnforcementController::class, 'startAudit']);
         Route::post('enforcement/promote', [EnforcementController::class, 'promote']);
         Route::post('enforcement/disable', [EnforcementController::class, 'disable']);
+        Route::post('enforcement/device-control', [EnforcementController::class, 'deviceControl']);
         Route::post('enforcement/audit-event/{id}/resolve', [EnforcementController::class, 'resolveAuditEvent']);
 
         // Enrolment admin: minting is the ONLY place an enrolment secret ever exists.

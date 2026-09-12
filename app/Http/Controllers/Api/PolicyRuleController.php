@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ApplicationPolicy;
 use App\Models\PolicyRule;
 use App\Models\WebsitePolicy;
+use App\Services\ProtectionCapabilities;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -60,6 +61,20 @@ class PolicyRuleController extends Controller
         'anydesk', 'teamviewer', 'quicksupport', 'rustdesk',
     ];
 
+    /**
+     * GET the protection capability matrix.
+     *
+     * The console calls this once when the Rules screen opens and uses it to
+     * decide which protection checkboxes to render, which to disable, and what
+     * consequence to print next to a browser-wide one. Without it the screen
+     * would offer every protection on every item and quietly enforce a third of
+     * them — the exact defect the client wrote a whole section about.
+     */
+    public function capabilities(ProtectionCapabilities $capabilities): JsonResponse
+    {
+        return response()->json(['ok' => true, 'data' => $capabilities->forConsole()]);
+    }
+
     /** GET the rules for one policy. */
     public function index(Request $request, string $type, int $policy): JsonResponse
     {
@@ -95,6 +110,14 @@ class PolicyRuleController extends Controller
             'rules.*.catalog_app_id' => ['nullable', 'string', 'max:64'],
             'rules.*.identifiers'    => ['nullable', 'array'],
             'rules.*.confirmed'      => ['nullable', 'boolean'],
+            // Protections are a SECOND lever, independent of status and action:
+            // an ALLOWED row may carry them, which is the whole point of the
+            // feature. Accepted as a map so the console can send the checkbox
+            // state verbatim; normalised to a canonical map below.
+            'rules.*.protections'          => ['nullable', 'array'],
+            'rules.*.protections.file'     => ['nullable', 'boolean'],
+            'rules.*.protections.image'    => ['nullable', 'boolean'],
+            'rules.*.protections.camera'   => ['nullable', 'boolean'],
         ]);
 
         $companyId = (int) $request->user()->company_id;
@@ -104,7 +127,9 @@ class PolicyRuleController extends Controller
         // set is worse than a rejected one.
         $refused = [];
         $needsConfirmation = [];
+        $unenforceable = [];
         $normalised = [];
+        $capabilities = app(ProtectionCapabilities::class);
 
         foreach ($data['rules'] as $r) {
             $item = $this->normalise((string) $r['item'], $typeName);
@@ -117,15 +142,45 @@ class PolicyRuleController extends Controller
             $hard = in_array($action, PolicyRule::HARD_ACTIONS, true)
                 && in_array($status, ['BLOCKED', 'VIOLATION'], true);
 
-            if ($hard && $typeName === 'APPLICATION') {
-                if (in_array($item, self::NEVER_ENFORCE, true)) {
+            $protections = $this->normaliseProtections($r['protections'] ?? null);
+
+            // Backstop for the console, not a substitute for it. A protection
+            // the capability matrix says cannot be enforced on this item is
+            // REFUSED rather than stored: storing it would put a control in the
+            // console, in the audit trail and in front of a bank's auditor that
+            // no endpoint will ever act on.
+            foreach (array_keys($protections) as $protection) {
+                if (! $capabilities->isOffered($item, $typeName, (string) $protection)) {
+                    $unenforceable[] = $item . ' → ' . $protection;
+                    unset($protections[$protection]);
+                }
+            }
+
+            if ($typeName === 'APPLICATION' && in_array($item, self::NEVER_ENFORCE, true)) {
+                // Refused for a full block for the reasons in the constant, and
+                // refused for protections too: denying explorer.exe the camera or
+                // closing its file dialogs is the same class of damage by a
+                // quieter route, and nothing on that list is an app an employee
+                // shares files from.
+                if ($hard || $protections !== []) {
                     $refused[] = $item;
                     continue;
                 }
-                if (in_array($item, self::CONFIRM_ENFORCE, true) && empty($r['confirmed'])) {
-                    $needsConfirmation[] = $item;
-                    continue;
-                }
+            }
+
+            if ($hard && $typeName === 'APPLICATION'
+                && in_array($item, self::CONFIRM_ENFORCE, true) && empty($r['confirmed'])) {
+                $needsConfirmation[] = $item;
+                continue;
+            }
+
+            // "steam" and "steam.exe" arrive as two rows and normalise to one.
+            // Last-wins silently dropped whatever the first row carried - a
+            // camera tick on "steam" vanished because "steam.exe" followed it
+            // with none. Protections are unioned; the rest of the row is the
+            // later one, as before.
+            if (isset($normalised[$item])) {
+                $protections = (array) $normalised[$item]['protections'] + $protections;
             }
 
             $normalised[$item] = [
@@ -135,17 +190,24 @@ class PolicyRuleController extends Controller
                 'action'         => $action,
                 'catalog_app_id' => $r['catalog_app_id'] ?? null,
                 'identifiers'    => $r['identifiers'] ?? null,
+                'protections'    => $protections,
                 'confirmed'      => ! empty($r['confirmed']) && $hard,
             ];
         }
 
+        // Refused outright: never-enforce items and unconfirmed guarded ones.
+        // An unenforceable protection is NOT a refusal: it has already been
+        // dropped above, the rest of the row saves, and the response says what
+        // was dropped. Refusing the whole save for it meant a protection that
+        // was offered yesterday and withdrawn today blocked every other edit.
         if ($refused || $needsConfirmation) {
             return response()->json([
                 'error' => [
                     'code' => 'RULE_REFUSED',
-                    'message' => $this->refusalMessage($refused, $needsConfirmation),
+                    'message' => $this->refusalMessage($refused, $needsConfirmation, $unenforceable),
                     'refused' => $refused,
                     'needs_confirmation' => $needsConfirmation,
+                    'unenforceable' => $unenforceable,
                 ],
             ], 422);
         }
@@ -172,6 +234,11 @@ class PolicyRuleController extends Controller
                     'action'         => $row['action'],
                     'catalog_app_id' => $row['catalog_app_id'],
                     'identifiers'    => $row['identifiers'],
+                    // NULL, not [], when nothing is set: the column's "no
+                    // protections" state and the pre-upgrade state are then the
+                    // same value, so a rule saved by this build and one that
+                    // predates the column are indistinguishable to every reader.
+                    'protections'    => $row['protections'] !== [] ? $row['protections'] : null,
                     'version'        => (int) ($rule->version ?? 0) + 1,
                 ]);
 
@@ -205,7 +272,15 @@ class PolicyRuleController extends Controller
                 ->update(['version' => DB::raw('version + 1')]);
         });
 
-        return $this->index($request, $type, $policy);
+        $response = $this->index($request, $type, $policy);
+        if ($unenforceable) {
+            $body = $response->getData(true);
+            $body['warning'] = $this->refusalMessage([], [], $unenforceable);
+            $body['unenforceable'] = array_values(array_unique($unenforceable));
+            $response->setData($body);
+        }
+
+        return $response;
     }
 
     /** @return array{0:string,1:class-string} */
@@ -225,6 +300,33 @@ class PolicyRuleController extends Controller
         return [self::TYPES[$key]['type'], $model];
     }
 
+    /**
+     * The protection map, reduced to the keys this build knows and to booleans.
+     *
+     * Unknown keys are dropped rather than stored: the column is JSON precisely
+     * so the set can grow, and letting an arbitrary key through would mean a
+     * console typo lands in the database and an endpoint silently ignores it —
+     * a protection an admin believes is on and that nothing enforces, which is
+     * the failure mode this whole feature is written to avoid.
+     *
+     * @return array<string,bool>
+     */
+    private function normaliseProtections(mixed $raw): array
+    {
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        $out = [];
+        foreach (PolicyRule::PROTECTIONS as $key) {
+            if (filter_var($raw[$key] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                $out[$key] = true;
+            }
+        }
+
+        return $out;
+    }
+
     /** Must match App\Services\ComplianceEvaluator's normalisation exactly. */
     private function normalise(string $s, string $type): string
     {
@@ -238,12 +340,21 @@ class PolicyRuleController extends Controller
         return trim($s, '/ ');
     }
 
-    /** @param array<int,string> $refused @param array<int,string> $confirm */
-    private function refusalMessage(array $refused, array $confirm): string
+    /**
+     * @param array<int,string> $refused
+     * @param array<int,string> $confirm
+     * @param array<int,string> $unenforceable
+     */
+    private function refusalMessage(array $refused, array $confirm, array $unenforceable = []): string
     {
         $parts = [];
+        if ($unenforceable) {
+            $parts[] = 'SmartEPT cannot currently enforce these, so they were not saved: '
+                . implode(', ', array_unique($unenforceable))
+                . '. Leaving them switched on would show a control that nothing on the PC acts on.';
+        }
         if ($refused) {
-            $parts[] = 'These cannot be blocked or closed, ever: ' . implode(', ', $refused)
+            $parts[] = 'These cannot be blocked, closed or restricted, ever: ' . implode(', ', $refused)
                 . '. They run Windows, your antivirus or SmartEPT itself — enforcing them would break the PC.';
         }
         if ($confirm) {

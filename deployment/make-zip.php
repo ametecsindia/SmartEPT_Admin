@@ -44,7 +44,14 @@ if ($src === false || ! is_dir($src)) {
     fwrite(STDERR, "Source folder not found: {$argv[1]}\n");
     exit(2);
 }
-$rootName = $rootName ?: basename($src);
+// A root name of "-" builds a FLAT archive (no wrapper folder). That is what an
+// UPDATE package must be: the on-prem updater copies the archive's top-level
+// entries over the app root, so a wrapper folder would make it create
+// smartept\SmartEPT-Admin-Server\ and replace nothing — a silent no-op update
+// that still reports success (seen at a client site, 1-Sep-2026). The installer
+// download keeps its wrapper, because a human unzips that one by hand.
+$flat = ($rootName === '-');
+$rootName = $flat ? '' : ($rootName ?: basename($src));
 
 // ZipArchive writes through a temp file next to the destination; without this the failure is a
 // bare "Failure to create temporary file", which says nothing about the missing folder.
@@ -82,7 +89,7 @@ $it = new \RecursiveIteratorIterator(
 
 foreach ($it as $item) {
     $rel = substr($item->getPathname(), strlen($src) + 1);
-    $entry = $rootName . '/' . str_replace('\\', '/', $rel);
+    $entry = ($flat ? '' : $rootName . '/') . str_replace('\\', '/', $rel);
 
     if ($item->isDir()) {
         // Explicit entries so EMPTY runtime folders survive — storage/logs, bootstrap/cache and
@@ -139,6 +146,19 @@ if ($check->open($partial) !== true) {
     exit(1);
 }
 $entries = $check->numFiles;
+
+// A flat archive is only useful if the app really is at its root. Check the three
+// paths the updater looks for, before this file is given its published name.
+if ($flat) {
+    foreach (['artisan', 'config/app.php', 'app/Providers/AppServiceProvider.php'] as $must) {
+        if ($check->locateName($must) === false) {
+            $check->close();
+            fwrite(STDERR, "The update archive has no {$must} at its root, so no updater would accept it.\n");
+            @unlink($partial);
+            exit(1);
+        }
+    }
+}
 $check->close();
 
 if (! @rename($partial, $out)) {

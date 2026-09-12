@@ -136,7 +136,7 @@
   .k-break{--kc:var(--info);--kc2:var(--info);--kcw:var(--info-w)}
   .k-cam{--kc:var(--danger);--kc2:var(--danger);--kcw:var(--danger-w)}
   .k-viol{--kc:var(--danger);--kc2:var(--danger);--kcw:var(--danger-w)}
-  .k-shot{--kc:var(--info);--kc2:var(--info);--kcw:var(--info-w)}
+  .k-shot{--kc:var(--warn);--kc2:var(--warn);--kcw:var(--warn-w)}   /* deep yellow */
   .kpi.drill{cursor:pointer}
   .kpi.drill .go{position:absolute;right:12px;top:14px;font-size:9.5px;font-weight:800;color:var(--kc,var(--accent));
     opacity:0;transform:translateX(-3px);transition:opacity .14s,transform .14s;letter-spacing:.3px;text-transform:uppercase}
@@ -247,8 +247,12 @@
   .filters label{margin:0;white-space:nowrap}
   .filters input,.filters select{width:auto;min-width:150px;padding:8px 11px}
   .mut{color:var(--ink-3);font-size:12px;padding:10px 0}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
-  .grid2 > .card{margin-bottom:0}
+  /* minmax(0,1fr), not 1fr: a bare 1fr is minmax(AUTO,1fr), and auto never shrinks
+     below the content's min-content width — so the 8-column API keys table pushed
+     the whole grid past the right edge of the page and clipped the second card.
+     The card scrolls its own wide table instead (as it already does on mobile). */
+  .grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;align-items:start}
+  .grid2 > .card{margin-bottom:0;overflow-x:auto}
   @media(max-width:1100px){.grid2{grid-template-columns:1fr}.kpis{grid-template-columns:1fr 1fr}}
   /* ---- Mobile ---- */
   .ham{display:none;width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--ink);font-size:19px;line-height:1;cursor:pointer;align-items:center;justify-content:center;flex:none}
@@ -785,8 +789,8 @@
         <select id="rule-add-status"><option value="TRACKED">Tracked</option><option value="ALLOWED">Allowed</option><option value="BLOCKED">Blocked</option><option value="VIOLATION">Violation</option></select>
         <button class="btn solid" id="rule-add-btn" type="button">+ Add</button>
         <span class="row" style="margin-left:auto">
-          <select id="rule-action" title="Sets the action on every Blocked/Violation row at once. Each row can still be changed individually."><option value="">Set all blocked to\u2026</option><option value="WARN">Warn employee</option><option value="SCREENSHOT">Warn + screenshot</option><option value="NOTIFY">Notify manager</option><option value="CLOSE">Close the app / block the site</option></select>
-          <button class="btn" id="rule-seed" type="button">Load common defaults</button>
+          <select id="rule-action" title="Sets the action on every Blocked/Violation row at once. Each row can still be changed individually."><option value="">Set all blocked to&hellip;</option><option value="WARN">Warn employee</option><option value="SCREENSHOT">Warn + screenshot</option><option value="NOTIFY">Notify manager</option><option value="CLOSE">Full Block &amp; Close</option></select>
+          <select id="rule-profile" title="A starting point. Every row stays editable and nothing applies until you Save."><option value="">Load a profile&hellip;</option><option value="banking">Banking / Collections</option><option value="general">General</option></select>
           <button class="btn solid" id="rule-save" type="button">Save rules</button>
         </span>
       </div>
@@ -794,9 +798,10 @@
         <h3>Apps &amp; Websites Rules <span class="hint">what the agent tracks, allows, blocks or flags as a violation &middot; applies company-wide</span>
           <input id="rule-q" placeholder="Search item" autocomplete="off" style="width:170px;font-weight:400;font-size:12px;margin-left:auto">
         </h3>
-        <div style="overflow-x:auto"><table><thead><tr><th>Item</th><th>Type</th><th>Status</th><th>What happens</th><th></th></tr></thead><tbody id="rule-rows"></tbody></table></div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Item</th><th>Type</th><th>Status</th><th>What happens</th><th>Protections</th><th></th></tr></thead><tbody id="rule-rows"></tbody></table></div>
         <div class="mut" style="margin-top:10px;font-size:11.5px"><b>Allowed</b> = whitelisted/productive &middot; <b>Tracked</b> = monitored only &middot; <b>Blocked</b> = employee warned + logged as a violation &middot; <b>Violation</b> = blocked and flagged for review. Agents pick up changes on their next heartbeat (~30s).</div>
-        <div class="mut" style="margin-top:6px;font-size:11.5px"><b>What happens</b> is now per row \u2014 you can warn about one app and close another. Warn, screenshot and notify take effect immediately. <b>Close / block</b> only ever prevents anything once enforcement is switched on below.</div>
+        <div class="mut" style="margin-top:6px;font-size:11.5px"><b>What happens</b> is per row \u2014 you can warn about one app and fully block another. Warn, screenshot and notify take effect immediately. <b>Full Block &amp; Close</b> only ever prevents anything once enforcement is switched on below.</div>
+        <div class="mut" style="margin-top:6px;font-size:11.5px"><b>Protections</b> keep the app or site working and stop one activity inside it \u2014 tick <b>Block all file sharing</b> and an employee can still chat and call on WhatsApp but cannot send a file out of it by any method: the attach button, copy-paste, or drag-and-drop are all stopped. They are independent of Status, so an <b>Allowed</b> app can still have protections. A row set to Full Block &amp; Close needs none: nothing runs. A protection SmartEPT cannot enforce on that item is greyed out with the reason, and the agent reports honestly when it could not enforce one.</div>
         <div class="mut" id="rule-msg" style="margin-top:8px"></div>
       </div>
 
@@ -810,6 +815,20 @@
           <span id="enf-mode-tag" class="tag" style="margin-left:auto">\u2026</span>
         </h3>
         <div id="enf-body" class="mut">Loading\u2026</div>
+      </div>
+      <div class="card" id="dev-card">
+        <h3>Device control <span class="hint">machine-wide hardware blocks on every enrolled PC</span></h3>
+        <div class="mut" style="font-size:12px;margin-bottom:8px">Real Windows device blocks, not hidden buttons \u2014 a blocked drive will not mount and a blocked camera disappears from every app and browser. Keyboards and mice are unaffected. Each PC applies a change within ~30s; turning a block off restores the device (a drive on its next insert).</div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px">
+          <input type="checkbox" id="dev-usb" data-dev="block_removable_storage"> <b>Block USB / removable storage</b> company-wide
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-top:6px">
+          <input type="checkbox" id="dev-cam" data-dev="block_camera_device"> <b>Block camera device</b> company-wide (all apps, all browsers, all users)
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-top:6px" title="Chrome, Edge and Brave lose their file picker by Windows policy (Save As stops too). Firefox has no such policy, so there the agent closes the picker as it opens. In every browser the agent also cancels drag-and-drop and clears copied files/images while the browser is in front.">
+          <input type="checkbox" id="dev-web" data-dev="block_browser_uploads"> <b>Block browser uploads</b> company-wide (every website, every browser)
+        </label>
+        <div class="mut" id="dev-msg" style="margin-top:8px;font-size:12px"></div>
       </div>
     </div>
 
@@ -2162,7 +2181,7 @@ function applyEmployeeChrome() {
     st.textContent =
       '.role-employee .btn.solid,.role-employee .btn.danger,' +
       '.role-employee #rule-add-item,.role-employee #rule-add-type,.role-employee #rule-add-status,' +
-      '.role-employee #rule-action,.role-employee #rule-seed{display:none !important}' +
+      '.role-employee #rule-action,.role-employee #rule-profile{display:none !important}' +
       '.role-employee [data-rule-status]{pointer-events:none;opacity:.65}' +
       // employee dashboard: Workforce card is hidden, so let Time-Utilization fill the row (no empty half)
       '.role-employee .dash-charts{grid-template-columns:1fr !important}' +
@@ -2813,7 +2832,9 @@ async function loadDashboard() {
     const c = d.cards;
     DASH_EMP = d.employees || [];
     const KPI = [
-      ['Employees', c.total_employees, 'k-total', 'all'],
+      // 'all' was a no-op — renderLiveRows() treats it exactly like no filter, so
+      // the card did nothing. The headcount belongs to the Employees screen.
+      ['Employees', c.total_employees, 'k-total', 'view:employees'],
       ['Active', c.active, 'k-ok', 'ACTIVE'],
       ['Idle', c.idle, 'k-idle', 'IDLE'],
       ['On break', c.break_total, 'k-break', 'BREAK', 'Tea ' + (c.break_tea || 0) + ' · Lunch ' + (c.break_lunch || 0) + ' · Other ' + (c.break_other || 0)],
@@ -4675,16 +4696,104 @@ const RULE_SEED = [
   { item: 'x.com', kind: 'site', status: 'BLOCKED' }, { item: 'reddit.com', kind: 'site', status: 'BLOCKED' },
   { item: 'tiktok.com', kind: 'site', status: 'VIOLATION' }, { item: 'netflix.com', kind: 'site', status: 'VIOLATION' },
 ];
+
+// Selectable starting points. Both are only a STARTING POINT: every row stays
+// fully editable and nothing takes effect until Save, so an admin can load a
+// profile and then change any of it. Applying a profile ADDS its rows without
+// touching what is already on the screen.
+//
+//  Banking / collections: the messengers and remote-control tools a bank's
+//  audit treats as uncontrolled data channels go to Full Block & Close - once
+//  a file is inside WhatsApp it can be forwarded and no endpoint can stop that,
+//  so the only real control is not letting it run. Office and mail stay open;
+//  the browser is allowed but its uploads are blocked.
+//
+//  General: the light-touch default - track most things, warn on the obvious
+//  time-sinks, block nothing outright until the admin decides to.
+const RULE_PROFILES = {
+  banking: {
+    label: 'Banking / Collections',
+    note: 'Messengers and remote tools fully blocked; Office and mail open; browser uploads blocked. The audit-ready starting point.',
+    rules: [
+      // Full Block & Close: the uncontrolled channels. confirmed so the guarded
+      // ones (anydesk, teamviewer) save without a second tick - choosing this
+      // profile IS the admin confirming them.
+      { item: 'whatsapp', kind: 'app', status: 'BLOCKED', action: 'CLOSE' },
+      { item: 'telegram', kind: 'app', status: 'BLOCKED', action: 'CLOSE' },
+      { item: 'signal', kind: 'app', status: 'BLOCKED', action: 'CLOSE' },
+      { item: 'anydesk', kind: 'app', status: 'BLOCKED', action: 'CLOSE', confirmed: true },
+      { item: 'teamviewer', kind: 'app', status: 'BLOCKED', action: 'CLOSE', confirmed: true },
+      { item: 'ultraviewer', kind: 'app', status: 'BLOCKED', action: 'CLOSE' },
+      { item: 'outlook.exe', kind: 'app', status: 'ALLOWED' },
+      { item: 'excel.exe', kind: 'app', status: 'ALLOWED' },
+      { item: 'winword.exe', kind: 'app', status: 'ALLOWED' },
+      { item: 'chrome.exe', kind: 'app', status: 'ALLOWED' },
+      // Webmail stays open, but the browser's file picker goes (browser-wide,
+      // every site) and the agent guards drag/paste into the browser.
+      { item: 'outlook.office.com', kind: 'site', status: 'ALLOWED', protections: { file: true, image: true } },
+      // Web channels a bank blocks by default.
+      { item: 'web.whatsapp.com', kind: 'site', status: 'BLOCKED' },
+      { item: 'web.telegram.org', kind: 'site', status: 'BLOCKED' },
+      { item: 'mail.google.com', kind: 'site', status: 'BLOCKED' },
+      { item: 'dropbox.com', kind: 'site', status: 'BLOCKED' },
+      { item: 'drive.google.com', kind: 'site', status: 'BLOCKED' },
+      { item: 'facebook.com', kind: 'site', status: 'BLOCKED' },
+      { item: 'instagram.com', kind: 'site', status: 'BLOCKED' },
+    ],
+  },
+  general: {
+    label: 'General',
+    note: 'Track most apps, warn on the obvious time-sinks, block nothing until you choose to. Fully customizable.',
+    rules: RULE_SEED,
+  },
+};
 // What a rule does when it fires. Only CLOSE reaches the enforcement layer; the
 // rest are the agent's existing warn/notify/screenshot behaviour.
 //
 // The API stores CLOSE for applications and BLOCK for websites (the two tables
 // have always disagreed on the name). One label here, translated on save.
 const RULE_ACTIONS = ['WARN', 'SCREENSHOT', 'NOTIFY', 'CLOSE'];
+// CLOSE is still the stored value in both policy tables — only the words on
+// screen changed, so every existing rule keeps working untouched.
 const RULE_ACTION_LABEL = {
   WARN: 'Warn employee', SCREENSHOT: 'Warn + screenshot',
-  NOTIFY: 'Notify manager', CLOSE: 'Close / block it',
+  NOTIFY: 'Notify manager', CLOSE: 'Full Block & Close',
 };
+
+// ---- Protections: block an activity, not the application -------------------
+//
+// A protection is orthogonal to Status and to What happens. "WhatsApp allowed,
+// file sharing blocked" is the requirement, and no value of What happens can
+// express it — those only mean anything on a blocked row.
+//
+// RULE_CAPS is the capability matrix from GET /policies/protection-capabilities.
+// It decides which boxes are offered, which are greyed with a reason, and which
+// carry a consequence warning. Null until it loads; everything is offered
+// un-annotated in that window rather than the screen refusing to render.
+const RULE_PROTECTIONS = ['file', 'image', 'camera'];
+const RULE_PROTECTION_LABEL = { file: 'Files', image: 'Images', camera: 'Camera' };
+// What the Rules screen actually shows. "Block all file sharing" is ONE switch
+// that covers files and images through every method the agent guards - the
+// attach dialog, clipboard paste and drag-and-drop - because a client asking
+// to "stop any file leaving" does not want to reason about three boxes. The
+// underlying model still stores file and image independently, so granular
+// control survives for anyone who needs it via the API; the console is simply
+// the common case made simple.
+const RULE_PROTECTION_GROUPS = [
+  { key: 'files', keys: ['file', 'image'], label: 'Block file sharing', sub: '' },
+  { key: 'camera', keys: ['camera'], label: 'Block camera', sub: '' },
+];
+let RULE_CAPS = null;
+
+// The capability answer for one row's protection, with sane fallbacks so a
+// missing or half-loaded matrix never hides a control silently.
+function ruleCap(r, p) {
+  if (!RULE_CAPS) return { status: 'UNVERIFIED', note: null };
+  const type = r.kind === 'app' ? 'APPLICATION' : 'WEBSITE';
+  const key = r.kind === 'app' ? ruleBase(r.item) : siteHost(r.item);
+  const entry = (RULE_CAPS.items && RULE_CAPS.items[key]) || (RULE_CAPS.defaults && RULE_CAPS.defaults[type]) || {};
+  return entry[p] || { status: 'UNSUPPORTED', note: null };
+}
 // Mirrors the agent's never-terminate list and PolicyRuleController::NEVER_ENFORCE.
 // Shown greyed in the dropdown so an admin sees WHY rather than hitting a 422.
 const RULE_NEVER_ENFORCE = ['explorer', 'winlogon', 'lsass', 'csrss', 'svchost', 'services',
@@ -4729,16 +4838,24 @@ function rulesFromPolicy(pol, kind) {
 
   const seen = new Set(); const out = [];
   const add = (item, status) => {
-    const k = String(item).toLowerCase(); if (!item || seen.has(k)) return; seen.add(k);
+    // Keyed by base name for apps: a legacy list holding both "steam" and
+    // "steam.exe" is ONE rule, and two rows for it fought on save (the second
+    // overwrote the first's ticks).
+    const k = kind === 'app' ? ruleBase(item) : String(item).toLowerCase(); if (!item || seen.has(k)) return; seen.add(k);
     const saved = perRule[ruleBase(item)];
     // BLOCK and CLOSE are the same thing wearing the two tables' different names.
     let action = String((saved && saved.action) || fallback).toUpperCase();
     if (action === 'BLOCK') action = 'CLOSE';
     if (action === 'LOG') action = 'WARN';
+    // protections comes back as {file:true,...} or null. Normalised to a plain
+    // object here so every later reader can do prot.file without guarding.
+    const prot = {};
+    RULE_PROTECTIONS.forEach((p) => { prot[p] = !!(saved && saved.protections && saved.protections[p]); });
     out.push({
       item: String(item), kind, status,
       action: RULE_ACTIONS.includes(action) ? action : 'WARN',
       confirmed: !!(saved && saved.confirmed),
+      protections: prot,
     });
   };
   Object.keys(cats).forEach((it) => { const c = String(cats[it]).toUpperCase(); if (RULE_ORDER.includes(c)) add(it, c); });
@@ -4747,16 +4864,22 @@ function rulesFromPolicy(pol, kind) {
   return out;
 }
 async function initRules() {
-  $('#rule-rows').innerHTML = '<tr><td colspan="5" class="mut">Loading…</td></tr>';
+  $('#rule-rows').innerHTML = '<tr><td colspan="6" class="mut">Loading…</td></tr>';
   try {
+    // Fetched once per screen load, not per row: fifty applications would
+    // otherwise be fifty requests. A failure here is not fatal — the rules
+    // still render, protections just lose their annotations.
+    if (!RULE_CAPS) {
+      try { RULE_CAPS = (await api('/policies/protection-capabilities')).data || null; } catch (_) { RULE_CAPS = null; }
+    }
     const [ap, wp] = await Promise.all([api('/policies/application'), api('/policies/website')]);
     RULE_POL.app = (ap.data || [])[0] || null;
     RULE_POL.site = (wp.data || [])[0] || null;
     RULES = rulesFromPolicy(RULE_POL.app, 'app').concat(rulesFromPolicy(RULE_POL.site, 'site'));
     renderRules();
-    if (!RULES.length) $('#rule-msg').innerHTML = 'No rules yet. Click <b>Load common defaults</b> to start, then <b>Save rules</b>.';
+    if (!RULES.length) $('#rule-msg').innerHTML = 'No rules yet. Pick a <b>profile</b> above to start (Banking or General), then <b>Save rules</b>.';
   } catch (e) {
-    $('#rule-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="5" class="mut">' + esc(e.message) + '</td></tr>';
+    $('#rule-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="6" class="mut">' + esc(e.message) + '</td></tr>';
   }
 }
 function renderRules() {
@@ -4774,8 +4897,55 @@ function renderRules() {
     + RULE_ORDER.map((sx) => '<option value="' + sx + '"' + (sx === r.status ? ' selected' : '') + '>' + RULE_LABEL[sx] + '</option>').join('')
     + '</select></td>'
     + '<td>' + ruleActionCell(r, i) + '</td>'
+    + '<td>' + ruleProtectionCell(r, i) + '</td>'
     + '<td><button class="btn danger" data-rule-del="' + i + '" type="button">Remove</button></td></tr>').join('')
-    || '<tr><td colspan="5" class="mut">No rules match. Add one above or load defaults.</td></tr>';
+    || '<tr><td colspan="6" class="mut">No rules match. Add one above or load defaults.</td></tr>';
+}
+
+// The protection checkboxes. Rendered for EVERY row whatever its status —
+// an Allowed application with File Sharing Block on is the whole point of the
+// feature, and gating these on Blocked would have reintroduced the assumption
+// this work exists to remove.
+//
+// A row already set to Full Block & Close gets none: nothing runs, so there is
+// no activity inside it to restrict, and offering the boxes there would imply
+// the two are alternatives when one contains the other.
+function ruleProtectionCell(r, i) {
+  if (ruleBlocks(r) && r.action === 'CLOSE') {
+    return '<span class="mut" style="font-size:11px">Whole item blocked</span>';
+  }
+
+  const parts = RULE_PROTECTION_GROUPS.map((g) => {
+    // A group's capability is the strongest of its underlying keys - offered if
+    // any key is offered, so "Block all file sharing" shows for an app where at
+    // least files can be guarded even if images alone could not.
+    const caps = g.keys.map((k) => ruleCap(r, k));
+    const cap = caps.find((c) => c.status !== 'UNSUPPORTED') || caps[0];
+    const on = g.keys.some((k) => r.protections && r.protections[k]);
+    const label = g.label + (g.sub ? ' <span class="mut" style="font-weight:400">(' + g.sub + ')</span>' : '');
+
+    // UNSUPPORTED is shown greyed WITH the reason rather than hidden. An admin
+    // who cannot find "camera" concludes the product lacks it; one who sees it
+    // greyed with "UltraViewer does not use the camera" has an answer.
+    if (cap.status === 'UNSUPPORTED') {
+      return '<label class="mut" style="display:block;font-size:11px" title="' + esc(cap.note || 'SmartEPT cannot enforce this here.') + '">'
+        + '<input type="checkbox" disabled> ' + g.label + ' — not available</label>';
+    }
+
+    const flag = cap.status === 'BROWSER_WIDE' ? ' ⚠' : (cap.status === 'UNVERIFIED' ? ' •' : '');
+    const title = (cap.note ? cap.note + ' ' : '')
+      + (cap.status === 'BROWSER_WIDE' ? '(Applies to the whole browser, not just this site.)'
+        : cap.status === 'UNVERIFIED' ? '(Not yet verified on this application — the agent reports honestly if it could not enforce it.)' : '');
+
+    return '<label style="display:block;font-size:11px" title="' + esc(title.trim()) + '">'
+      + '<input type="checkbox" data-rule-prot="' + i + '" data-prot="' + g.key + '"' + (on ? ' checked' : '') + '> '
+      + label + flag + '</label>';
+  }).join('');
+
+  const warn = RULE_PROTECTIONS.some((p) => r.protections && r.protections[p] && ruleCap(r, p).status === 'BROWSER_WIDE')
+    ? '<div style="font-size:10.5px;color:var(--warn,#b54708);margin-top:2px">⚠ Browser-wide, not just this site</div>' : '';
+
+  return parts + warn;
 }
 
 // The per-row action. Allowed/Tracked items have nothing to do when they fire,
@@ -4819,9 +4989,10 @@ function addRule() {
     }
   }
   if (RULES.some((r) => r.item.toLowerCase() === item && r.kind === kind)) { toast('Already in the list'); return; }
-  // New rules start at WARN, never at CLOSE. Nothing this screen creates should
-  // ever start preventing something the moment it is saved.
-  RULES.push({ item, kind, status, action: 'WARN', confirmed: false });
+  // New rules start at WARN, never at CLOSE, and with no protections. Nothing
+  // this screen creates should ever start preventing something the moment it is
+  // saved.
+  RULES.push({ item, kind, status, action: 'WARN', confirmed: false, protections: {} });
   $('#rule-add-item').value = ''; renderRules();
 }
 async function saveRules() {
@@ -4881,17 +5052,47 @@ async function saveRuleActions(type, policy, kind) {
     action: !ruleBlocks(r) ? 'LOG'
       : (r.action === 'CLOSE' ? (kind === 'site' ? 'BLOCK' : 'CLOSE') : r.action),
     confirmed: !!r.confirmed,
+    // Sent for every row, blocked or not. The server stores NULL when nothing
+    // is ticked, so a row with no protections is indistinguishable from one
+    // saved before this column existed.
+    // Only what the screen actually offers. A protection that was saved when
+    // it was offered and is no longer (Outlook file block, since the guard was
+    // withdrawn) would otherwise ride along unchanged and be refused, and the
+    // refusal would block saving every other row too.
+    protections: RULE_PROTECTIONS.reduce((acc, p) => {
+      acc[p] = !!(r.protections && r.protections[p]) && ruleCap(r, p).status !== 'UNSUPPORTED'; return acc;
+    }, {}),
   }));
-  await api('/policies/' + type + '/' + policy.id + '/rules', {
+  const res = await api('/policies/' + type + '/' + policy.id + '/rules', {
     method: 'PUT', body: JSON.stringify({ rules }),
   });
+  if (res && res.warning) toast(res.warning);
 }
 $('#rule-add-btn').onclick = addRule;
 $('#rule-add-item').addEventListener('keydown', (e) => { if (e.key === 'Enter') addRule(); });
 $('#rule-save').onclick = saveRules;
 // Defaults load as WARN, never as Close. The preset is populated but not armed —
 // the admin decides which rows start preventing something.
-$('#rule-seed').onclick = () => { RULE_SEED.forEach((sd) => { if (!RULES.some((r) => r.item.toLowerCase() === sd.item && r.kind === sd.kind)) RULES.push({ item: sd.item, kind: sd.kind, status: sd.status, action: 'WARN', confirmed: false }); }); renderRules(); toast('Loaded common defaults — review, then Save rules'); };
+function loadProfile(name) {
+  const prof = RULE_PROFILES[name];
+  if (!prof) return;
+  prof.rules.forEach((sd) => {
+    const item = String(sd.item).toLowerCase();
+    if (RULES.some((r) => r.item.toLowerCase() === item && r.kind === sd.kind)) return;
+    RULES.push({
+      item, kind: sd.kind, status: sd.status,
+      // A profile may set a real action (Full Block = CLOSE); otherwise WARN,
+      // so nothing a profile adds starts preventing anything the admin has not
+      // looked at - except where the profile explicitly asks for a full block.
+      action: sd.action || 'WARN',
+      confirmed: !!sd.confirmed,
+      protections: sd.protections ? { ...sd.protections } : {},
+    });
+  });
+  renderRules();
+  toast('Loaded the ' + prof.label + ' profile - review every row, then Save rules');
+}
+$('#rule-profile').onchange = (e) => { const v = e.target.value; e.target.value = ''; if (v) loadProfile(v); };
 $('#rule-q').addEventListener('input', renderRules);
 $('#rule-rows').addEventListener('change', (e) => {
   const s = e.target.closest('[data-rule-status]');
@@ -4908,6 +5109,23 @@ $('#rule-rows').addEventListener('change', (e) => {
     // Stepping away from Close drops the confirmation with it — an admin who
     // changes their mind must not leave a stale "I understand" behind.
     if (r.action !== 'CLOSE') r.confirmed = false;
+    // Full Block & Close subsumes every protection. Clearing them is honest
+    // bookkeeping: leaving them ticked but unenforced is how a console ends up
+    // showing a control nothing acts on.
+    else r.protections = {};
+    renderRules();
+    return;
+  }
+  const p = e.target.closest('[data-rule-prot]');
+  if (p) {
+    const r = RULES[+p.dataset.ruleProt];
+    r.protections = r.protections || {};
+    // One screen switch drives its underlying model keys together: "Block all
+    // file sharing" sets both file and image, so an admin cannot leave one of
+    // them on by accident and think everything is covered.
+    const grp = RULE_PROTECTION_GROUPS.find((g) => g.key === p.dataset.prot);
+    (grp ? grp.keys : [p.dataset.prot]).forEach((k) => { r.protections[k] = p.checked; });
+    // Redraw so the browser-wide warning appears and disappears with the tick.
     renderRules();
     return;
   }
@@ -4926,6 +5144,7 @@ $('#rule-action').addEventListener('change', (e) => {
     if (v === 'CLOSE' && r.kind === 'app' && RULE_NEVER_ENFORCE.includes(ruleBase(r.item))) { skipped++; return; }
     r.action = v;
     if (v !== 'CLOSE') r.confirmed = false;
+    else r.protections = {}; // subsumed — see the per-row handler
   });
   e.target.value = '';
   renderRules();
@@ -4950,6 +5169,11 @@ async function initEnforcement() {
   try {
     const res = await api('/enforcement/audit-report');
     ENF = res.data || null;
+    if (ENF) {
+      const u = $('#dev-usb'); if (u) u.checked = !!ENF.block_removable_storage;
+      const c = $('#dev-cam'); if (c) c.checked = !!ENF.block_camera_device;
+      const b = $('#dev-web'); if (b) b.checked = !!ENF.block_browser_uploads;
+    }
     if (!ENF) { body.textContent = 'Unavailable.'; return; }
 
     const mode = ENF.mode || 'OFF';
@@ -5188,6 +5412,22 @@ function wireEnforcement() {
 // Attached once, at load. wireEnforcement() runs on every refresh and #enf-body
 // survives the innerHTML swap, so binding there would stack listeners and make
 // one click fire N requests.
+for (const box of document.querySelectorAll('#dev-card [data-dev]')) box.addEventListener('change', async (e) => {
+  const on = e.target.checked;
+  const what = { block_camera_device: 'Camera', block_browser_uploads: 'Browser uploads' }[e.target.dataset.dev] || 'USB storage';
+  const msg = $('#dev-msg'); msg.style.color=''; msg.textContent = 'Saving\u2026';
+  try {
+    await api('/enforcement/device-control', { method: 'POST', body: JSON.stringify({ [e.target.dataset.dev]: on }) });
+    msg.style.color = 'var(--ok)';
+    msg.textContent = on
+      ? '\u2713 ' + what + ' blocked \u2014 enrolled PCs apply it within ~30s.'
+      : '\u2713 ' + what + ' allowed \u2014 enrolled PCs restore it within ~30s.';
+  } catch (err) {
+    e.target.checked = !on;
+    msg.style.color = 'var(--danger)';
+    msg.textContent = err.message || String(err);
+  }
+});
 $('#enf-body').addEventListener('click', async (e) => {
   const r = e.target.closest('[data-enf-resolve]');
   if (!r) return;
@@ -6712,7 +6952,12 @@ function updProgress(s) {
     + '<p style="margin:6px 0 2px"><b>' + esc(s.message || '') + '</b></p>'
     + (log ? '<div style="background:#f4f8f9;border-radius:10px;padding:10px 12px;margin:12px 0;font-size:12px;'
         + 'font-family:ui-monospace,Consolas,monospace;color:#456;max-height:180px;overflow:auto">' + log + '</div>' : '')
-    + (done ? '<div style="margin-top:14px">' + updBtn('Reload console', 'location.reload()', true) + '</div>'
+    // location.reload() re-uses the browser's cached copy of this page, so the
+    // admin saw the OLD console after a perfectly good update and reported the
+    // update as broken (1-Sep-2026). A fresh query string cannot be served from
+    // cache, so the new version is what loads.
+    + (done ? '<div style="margin-top:14px">'
+        + updBtn('Reload console', 'location.href=location.pathname+\'?v=\'+Date.now()', true) + '</div>'
        : (failed ? '<p class="mut" style="margin:8px 0 14px;font-size:12.5px">Your previous version was restored automatically — '
             + 'nothing was lost. Send this message to SmartEPT support if it keeps happening.</p>'
             + updBtn('Close', 'updClose()')

@@ -128,6 +128,10 @@ class EnforcementController extends Controller
                 'audit_days'       => $state->auditDays(),
                 'audit_minutes'    => $state->auditMinutes(),
                 'min_audit_minutes' => EnforcementState::minAuditMinutes(),
+                // USB / removable-storage block (company-wide device control).
+                'block_removable_storage' => (bool) \App\Models\Company::withoutGlobalScopes()->whereKey($companyId)->value('block_removable_storage'),
+                'block_camera_device'     => (bool) \App\Models\Company::withoutGlobalScopes()->whereKey($companyId)->value('block_camera_device'),
+                'block_browser_uploads'   => (bool) \App\Models\Company::withoutGlobalScopes()->whereKey($companyId)->value('block_browser_uploads'),
                 // THREE different numbers, because they mean three different things and the
                 // console was conflating them (Ejaz, 27-Aug-2026: "one agent had already
                 // logged in to other PC, but the Enforcement section says 0 PCs").
@@ -416,5 +420,32 @@ class EnforcementController extends Controller
         }
 
         return false;
+    }
+
+    /**
+     * Company-wide device control: USB / removable storage and the camera
+     * device. Both are real Windows device-level blocks enforced by the service;
+     * the admin flips a switch and every enrolled PC applies (or releases) it on
+     * its next sync (~30s).
+     */
+    public function deviceControl(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'block_removable_storage' => ['sometimes', 'boolean'],
+            'block_camera_device'     => ['sometimes', 'boolean'],
+            'block_browser_uploads'   => ['sometimes', 'boolean'],
+        ]);
+        if ($data === []) {
+            return response()->json(['error' => 'nothing to change'], 422);
+        }
+        $companyId = (int) $request->user()->company_id;
+
+        \App\Models\Company::withoutGlobalScopes()->whereKey($companyId)->update($data);
+
+        // Move the policy version so enrolled machines re-sync promptly.
+        $state = EnforcementState::forCompany($companyId);
+        $state->forceFill(['policy_version' => (int) ($state->policy_version ?? 0) + 1])->save();
+
+        return response()->json(['ok' => true] + $data);
     }
 }

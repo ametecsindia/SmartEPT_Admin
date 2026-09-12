@@ -20,6 +20,7 @@ class PolicyRule extends Model
 
     protected $casts = [
         'identifiers'  => 'array',
+        'protections'  => 'array',
         'confirmed_at' => 'datetime',
     ];
 
@@ -47,7 +48,47 @@ class PolicyRule extends Model
 
     public const TYPES = ['APPLICATION', 'WEBSITE'];
 
-    /** True when this rule asks for real prevention rather than a warning. */
+    /**
+     * Protections block an ACTIVITY inside an application while the application
+     * itself keeps running. Orthogonal to `action` and to `status` on purpose:
+     * "WhatsApp is allowed, sending files out of it is not" is the requirement,
+     * and it cannot be expressed by any value of `action`, whose meanings only
+     * apply to a blocked row.
+     *
+     * Keys are stored in the `protections` JSON column; an absent key is false.
+     * The list will grow (microphone, clipboard, printing), which is why the
+     * column is JSON and this constant is the single place the set is named.
+     */
+    public const PROTECTIONS = ['file', 'image', 'camera'];
+
+    /** The protections actually switched on, normalised. @return array<int,string> */
+    public function protectionList(): array
+    {
+        $set = (array) ($this->protections ?? []);
+
+        return array_values(array_filter(
+            self::PROTECTIONS,
+            static fn (string $k): bool => ! empty($set[$k])
+        ));
+    }
+
+    public function hasProtection(string $key): bool
+    {
+        return in_array($key, $this->protectionList(), true);
+    }
+
+    public function hasProtections(): bool
+    {
+        return $this->protectionList() !== [];
+    }
+
+    /**
+     * True when this rule asks for the whole application to be prevented.
+     *
+     * The console calls this "Full Block & Close"; the stored value is still
+     * CLOSE (applications) or BLOCK (websites), unchanged, so nothing that
+     * already reads this column had to be touched.
+     */
     public function isEnforcing(): bool
     {
         return in_array(strtoupper((string) $this->action), self::HARD_ACTIONS, true)
@@ -58,6 +99,26 @@ class PolicyRule extends Model
     {
         return $query->whereIn('action', self::HARD_ACTIONS)
                      ->whereIn('status', ['BLOCKED', 'VIOLATION']);
+    }
+
+    /**
+     * Rows that carry at least one protection, whatever their status.
+     *
+     * Deliberately NOT filtered by status: an ALLOWED row with File Sharing
+     * Block on is the central case, and folding this into scopeEnforcing()
+     * would have sent it to the endpoint as something to deny outright —
+     * exactly the "protection == kill the app" mistake this feature exists to
+     * avoid.
+     *
+     * SQL narrows to "has a non-empty protections value" and the caller filters
+     * precisely in PHP. A rule set is at most a couple of thousand rows, and a
+     * portable JSON predicate across MySQL and the SQLite the suite runs on is
+     * not worth the fragility.
+     */
+    public function scopeWithProtections($query)
+    {
+        return $query->whereNotNull('protections')
+                     ->whereNotIn('protections', ['', '[]', '{}', 'null']);
     }
 
     public function scopeOfType($query, string $type)
