@@ -90,7 +90,7 @@ echo.
 REM ===========================================================================
 REM  1. SERVER
 REM ===========================================================================
-echo [1/6] Building the server package ...
+echo [1/7] Building the server package ...
 echo.
 call "%SRC%\deployment\rebuild-server-zip.bat" %VER%
 if errorlevel 1 (
@@ -129,7 +129,7 @@ REM  CONTAINS the service. An agent built from a tree with an empty build\servic
 REM  cleanly, reports activity, and blocks nothing - and its own .nsh says so in a message box
 REM  nobody reads. Better to fail here.
 echo.
-echo [2/6] Checking the policy service inside the agent ...
+echo [2/7] Checking the policy service inside the agent ...
 
 set "SVC_EXE=%SRC_AGENT%\build\service\SmartEPTAgentService.exe"
 if not exist "%SVC_EXE%" (
@@ -147,7 +147,7 @@ REM ===========================================================================
 REM  3. AGENT  -  the one file that goes on an employee PC
 REM ===========================================================================
 echo.
-echo [3/6] Checking the employee agent ...
+echo [3/7] Checking the employee agent ...
 
 set "AGENT_SETUP="
 for %%F in ("%SRC_AGENT%\dist\SmartEPT Agent Setup *.exe") do set "AGENT_SETUP=%%F"
@@ -188,10 +188,36 @@ if "!STALE_AGENT3!"=="1" (
 echo       OK - installer is current and contains the service.
 
 REM ===========================================================================
-REM  4. ASSEMBLE
+REM  4. LIVEVIEW RELAY  -  compiled binary, same staleness risk as the agent above
+REM ===========================================================================
+REM 18-Sep-2026: relay\server.js changed (native TLS/wss:// support) and nothing
+REM here ever checked whether relay\dist\smartept-relay-win.exe was rebuilt to
+REM match it - unlike the agent above, which has had this guard from the start.
+REM Same failure class as the agent comment at the top of this file: a stale
+REM relay installs fine, starts fine, and simply never upgrades to wss:// (or
+REM whatever the next relay fix is), which looks like "it's just not working"
+REM in the field with nothing in this build log to explain why.
+echo.
+echo [4/7] Checking the LiveView relay ...
+if not exist "%SRC%\relay\dist\smartept-relay-win.exe" (
+  echo  [X] No relay\dist\smartept-relay-win.exe - LiveView will not be available to any client.
+  echo      Build it with:  cd /d %SRC%\relay  ^&^&  npm install  ^&^&  npm run build
+  pause & exit /b 1
+)
+call :NEWER_THAN "%SRC%\relay\dist\smartept-relay-win.exe" "%SRC%\relay" "*.js" STALE_RELAY
+if "!STALE_RELAY!"=="1" (
+  echo.
+  echo  [X] STOP. relay source is NEWER than the compiled relay binary.
+  echo      Rebuild with:  cd /d %SRC%\relay  ^&^&  npm run build
+  pause & exit /b 1
+)
+echo       OK - relay binary is current.
+
+REM ===========================================================================
+REM  5. ASSEMBLE
 REM ===========================================================================
 echo.
-echo [4/6] Assembling %PKG% ...
+echo [5/7] Assembling %PKG% ...
 
 REM Two folders, not three. There is no separate enforcer to install any more - the agent
 REM setup IS the whole employee-PC install.
@@ -325,10 +351,10 @@ if defined STALE_DOCS (
 )
 
 REM ===========================================================================
-REM  5. MANIFEST  - what is in the box, and what it is made of
+REM  6. MANIFEST  - what is in the box, and what it is made of
 REM ===========================================================================
 echo.
-echo [5/6] Writing the manifest ...
+echo [6/7] Writing the manifest ...
 
 REM Written by PowerShell, not a cmd loop. A `goto` label inside a
 REM parenthesised for-block does not work in cmd - the first version of this
@@ -348,10 +374,10 @@ if not exist "%PKG%\MANIFEST.txt" (
 )
 
 REM ===========================================================================
-REM  6. DONE
+REM  7. DONE
 REM ===========================================================================
 echo.
-echo [6/6] Done.
+echo [7/7] Done.
 
 REM The bump happens HERE and nowhere earlier: a build that failed must not
 REM consume a version number, or the next package silently skips one.

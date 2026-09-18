@@ -151,6 +151,49 @@ if not exist "relay\dist\smartept-relay-win.exe" (
     REM 15-Sep-2026).
     >relay\dist\relay-secret.txt echo %%b
   )
+
+  echo.
+  echo    HTTPS for LiveView ^(optional - needed only if this site's admin
+  echo    console is opened over https://^) ...
+  REM 18-Sep-2026: browsers refuse an insecure ws:// socket from an https:// page -
+  REM found on a real client install. Rather than every client hand-editing a
+  REM reverse-proxy config, the relay speaks TLS itself when told which certificate
+  REM to use - asked ONCE, here, same as the admin email/company questions in step
+  REM [7/9] above. Blank = skip = plain ws:// (today's behaviour, no change, nothing
+  REM breaks). This whole step runs inside the "else" block opened above, which is
+  REM parsed as one unit before any of it executes - so, same as RELAY_PORT further
+  REM down, every variable set AND read in here must use !VAR!, not %VAR%.
+  if exist "relay\relay-tls-cert-path.txt" (
+    echo    Already configured - press Enter on both lines below to keep it, or
+    echo    paste new paths to replace it.
+  )
+  set "RELAY_TLS_CERT="
+  set /p RELAY_TLS_CERT="   Certificate file for this site's HTTPS (blank = skip, use ws://): "
+  if not "!RELAY_TLS_CERT!"=="" (
+    if exist "!RELAY_TLS_CERT!" (
+      set "RELAY_TLS_KEY="
+      set /p RELAY_TLS_KEY="   Matching private key file: "
+      if exist "!RELAY_TLS_KEY!" (
+        >relay\relay-tls-cert-path.txt echo !RELAY_TLS_CERT!
+        >relay\dist\relay-tls-cert-path.txt echo !RELAY_TLS_CERT!
+        >relay\relay-tls-key-path.txt echo !RELAY_TLS_KEY!
+        >relay\dist\relay-tls-key-path.txt echo !RELAY_TLS_KEY!
+        echo    [ok] LiveView will use wss:// - same certificate as the main site.
+      ) else (
+        echo    [WARN] Key file not found - LiveView will use ws:// for now.
+      )
+    ) else (
+      echo    [WARN] Certificate file not found - LiveView will use ws:// for now.
+    )
+  ) else (
+    if exist "relay\relay-tls-cert-path.txt" (
+      echo    [ok] Keeping the existing certificate - still wss://.
+    ) else (
+      echo    [ok] Skipped - LiveView uses ws:// ^(fine for http:// / LAN-only sites^).
+    )
+  )
+  echo.
+
   REM Always remove any previous registration then recreate — an install from
   REM before 15-Sep-2026 may have the old node-windows daemon, or the
   REM short-lived sc.exe SERVICE attempt, registered under this same name.

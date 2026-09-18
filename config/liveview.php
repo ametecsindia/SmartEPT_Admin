@@ -23,8 +23,14 @@
 // host the caller already proved they can reach. LIVEVIEW_RELAY_URL below is
 // now only an explicit override (e.g. a custom domain in production where the
 // relay sits behind its own reverse proxy) — leave it unset for normal LAN use.
-// Still ws:// (not wss://) unconditionally — the relay binary itself has no TLS
-// support yet; that's a separate, bigger piece of work.
+//
+// 18-Sep-2026: relayUrl() now emits wss:// automatically whenever the calling
+// request itself came in over HTTPS (browsers refuse plain ws:// from an https://
+// page). The relay binary gained native TLS support the same day — point
+// RELAY_TLS_CERT/RELAY_TLS_KEY (relay/.env, NOT this file) at the site's own
+// existing certificate and it serves wss:// with zero per-client proxy config.
+// No cert configured on the relay → it still serves plain ws:// (LAN-only /
+// http-only installs keep working exactly as before).
 return [
     'relay_secret' => env('LIVEVIEW_RELAY_SECRET', config('app.key')),
     'relay_url'    => env('LIVEVIEW_RELAY_URL'),

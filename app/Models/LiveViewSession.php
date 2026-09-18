@@ -89,9 +89,22 @@ class LiveViewSession extends Model
      * above) and the admin browser's view leg (LiveViewController::start()) now use.
      * LIVEVIEW_RELAY_URL stays as an explicit override for setups where that isn't
      * true (e.g. the relay sits behind its own reverse-proxy domain in production).
+     *
+     * 18-Sep-2026: also matches the CALLER's own scheme (wss:// when this request
+     * came in over HTTPS) — a browser refuses an insecure ws:// socket from an
+     * https:// page, and this hit every HTTPS client install, not one config. No
+     * per-client relay_url override needed: the relay itself now speaks wss:// once
+     * RELAY_TLS_CERT/RELAY_TLS_KEY point it at the site's own certificate (see
+     * relay/.env.example) — this just tells each caller which scheme to expect,
+     * consistently for both the admin browser's view leg and the Agent's stream leg.
      */
     public static function relayUrl(): string
     {
-        return config('liveview.relay_url') ?: 'ws://' . request()->getHost() . ':' . config('liveview.relay_port');
+        if ($override = config('liveview.relay_url')) {
+            return $override;
+        }
+        $scheme = request()->isSecure() ? 'wss' : 'ws';
+
+        return $scheme . '://' . request()->getHost() . ':' . config('liveview.relay_port');
     }
 }

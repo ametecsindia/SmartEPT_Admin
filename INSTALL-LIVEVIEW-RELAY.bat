@@ -66,7 +66,7 @@ if not exist ".env" (
   exit /b 1
 )
 
-echo [1/3] Reading APP_KEY from .env...
+echo [1/4] Reading APP_KEY from .env...
 for /f "tokens=1,* delims==" %%a in ('findstr /b "APP_KEY=" .env') do (
   >relay\relay-secret.txt echo %%b
   >relay\dist\relay-secret.txt echo %%b
@@ -77,7 +77,45 @@ set "RELAY_PORT=8098"
 for /f "tokens=1,* delims==" %%a in ('findstr /b "RELAY_PORT=" .env') do set "RELAY_PORT=%%b"
 
 echo.
-echo [2/3] Registering the startup task...
+echo [2/4] HTTPS for LiveView (optional — needed only if this site's admin
+echo        console is opened over https://) ...
+REM 18-Sep-2026: browsers refuse an insecure ws:// socket from an https:// page.
+REM Rather than every client hand-editing a reverse-proxy config, the relay
+REM speaks TLS itself when told which certificate to use — asked ONCE, here,
+REM same as the admin email/company questions elsewhere in this installer.
+REM Blank = skip = plain ws:// (today's behaviour, no change, nothing breaks).
+if exist "relay\relay-tls-cert-path.txt" (
+  echo    Already configured — press Enter on both lines below to keep it, or
+  echo    paste new paths to replace it.
+)
+set "RELAY_TLS_CERT="
+set /p RELAY_TLS_CERT="   Certificate file for this site's HTTPS (blank = skip, use ws://): "
+if not "%RELAY_TLS_CERT%"=="" (
+  if exist "%RELAY_TLS_CERT%" (
+    set "RELAY_TLS_KEY="
+    set /p RELAY_TLS_KEY="   Matching private key file: "
+    if exist "!RELAY_TLS_KEY!" (
+      >relay\relay-tls-cert-path.txt echo %RELAY_TLS_CERT%
+      >relay\dist\relay-tls-cert-path.txt echo %RELAY_TLS_CERT%
+      >relay\relay-tls-key-path.txt echo !RELAY_TLS_KEY!
+      >relay\dist\relay-tls-key-path.txt echo !RELAY_TLS_KEY!
+      echo    [ok] LiveView will use wss:// — same certificate as the main site.
+    ) else (
+      echo    [WARN] Key file not found — LiveView will use ws:// for now.
+    )
+  ) else (
+    echo    [WARN] Certificate file not found — LiveView will use ws:// for now.
+  )
+) else (
+  if exist "relay\relay-tls-cert-path.txt" (
+    echo    [ok] Keeping the existing certificate — still wss://.
+  ) else (
+    echo    [ok] Skipped — LiveView uses ws:// ^(fine for http:// / LAN-only sites^).
+  )
+)
+
+echo.
+echo [3/4] Registering the startup task...
 REM Clean up any previous registration before recreating — including a leftover
 REM sc.exe SERVICE from before 15-Sep-2026's fix (harmless if none exists).
 taskkill /F /IM smartept-relay-win.exe >nul 2>nul
@@ -100,7 +138,7 @@ netsh advfirewall firewall add rule name="SmartEPT LiveView Relay" dir=in action
 echo    [ok] Firewall opened for port %RELAY_PORT% - other PCs on the network can now reach it.
 
 echo.
-echo [3/3] Starting it now...
+echo [4/4] Starting it now...
 schtasks /Run /TN "SmartEPT LiveView Relay"
 if not "%errorlevel%"=="0" (
   echo    [WARN] Task registered but did not start - check the Windows Event Log,

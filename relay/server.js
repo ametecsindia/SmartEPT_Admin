@@ -36,6 +36,18 @@ function loadSecret() {
   try { return fs.readFileSync(path.join(APP_DIR, 'relay-secret.txt'), 'utf8').split('\n')[0].trim(); } catch { return ''; }
 }
 
+// 18-Sep-2026: same fallback-file pattern as loadSecret() above, for the TLS cert/key
+// FILE PATHS — the installers (INSTALL.bat / install-linux.sh / install-macos.sh) write
+// these once, from a prompt, so nobody ever hand-edits a config file on a client machine.
+// Blank/missing → null → plain ws:// (unchanged default, no regression).
+function loadTlsPath(envVar, fallbackFile) {
+  if (process.env[envVar]) return process.env[envVar];
+  try {
+    const v = fs.readFileSync(path.join(APP_DIR, fallbackFile), 'utf8').split('\n')[0].trim();
+    return v || null;
+  } catch { return null; }
+}
+
 const SECRET = loadSecret();
 const PORT = parseInt(process.env.RELAY_PORT || '8098', 10);
 
@@ -78,7 +90,29 @@ function dropIfEmpty(sid) {
 }
 
 const wss = new WebSocketServer({ noServer: true });
-const server = require('http').createServer((req, res) => { res.writeHead(404); res.end(); });
+
+// TLS (18-Sep-2026): the admin console is commonly served over HTTPS, and browsers
+// refuse an insecure ws:// socket from an https:// page — every client install hit
+// this, not just one. Rather than each client hand-configuring a reverse proxy,
+// the relay speaks TLS itself when pointed at the SAME certificate files the site's
+// own web server already uses for that domain (RELAY_TLS_CERT/RELAY_TLS_KEY —
+// e.g. the nginx/Apache/Laragon vhost's existing fullchain.pem/privkey.pem). Same
+// hostname, different port — the browser trusts it exactly like the main site,
+// no separate cert to buy or provision. No paths set (LAN-only / http installs) →
+// falls back to the original plain http server, unchanged.
+const certPath = loadTlsPath('RELAY_TLS_CERT', 'relay-tls-cert-path.txt');
+const keyPath = loadTlsPath('RELAY_TLS_KEY', 'relay-tls-key-path.txt');
+let httpsOpts = null;
+if (certPath && keyPath) {
+  try {
+    httpsOpts = { cert: fs.readFileSync(certPath), key: fs.readFileSync(keyPath) };
+  } catch (e) {
+    console.error(`[smartept-relay] RELAY_TLS_CERT/RELAY_TLS_KEY set but unreadable (${e.message}) — falling back to ws://.`);
+  }
+}
+const server = httpsOpts
+  ? require('https').createServer(httpsOpts, (req, res) => { res.writeHead(404); res.end(); })
+  : require('http').createServer((req, res) => { res.writeHead(404); res.end(); });
 
 server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url, 'http://relay');
@@ -154,6 +188,6 @@ server.on('error', (e) => {
   process.exit(1);
 });
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[smartept-relay] listening on ${PORT}`);
-  writeStatus({ event: 'listening', port: PORT, address: server.address() });
+  console.log(`[smartept-relay] listening on ${PORT} (${httpsOpts ? 'wss' : 'ws'})`);
+  writeStatus({ event: 'listening', port: PORT, address: server.address(), tls: !!httpsOpts });
 });

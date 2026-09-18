@@ -109,6 +109,37 @@ fi
 if [ -f relay/dist/smartept-relay-linux ]; then
   chmod +x relay/dist/smartept-relay-linux
   grep '^APP_KEY=' .env | cut -d= -f2- > relay/relay-secret.txt
+
+  # HTTPS for LiveView (optional - only needed if this site's admin console is
+  # opened over https://). 18-Sep-2026: browsers refuse an insecure ws:// socket
+  # from an https:// page. Rather than every client hand-editing a reverse-proxy
+  # config, the relay speaks TLS itself when told which certificate to use -
+  # asked ONCE, here. Blank = skip = plain ws:// (today's behaviour, unchanged).
+  echo
+  echo "HTTPS for LiveView (optional - blank skips it, relay stays on ws://):"
+  if [ -f relay/relay-tls-cert-path.txt ]; then
+    echo "  Already configured - press Enter on both lines below to keep it."
+  fi
+  read -r -p "  Certificate file for this site's HTTPS (blank = skip): " RELAY_TLS_CERT
+  if [ -n "$RELAY_TLS_CERT" ] && [ -f "$RELAY_TLS_CERT" ]; then
+    read -r -p "  Matching private key file: " RELAY_TLS_KEY
+    if [ -n "$RELAY_TLS_KEY" ] && [ -f "$RELAY_TLS_KEY" ]; then
+      echo "$RELAY_TLS_CERT" > relay/relay-tls-cert-path.txt
+      echo "$RELAY_TLS_CERT" > relay/dist/relay-tls-cert-path.txt
+      echo "$RELAY_TLS_KEY" > relay/relay-tls-key-path.txt
+      echo "$RELAY_TLS_KEY" > relay/dist/relay-tls-key-path.txt
+      echo "[ok] LiveView will use wss:// - same certificate as the main site."
+    else
+      echo "[WARN] Key file not found - LiveView will use ws:// for now."
+    fi
+  elif [ -n "$RELAY_TLS_CERT" ]; then
+    echo "[WARN] Certificate file not found - LiveView will use ws:// for now."
+  elif [ -f relay/relay-tls-cert-path.txt ]; then
+    echo "[ok] Keeping the existing certificate - still wss://."
+  else
+    echo "[ok] Skipped - LiveView uses ws:// (fine for http:// / LAN-only sites)."
+  fi
+
   if [ "$(id -u)" = "0" ] && command -v systemctl >/dev/null 2>&1; then
     cat > /etc/systemd/system/smartept-relay.service <<UNIT
 [Unit]
