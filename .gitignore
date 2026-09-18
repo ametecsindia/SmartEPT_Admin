@@ -1,4 +1,5 @@
 # Laravel / PHP
+
 /.phpunit.cache
 /node_modules
 /public/build
@@ -9,12 +10,14 @@
 /vendor
 
 # Environment / local configuration
+
 .env
 .env.backup
 .env.production
 /auth.json
 
 # IDE / editor
+
 .phpactor.json
 .phpunit.result.cache
 Homestead.json
@@ -28,18 +31,30 @@ yarn-error.log
 /.zed
 
 # Scratch / FUSE mount artifacts (Cowork device bridge)
+
 _to_delete/
 .fuse_hidden*
 /individual
 
 # Developer licence toggle
+
 # Machine-bound, never committed, never shipped
+
 /licence-off.key
 
 # Local licence
+
 # Machine-bound, never committed, never shipped
+
 /license.lic
 
+# Local development / generated output
+
+/Claude outputs/
+/relay/
+
 # Local Windows shortcuts
+
 # Uncomment if .lnk files are only developer-local
+
 # *.lnk
