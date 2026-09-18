@@ -299,6 +299,36 @@
     font-size:9.5px;font-weight:800;letter-spacing:.6px;text-align:center;padding:4px}
   @keyframes evpulse{0%,100%{box-shadow:var(--shadow-1)}50%{box-shadow:0 0 0 8px rgba(183,121,31,.22)}}
 
+  /* ---------- LiveView tiles (Phase 4, 14-Sep-2026; multi-screen + fullscreen + per-tile desktop switch 14-Sep-2026) ---------- */
+  .lv-tile{padding:0;overflow:hidden}
+  .lv-tile .lv-tile-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--hairline)}
+  .lv-tile .lv-tile-head-left{display:flex;align-items:center;gap:6px;min-width:0;flex:1}
+  .lv-tile .lv-tile-name{font-weight:700;font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    flex:1 1 auto;min-width:30px}
+  .lv-tile .lv-tile-id{font-weight:600;color:var(--ink-3);font-size:11px}
+  .lv-tile .lv-tile-desktop-sel{font-weight:600;color:var(--ink-2);font-size:11.5px;border:1px solid var(--border);border-radius:6px;
+    padding:2px 6px;background:var(--card-2);flex:0 0 auto;max-width:112px}
+  .lv-tile .lv-tile-actions{display:flex;gap:6px;flex-shrink:0;align-items:center}
+  .lv-tile .lv-tile-actions button.btn{font-size:11.5px;padding:4px 9px}
+  .lv-tile .lv-fs-btn{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;padding:0}
+  .lv-tile .lv-tile-actions .x{background:var(--danger-w);border:1px solid var(--danger);color:var(--danger);font-size:12px;cursor:pointer;
+    font-family:inherit;width:26px;height:26px;border-radius:8px;transition:background .12s,color .12s;flex-shrink:0}
+  .lv-tile .lv-tile-actions .x:hover{background:var(--danger);color:#fff}
+  .lv-tile .lv-tile-body{position:relative;aspect-ratio:16/9;background:#0B1418;display:flex;align-items:center;justify-content:center}
+  .lv-tile canvas{width:100%;height:100%;object-fit:contain;display:none}
+  .lv-tile .lv-tile-status{position:absolute;inset:auto 10px 10px 10px;font-size:11px;color:#C9D4D8;
+    background:rgba(5,20,24,.55);border-radius:6px;padding:4px 8px;backdrop-filter:blur(2px)}
+  .lv-tile .lv-live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:5px;animation:lvpulse 1.4s ease infinite}
+  @keyframes lvpulse{0%,100%{opacity:1}50%{opacity:.35}}
+  /* Fullscreen the whole tile, not just the canvas, so the employee name, the Desktop N
+     switcher and the Stop (X) button stay visible and usable while zoomed in. */
+  .lv-tile:fullscreen{display:flex;flex-direction:column;background:#000;border-radius:0}
+  .lv-tile:fullscreen .lv-tile-head{background:#0B1418;border-bottom-color:#1C2B30}
+  .lv-tile:fullscreen .lv-tile-name{color:#fff}
+  .lv-tile:fullscreen .lv-tile-id{color:#9FB0B6}
+  .lv-tile:fullscreen .lv-tile-desktop-sel{background:#0B1418;color:#C9D4D8;border-color:#1C2B30}
+  .lv-tile:fullscreen .lv-tile-body{flex:1;aspect-ratio:auto}
+
   /* ---------- Overlays / modals ---------- */
   .ovl{position:fixed;inset:0;background:rgba(5,42,51,.55);backdrop-filter:blur(3px);display:none;align-items:center;
     justify-content:center;z-index:80;padding:20px}
@@ -426,6 +456,8 @@
     <div class="nav" data-view="meetings"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v3M16 3v3M8 13h3M8 16.5h6"/></svg></span> Meetings</div>
     <div class="nav" data-view="users"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.4" r="3.6"/><path d="M4.8 20.4a7.2 7.2 0 0 1 14.4 0"/></svg></span> Users</div>
     <div class="nav" data-view="devices"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="12.5" rx="2"/><path d="M8.5 21h7M12 17v4"/></svg></span> Devices</div>
+    <!-- LiveView Phase 4 (14-Sep-2026): gated by liveview.view via applyPermissionNav's NAVP map -->
+    <div class="nav" data-view="liveview"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4.5" width="19" height="13" rx="2"/><path d="M8 21h8M12 17.5V21"/><circle cx="12" cy="11" r="3"/></svg></span> LiveView</div>
     <div class="nav" data-view="policies"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.5 3v5.2c0 4.8-3.2 8.2-7.5 9.8-4.3-1.6-7.5-5-7.5-9.8V6z"/><path d="M9 11.8l2.1 2.1 3.9-4.2"/></svg></span> Policies</div>
     <div class="nav" data-view="rules"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h11M4 18h7"/><circle cx="18.5" cy="16.5" r="3"/><path d="M20.6 18.6 23 21"/></svg></span> App &amp; Web Rules</div>
     <div class="nav" data-view="biometric"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8A9 9 0 0 1 21 12c0 2.6-.4 5-1.2 7"/><path d="M3.6 8.4A9 9 0 0 0 3 12c0 2.8.6 5.2 1.6 7.2"/><path d="M12 8.4a3.6 3.6 0 0 1 3.6 3.6c0 2.3-.3 4.5-1 6.6"/><path d="M8.4 12a3.6 3.6 0 0 1 .4-1.7M8.6 15.6c.3 1.5.2 3-.2 4.6"/><path d="M12 12v2.4c0 1.7-.2 3.4-.7 5"/></svg></span> Biometric</div>
@@ -717,6 +749,34 @@
       </div>
     </div>
 
+    <!-- 6b. LIVEVIEW (Phase 4, 14-Sep-2026) — ported from the Phase 3 POC (liveview-poc.blade.php),
+         swapped onto the console's own api()/can() instead of the POC's standalone login/fetch.
+         Multi-screen (14-Sep-2026): Start adds a tile to the grid instead of replacing a single
+         viewer, up to the licence's liveview_max_concurrent (server is still the real gate — this
+         is just matching UX to what the licence already enforces). -->
+    <div class="view" id="v-liveview">
+      <div class="card">
+        <h3>Watch employees' screens <span class="hint">live, only while this panel is open — nothing is recorded</span></h3>
+        <div class="filters" style="margin:0 0 10px">
+          <label>Employee</label><select id="lv-employee" style="min-width:220px"></select>
+          <label>Monitor</label><select id="lv-monitor" style="min-width:0"><option value="0">Desktop 1</option></select>
+          <label>Quality</label>
+          <select id="lv-quality" style="min-width:0">
+            <option value="data_saver">Data Saver (480p)</option>
+            <option value="low" selected>Low (720p)</option>
+            <option value="high" id="lv-quality-high">High (1080p)</option>
+          </select>
+          <button class="btn solid" id="lv-start">Start</button>
+          <button class="btn" id="lv-start-all" title="Start every desktop this employee has, in one grid">&#9638; All Screens</button>
+          <button class="btn" id="lv-show-all" title="Show All — open every live screen in its own CCTV-style window" style="margin-left:auto">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>Show All
+          </button>
+        </div>
+        <div class="mut" id="lv-status" style="margin-bottom:0"></div>
+      </div>
+      <div id="lv-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px;margin-top:14px"></div>
+    </div>
+
     <!-- 7. POLICIES -->
     <div class="view" id="v-policies">
       <div class="filters">
@@ -798,7 +858,7 @@
         <h3>Apps &amp; Websites Rules <span class="hint">what the agent tracks, allows, blocks or flags as a violation &middot; applies company-wide</span>
           <input id="rule-q" placeholder="Search item" autocomplete="off" style="width:170px;font-weight:400;font-size:12px;margin-left:auto">
         </h3>
-        <div style="overflow-x:auto"><table><thead><tr><th>Item</th><th>Type</th><th>Status</th><th>What happens</th><th>Protections</th><th></th></tr></thead><tbody id="rule-rows"></tbody></table></div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Item</th><th>Type</th><th>Status</th><th>What happens</th><th id="rule-th-prot">Protections</th><th></th></tr></thead><tbody id="rule-rows"></tbody></table></div>
         <div class="mut" style="margin-top:10px;font-size:11.5px"><b>Allowed</b> = whitelisted/productive &middot; <b>Tracked</b> = monitored only &middot; <b>Blocked</b> = employee warned + logged as a violation &middot; <b>Violation</b> = blocked and flagged for review. Agents pick up changes on their next heartbeat (~30s).</div>
         <div class="mut" style="margin-top:6px;font-size:11.5px"><b>What happens</b> is per row \u2014 you can warn about one app and fully block another. Warn, screenshot and notify take effect immediately. <b>Full Block &amp; Close</b> only ever prevents anything once enforcement is switched on below.</div>
         <div class="mut" style="margin-top:6px;font-size:11.5px"><b>Protections</b> keep the app or site working and stop one activity inside it \u2014 tick <b>Block all file sharing</b> and an employee can still chat and call on WhatsApp but cannot send a file out of it by any method: the attach button, copy-paste, or drag-and-drop are all stopped. They are independent of Status, so an <b>Allowed</b> app can still have protections. A row set to Full Block &amp; Close needs none: nothing runs. A protection SmartEPT cannot enforce on that item is greyed out with the reason, and the agent reports honestly when it could not enforce one.</div>
@@ -827,6 +887,9 @@
         </label>
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-top:6px" title="Chrome, Edge and Brave lose their file picker by Windows policy (Save As stops too). Firefox has no such policy, so there the agent closes the picker as it opens. In every browser the agent also cancels drag-and-drop and clears copied files/images while the browser is in front.">
           <input type="checkbox" id="dev-web" data-dev="block_browser_uploads"> <b>Block browser uploads</b> company-wide (every website, every browser)
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-top:6px" title="Prevents video/reel playback in Chrome, Edge, Brave, Vivaldi and Opera on every enrolled PC, on ANY site — the app or site itself keeps opening. Sites marked Allowed on the Rules screen are exempt (the same list that exempts the camera). Requires the SmartEPT Media Control browser extension to be published and force-installed — the switch saves either way, but has nothing to enforce until that is done. Firefox is not covered yet.">
+          <input type="checkbox" id="dev-media" data-dev="block_media_streaming"> <b>Block media streaming</b> company-wide (video/reels, any site, Chrome/Edge/Brave family) <span class="tag t-warn" style="margin-left:6px">Experimental</span>
         </label>
         <div class="mut" id="dev-msg" style="margin-top:8px;font-size:12px"></div>
       </div>
@@ -1140,7 +1203,7 @@
           <button class="btn solid" id="lic-save">Save &amp; validate</button>
           <button class="btn" id="lic-check">Validate now</button>
         </div>
-        <div class="mut" id="lic-msg">Paste the key from your SmartEPT order email or the client portal (Billing &amp; Licences). Without a key the server runs a 7-day free evaluation, then monitoring stops until a key is entered.</div>
+        <div class="mut" id="lic-msg">Paste the key from your SmartEPT order email or the <a href="https://smartept.com/client" target="_blank" rel="noopener">client portal</a> (Billing &amp; Licences). Without a key the server runs a 7-day free evaluation, then monitoring stops until a key is entered.</div>
       </div>
       <div class="card"><h3>Offline licence file <span class="hint">no internet needed — a signed file locked to this PC</span></h3>
         <p class="mut" style="margin-bottom:10px">Send this machine's fingerprint to Ametecs. They return a <code>license.lic</code> file locked to this PC — import it below to activate. Works fully offline (no SMARTEPT_LICENSE_URL, no SSL).</p>
@@ -1452,7 +1515,7 @@
               <p><b>What you see:</b> Monitoring or screenshot storage is paused, or a banner says the evaluation has ended.</p>
               <p><b>Likely cause:</b> The licence key hasn’t been entered or validated, so recording is held until it is.</p>
               <p><b>How to check:</b> Run <b>System Health</b> — the “Evidence recording” row will be amber and say storage is paused.</p>
-              <p><b>How to fix:</b> Open <b>Licence</b> in the menu, enter your key and press validate. Recording resumes immediately. Get a key from the client portal or WhatsApp <b>90000 98877</b>.</p>
+              <p><b>How to fix:</b> Open <b>Licence</b> in the menu, enter your key and press validate. Recording resumes immediately. Get a key from the <a href="https://smartept.com/client" target="_blank" rel="noopener">client portal</a> or WhatsApp <b>90000 98877</b>.</p>
               <p class="kb-esc"><b>When to call Ametecs:</b> If your key won’t validate, contact WhatsApp <b>90000 98877</b>.</p>
             </div>
           </details>
@@ -1844,6 +1907,15 @@
           <div class="mut" style="font-size:11px;margin-top:5px"><b>Nothing is blocked for anybody</b> until enforcement is switched on for the whole company in App &amp; Web Rules. This setting only decides who is inside that when it is — as do the same settings on the shift, team, department and branch. Most specific wins: this person’s own setting beats their shift, which beats their team, then department, then branch, then the company.</div>
           <div class="mut" style="font-size:11px;margin-top:5px;color:var(--warn)"><b>Websites are machine-wide.</b> Blocked sites are refused on the PC itself, so on a <i>shared</i> PC an exempt person still cannot reach them. Apps are per person and work as you expect.</div>
         </div>
+        <div class="full"><label>Media streaming block <span style="font-weight:400;color:var(--ink-3)">— video/reel playback for this person specifically, in Chrome and Edge</span></label>
+          <select id="f-media-block">
+            <option value="">Inherit (from the company's "Block media streaming" switch in Device Control)</option>
+            <option value="BLOCKED">Block ON — video/media playback fails on this person's PC, even if the company switch is off</option>
+            <option value="ALLOWED">Block OFF — this person can play video, even if the company switch is on</option>
+          </select>
+          <div class="mut" style="font-size:11px;margin-top:5px">The site or app itself still opens — YouTube, Instagram etc. stay reachable; only playback is targeted. Applies while THIS person is signed in on a PC, the same way Enforcement above follows the person rather than the machine.</div>
+          <div class="mut" style="font-size:11px;margin-top:5px;color:var(--warn)"><b>Chrome and Edge only, video traffic only.</b> Desktop apps that don't route through a browser (Discord, a standalone Spotify, etc.) are not reached by this. It works by decrypting the browser's own HTTPS traffic on that PC with a certificate SmartEPT installs — the same technique commercial content filters use — and dropping responses that look like video by content type, not by site, so it is not limited to a fixed domain list. It is a heuristic: an occasional page may be misjudged either way.</div>
+        </div>
         <div class="full"><label>Gate-to-PC exclusion <span style="font-weight:400;color:var(--ink-3)">— whether this person must punch in at the door before their PC starts working</span></label>
           <select id="f-gate">
             <option value="">Inherit (from team / department / branch)</option>
@@ -2105,6 +2177,10 @@ function licenceWall(err) {
   if (LIC_WALL_UP) return;
   LIC_WALL_UP = true;
   const canFix = !!(err && err.admin_can_fix);
+  // Same portal the on-prem client's own console points at (per-install Central
+  // via EnsureLicensed's central_url), so this works for a self-hosted/white
+  // labelled Central too, not just the default.
+  const portal = (err && err.central_url) || 'https://smartept.com';
   const el = document.createElement('div');
   el.id = 'lic-wall';
   el.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(10,32,40,.94);display:flex;align-items:center;justify-content:center;padding:24px';
@@ -2114,9 +2190,10 @@ function licenceWall(err) {
     <p style="margin:0 0 18px;line-height:1.55;color:#334">${esc((err && err.message) || 'This SmartEPT licence is no longer active.')}</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       ${canFix ? '<button class="btn solid" id="lic-wall-go">Open the Licence screen</button>' : ''}
+      <a class="btn" href="${portal}/client" target="_blank" rel="noopener">Buy / renew / raise a ticket</a>
       <button class="btn" id="lic-wall-out">Sign out</button>
     </div>
-    <p style="margin:16px 0 0;font-size:12px;color:#6B7B90">Need a key or a renewal? Contact Ametecs on WhatsApp 90000 98877 or your client portal.</p>
+    <p style="margin:16px 0 0;font-size:12px;color:#6B7B90">Need a key or a renewal? Contact Ametecs on WhatsApp 90000 98877 or the <a href="${portal}/client" target="_blank" rel="noopener">client portal</a>.</p>
   </div>`;
   document.body.appendChild(el);
   const go = el.querySelector('#lic-wall-go');
@@ -2163,6 +2240,7 @@ function enterApp() {
   if (!window.__mtgJoinPoll) { window.__mtgJoinPoll = setInterval(pollJoinable, 45000); setTimeout(pollJoinable, 4000); }
   applyAttendanceMode();
   applyPermissionNav();
+  applyPlanNav();
   applyEmployeeChrome();
   applyCardAccess();
   // HOST section (Tenants) — the operator's cross-tenant view, Super Admin only.
@@ -2343,6 +2421,25 @@ function can(perm) {
   if (ME.role === 'SUPER_ADMIN' || ME.role === 'COMPANY_ADMIN') return true;
   return (ME.permissions || []).includes(perm);
 }
+// 18-Sep-2026 (Standard/Enforcer/Commander): a licence gate, not an RBAC one —
+// unlike applyPermissionNav below, this runs for every role INCLUDING admins.
+// ME.plan_tier is null on a licence issued before this feature existed; treat
+// that as "don't restrict" so no pre-existing install loses anything.
+function hasPlanFeature(key) {
+  return !ME || !ME.plan_tier || !!(ME.plan_features && ME.plan_features[key]);
+}
+function applyPlanNav() {
+  const nav = document.querySelector('.nav[data-view="liveview"]');
+  if (nav) nav.style.display = hasPlanFeature('live_view') ? '' : 'none';
+}
+// 18-Sep-2026: ME (and its plan_tier/plan_features) is only set at login — a
+// plan change in Central updates the licence row, but an already-open Admin
+// session never re-reads it. Whenever a licence check/import refreshes the
+// server-side bundle, re-fetch ME too so nav gating (LiveView) reflects the
+// new plan immediately instead of needing a logout/login.
+async function refreshMe() {
+  try { const r = await api('/auth/me'); ME = r.user; applyPlanNav(); } catch (e) { /* keep the stale ME rather than break the page */ }
+}
 // R4 item 5: the role's permission matrix decides which modules appear.
 function applyPermissionNav() {
   if (!ME || !ME.role) return;
@@ -2362,6 +2459,8 @@ function applyPermissionNav() {
     policies: 'policy.view', ops: 'audit.view',
     // QA Phase 4 (B5): the Meetings screen is gated on meeting.view.
     meetings: 'meeting.view',
+    // LiveView Phase 4 (14-Sep-2026): same pattern as meetings above.
+    liveview: 'liveview.view',
   };
   Object.entries(NAVP).forEach(([view, perm]) => {
     const el = document.querySelector('.nav[data-view="' + view + '"]');
@@ -2482,6 +2581,7 @@ const TITLES = {
   meetings: ['Meetings', 'Schedule meetings & track participation'],
   users: ['Users', 'Login accounts, roles & credentials'],
   devices: ['Devices', 'Registered endpoints & agent health'],
+  liveview: ['LiveView', 'Watch an employee\'s screen, live'],
   policies: ['Policies', 'The control room — what is tracked, for whom'],
   rules: ['App & Web Rules', 'Track, allow, block or flag apps & websites — company-wide'],
   biometric: ['Biometric', 'Cloud punch sync, mapping & reconciliation'],
@@ -2517,6 +2617,7 @@ function show(v) {
   if (v === 'meetings') initMeetings();
   if (v === 'users') loadUsers();
   if (v === 'devices') loadDevices();
+  if (v === 'liveview') initLiveView();
   if (v === 'policies') initPolicies();
   if (v === 'rules') { initRules(); initEnforcement(); }
   if (v === 'biometric') initBiometric();
@@ -3600,6 +3701,7 @@ async function openEmpModal(id) {
       set('#f-enf-from', e.enforcement_exempt_from ? String(e.enforcement_exempt_from).slice(0, 10) : '');
       set('#f-enf-until', e.enforcement_exempt_until ? String(e.enforcement_exempt_until).slice(0, 10) : '');
       set('#f-enf-reason', e.enforcement_exempt_reason || '');
+      set('#f-media-block', e.media_block_mode || '');
       set('#f-gate', e.gate_mode || '');
       set('#f-gate-from', e.gate_mode_from ? String(e.gate_mode_from).slice(0, 10) : '');
       set('#f-gate-until', e.gate_mode_until ? String(e.gate_mode_until).slice(0, 10) : '');
@@ -4323,6 +4425,7 @@ $('#emp-m-save').onclick = async () => {
     enforcement_exempt_from: $('#f-enf-from').value || null,
     enforcement_exempt_until: $('#f-enf-until').value || null,
     enforcement_exempt_reason: $('#f-enf-reason').value.trim() || null,
+    media_block_mode: $('#f-media-block').value || null,
     gate_mode: $('#f-gate').value || null,
     gate_mode_from: $('#f-gate-from').value || null,
     gate_mode_until: $('#f-gate-until').value || null,
@@ -4388,7 +4491,11 @@ async function loadDevices() {
       const hc = { HEALTHY: 't-ok', DEGRADED: 't-warn', STOPPED: 't-danger' }[h.agent_health] || 't-off';
       const cc = { COMPLIANT: 't-ok', WARNING: 't-warn', NON_COMPLIANT: 't-danger', CRITICAL: 't-danger' }[h.compliance_status] || 't-off';
       const sc = { ONLINE: 't-ok', IDLE: 't-idle', AWAY: 't-warn', OFFLINE: 't-off' }[h.current_status] || 't-off';
-      return '<tr data-devid="' + v.id + '" data-devname="' + esc(v.computer_name || v.device_uuid) + '"><td><b>' + esc(v.computer_name || v.device_uuid) + '</b></td>'
+      // LiveView multi-screen (14-Sep-2026): surface the monitor count the Agent already reports
+      // on heartbeat — only when it's actually >1, so a single-monitor PC (the common case)
+      // doesn't clutter this cell. Not worth a whole extra column for one detail.
+      return '<tr data-devid="' + v.id + '" data-devname="' + esc(v.computer_name || v.device_uuid) + '"><td><b>' + esc(v.computer_name || v.device_uuid) + '</b>'
+        + ((v.monitor_count || 1) > 1 ? ' <span class="mut" style="font-size:10.5px">· ' + v.monitor_count + ' monitors</span>' : '') + '</td>'
         + '<td>' + esc(fullName(v.employee) || '—') + '</td>'
         + '<td>' + esc(v.os_version || '—') + '</td><td>' + esc(h.app_version || v.app_version || '—') + '</td>'
         + '<td><span class="tag ' + hc + '">' + esc(h.agent_health || '—') + '</span></td>'
@@ -4424,6 +4531,406 @@ $('#dev-rows').addEventListener('click', async (e) => {
     catch (err) { alert(err.message); }
   }
 });
+
+// ---- 6b. LiveView (Phase 4, 14-Sep-2026; multi-screen 14-Sep-2026) ----
+// Client logic ported from the Phase 3 POC (liveview-poc.blade.php), which proved the
+// full capture -> relay -> browser pipeline end-to-end; only the login/fetch plumbing
+// changed, to reuse the console's own api()/can()/TOKEN instead of the POC's standalone copies.
+// Each active session is one tile in #lv-grid; lvTiles maps session_id -> its own ws/canvas/status,
+// so N screens run independently. lvMaxConcurrent is read once from /license on first open —
+// server-side LIVEVIEW_LIMIT_REACHED is still the real gate, this just mirrors it in the UI.
+let lvBound = false, lvMaxConcurrent = 1;
+const lvTiles = new Map();
+// Show All (15-Sep-2026): a separate pop-up window that mirrors every currently-live tile
+// into a CCTV-style wall, sized to fill whatever window it's in. It does NOT open a second
+// relay connection per screen — it just blits the frame already decoded onto each tile's own
+// canvas (lvConnect's ws.onmessage) across onto a same-origin canvas living in the pop-up, on
+// a light interval. lvWallMirrors maps session_id -> { wrap, canvas, ctx, lbl } in that window.
+let lvWallWin = null, lvWallTimer = null;
+const lvWallMirrors = new Map();
+// Maximize / minimize (lucide-style, stroke=currentColor so it matches the button's own text color).
+const LV_ICON_EXPAND = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/></svg>';
+const LV_ICON_COMPRESS = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/></svg>';
+const LV_ICON_CAMERA = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+// Instant screenshot (15-Sep-2026): grabs whatever's already painted on a live tile's own
+// <canvas> — no server round trip, no new endpoint, no persistence — and downloads it as a
+// JPEG right now. Shared by both the main grid tile and the Show All wall tile below, since
+// both just hand it a canvas + a label to build the filename from.
+function lvCapture(canvas, label) {
+  if (!canvas || !canvas.width) return;
+  canvas.toBlob((blob) => {
+    if (!blob) return;
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (label || 'screenshot').replace(/[^a-z0-9]+/gi, '_') + '_' + ts + '.jpg';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }, 'image/jpeg', 0.92);
+}
+function initLiveView() {
+  // 18-Sep-2026: plan gate, checked here too (not just the nav hide in
+  // applyPlanNav) — this is the single choke point every path into the
+  // LiveView screen runs through (nav click, a stale open tab, a deep link),
+  // so this is where the actual watch-controls get replaced, not just hidden
+  // from the menu. The server (feature:live_view on /liveview/session/start)
+  // is still the real gate; this just stops the UI from lying about it.
+  const v = $('#v-liveview');
+  if (!hasPlanFeature('live_view')) {
+    v.innerHTML = '<div class="card" style="padding:24px"><b>LiveView is not included in your current plan.</b>'
+      + '<div class="mut" style="margin-top:6px">Upgrade to SmartEPT Commander to watch employee screens live. Contact Ametecs to upgrade.</div></div>';
+    return;
+  }
+  $('#lv-start').style.display = can('liveview.start') ? '' : 'none';
+  $('#lv-start-all').style.display = can('liveview.start') ? '' : 'none';
+  $('#lv-quality-high').disabled = !can('liveview.high_quality');
+  employeesList().then((list) => {
+    const sel = $('#lv-employee');
+    sel.innerHTML = list.map((e) => '<option value="' + e.id + '">' + esc(fullName(e) || e.employee_code || ('#' + e.id)) + '</option>').join('');
+    lvPopulateMonitors(parseInt(sel.value, 10));
+  }).catch(() => {});
+  if (lvBound) return;
+  lvBound = true;
+  $('#lv-start').onclick = lvStart;
+  $('#lv-start-all').onclick = lvStartAll;
+  $('#lv-show-all').onclick = lvOpenWall;
+  $('#lv-employee').onchange = (e) => lvPopulateMonitors(parseInt(e.target.value, 10));
+  api('/license').then((d) => { lvMaxConcurrent = (d.features && d.features.liveview_max_concurrent) || 1; lvUpdateStatus(); }).catch(() => {});
+  // One listener for every tile: swap that tile's icon to "compress" while it's the
+  // fullscreen element, and every other tile back to "expand" (covers Esc too, not just the button).
+  document.addEventListener('fullscreenchange', () => {
+    lvTiles.forEach((t) => {
+      const btn = t.el.querySelector('[data-act="fs"]');
+      if (!btn) return;
+      const isFs = document.fullscreenElement === t.el;
+      btn.innerHTML = isFs ? LV_ICON_COMPRESS : LV_ICON_EXPAND;
+      btn.title = isFs ? 'Exit full screen' : 'Full screen';
+    });
+  });
+}
+// Desktop 1 / Desktop 2 / ... — the Agent reports how many monitors it sees
+// (EmployeeDevice.monitor_count, from Electron's screen.getAllDisplays().length on
+// every heartbeat); devicesList() is the same cache the Devices panel already uses.
+function lvPopulateMonitors(empId) {
+  const sel = $('#lv-monitor');
+  // force refresh (15-Sep-2026): DEV_CACHE is otherwise stale for the rest of the
+  // admin's session once anything else has populated it — a monitor plugged in
+  // after that point would never show up here without this. This is the moment
+  // freshness actually matters (about to pick a monitor to start), so it's worth
+  // the extra request; unlike the cached calls elsewhere, this one isn't on a poll.
+  devicesList(true).then((list) => {
+    const dev = list.find((d) => d.employee_id === empId);
+    const n = Math.max(1, (dev && dev.monitor_count) || 1);
+    let opts = '';
+    for (let i = 0; i < n; i++) opts += '<option value="' + i + '">Desktop ' + (i + 1) + '</option>';
+    sel.innerHTML = opts;
+  }).catch(() => { sel.innerHTML = '<option value="0">Desktop 1</option>'; });
+}
+function lvUpdateStatus() {
+  $('#lv-status').textContent = lvTiles.size + ' of ' + lvMaxConcurrent + ' live screen' + (lvMaxConcurrent === 1 ? '' : 's') + ' in use';
+}
+async function lvStart() {
+  if (lvTiles.size >= lvMaxConcurrent) { $('#lv-status').textContent = 'Limit reached — stop a screen before starting another (' + lvMaxConcurrent + ' allowed).'; return; }
+  const empSel = $('#lv-employee');
+  const empId = parseInt(empSel.value, 10);
+  if (!empId) { $('#lv-status').textContent = 'Pick an employee first.'; return; }
+  const empLabel = empSel.selectedOptions[0] ? empSel.selectedOptions[0].textContent : ('#' + empId);
+  const monitorIndex = parseInt($('#lv-monitor').value, 10);
+  const quality = $('#lv-quality').value;
+  $('#lv-status').textContent = 'Requesting session…';
+  try {
+    const res = await api('/liveview/session/start', { method: 'POST', body: JSON.stringify({
+      employee_id: empId, monitor_index: monitorIndex, quality: quality,
+    }) });
+    lvAddTile(res.session_id, empId, empLabel, monitorIndex, quality, res.relay_url, res.view_token);
+    lvUpdateStatus();
+  } catch (e) {
+    $('#lv-status').textContent = 'Start failed: ' + (e.message || 'unknown error');
+  }
+}
+// All Screens: start every desktop the selected employee's PC has (skipping any already
+// showing in a tile), one after another so a licence limit hit stops cleanly rather than
+// firing every start request in parallel and getting a pile of LIVEVIEW_LIMIT_REACHED errors.
+async function lvStartAll() {
+  const empSel = $('#lv-employee');
+  const empId = parseInt(empSel.value, 10);
+  if (!empId) { $('#lv-status').textContent = 'Pick an employee first.'; return; }
+  const empLabel = empSel.selectedOptions[0] ? empSel.selectedOptions[0].textContent : ('#' + empId);
+  const quality = $('#lv-quality').value;
+  const already = new Set();
+  lvTiles.forEach((t) => { if (t.empId === empId) already.add(t.monitorIndex); });
+  const list = await devicesList(true).catch(() => []); // force refresh — see lvPopulateMonitors
+  const dev = list.find((d) => d.employee_id === empId);
+  const n = Math.max(1, (dev && dev.monitor_count) || 1);
+  const toStart = [];
+  for (let i = 0; i < n; i++) if (!already.has(i)) toStart.push(i);
+  if (!toStart.length) { $('#lv-status').textContent = already.size ? 'All of this employee\'s screens are already showing.' : 'No desktops to start.'; return; }
+  $('#lv-status').textContent = 'Starting all screens…';
+  let started = 0, limitHit = false;
+  for (const monitorIndex of toStart) {
+    if (lvTiles.size >= lvMaxConcurrent) { limitHit = true; break; }
+    try {
+      const res = await api('/liveview/session/start', { method: 'POST', body: JSON.stringify({
+        employee_id: empId, monitor_index: monitorIndex, quality: quality,
+      }) });
+      lvAddTile(res.session_id, empId, empLabel, monitorIndex, quality, res.relay_url, res.view_token);
+      started++;
+    } catch (e) { limitHit = true; break; }
+  }
+  lvUpdateStatus();
+  if (limitHit) $('#lv-status').textContent += ' — started ' + started + ' of ' + toStart.length + ' (licence allows ' + lvMaxConcurrent + ' at a time).';
+}
+function lvAddTile(sid, empId, empLabel, monitorIndex, quality, relayUrl, viewToken) {
+  const el = document.createElement('div');
+  el.className = 'card lv-tile';
+  // Fullscreen targets the whole tile (head + body), not just the canvas, so the
+  // employee name, the Desktop N switcher and the Stop button stay usable while zoomed in.
+  el.innerHTML = '<div class="lv-tile-head"><div class="lv-tile-head-left">'
+    + '<span class="lv-tile-name" title="' + esc(empLabel) + ' (#' + empId + ')">' + esc(empLabel) + ' <span class="lv-tile-id">(#' + empId + ')</span></span>'
+    + '<select class="lv-tile-desktop-sel"></select></div>'
+    + '<div class="lv-tile-actions">'
+    + '<button class="btn lv-fs-btn" data-act="cap" title="Take screenshot">' + LV_ICON_CAMERA + '</button>'
+    + '<button class="btn lv-fs-btn" data-act="fs" title="Full screen">' + LV_ICON_EXPAND + '</button>'
+    + '<button class="x" data-act="stop" title="Stop">&#10005;</button>'
+    + '</div></div>'
+    + '<div class="lv-tile-body">'
+    + '<canvas></canvas>'
+    + '<div class="lv-tile-status">Connecting to relay…</div>'
+    + '</div>';
+  $('#lv-grid').appendChild(el);
+  const canvas = el.querySelector('canvas');
+  // tile.sid is mutable (lvSwitchDesktop reassigns it when the viewer restarts under a new
+  // session id) — button handlers read tile.sid at click time, never the sid this tile was
+  // created with, so they keep working across a desktop switch.
+  const tile = {
+    sid, empId, empLabel, monitorIndex, quality, el, canvas, ctx: canvas.getContext('2d'),
+    statusEl: el.querySelector('.lv-tile-status'), desktopSel: el.querySelector('.lv-tile-desktop-sel'),
+    frames: 0, lastLabel: Date.now(),
+  };
+  lvFillDesktopSelect(tile, monitorIndex);
+  tile.desktopSel.onchange = () => lvSwitchDesktop(tile, parseInt(tile.desktopSel.value, 10));
+  el.querySelector('[data-act="stop"]').onclick = () => lvStop(tile.sid);
+  el.querySelector('[data-act="cap"]').onclick = () => lvCapture(tile.canvas, tile.empLabel + '_Desktop' + (tile.monitorIndex + 1));
+  el.querySelector('[data-act="fs"]').onclick = () => {
+    if (document.fullscreenElement === el) { document.exitFullscreen && document.exitFullscreen().catch(() => {}); }
+    else { el.requestFullscreen && el.requestFullscreen().catch(() => {}); }
+  };
+  lvTiles.set(sid, tile);
+  lvConnect(tile, relayUrl, viewToken);
+  lvWallSync();
+}
+// Same devicesList() cache the toolbar's own Monitor dropdown uses (lvPopulateMonitors) —
+// kept as a separate small function because a tile fills a <select> already in the DOM,
+// not the toolbar's, and marks the current desktop as selected.
+function lvFillDesktopSelect(tile, selectedIndex) {
+  devicesList(true).then((list) => { // force refresh — see lvPopulateMonitors
+    const dev = list.find((d) => d.employee_id === tile.empId);
+    const n = Math.max(1, (dev && dev.monitor_count) || 1);
+    let opts = '';
+    for (let i = 0; i < n; i++) opts += '<option value="' + i + '"' + (i === selectedIndex ? ' selected' : '') + '>Desktop ' + (i + 1) + '</option>';
+    tile.desktopSel.innerHTML = opts;
+  }).catch(() => { tile.desktopSel.innerHTML = '<option value="' + selectedIndex + '">Desktop ' + (selectedIndex + 1) + '</option>'; });
+}
+// Switching desktop on a live tile = stop the old session, start a fresh one on the new
+// monitor for the same employee/quality, and re-point this SAME tile at it — stop-before-start
+// so it never trips LIVEVIEW_LIMIT_REACHED against its own outgoing session.
+async function lvSwitchDesktop(tile, newIndex) {
+  const oldSid = tile.sid;
+  if (tile.ws) { try { tile.ws.close(); } catch (e) {} }
+  tile.canvas.style.display = 'none';
+  tile.statusEl.textContent = 'Switching desktop…';
+  lvTiles.delete(oldSid);
+  lvUpdateStatus();
+  lvWallSync();
+  try { await api('/liveview/session/' + oldSid + '/stop', { method: 'POST' }); } catch (e) {}
+  try {
+    const res = await api('/liveview/session/start', { method: 'POST', body: JSON.stringify({
+      employee_id: tile.empId, monitor_index: newIndex, quality: tile.quality,
+    }) });
+    tile.sid = res.session_id;
+    tile.monitorIndex = newIndex;
+    lvTiles.set(tile.sid, tile);
+    lvConnect(tile, res.relay_url, res.view_token);
+    lvWallSync();
+  } catch (e) {
+    tile.statusEl.textContent = 'Switch failed: ' + (e.message || 'unknown error');
+    tile.el.remove(); // the old session is already stopped server-side — nothing left for this tile to show
+  } finally {
+    lvUpdateStatus();
+  }
+}
+function lvConnect(tile, relayUrl, viewToken) {
+  const ws = new WebSocket(relayUrl.replace(/\/$/, '') + '/relay/view?token=' + encodeURIComponent(viewToken));
+  ws.binaryType = 'arraybuffer';
+  tile.ws = ws;
+  ws.onopen = () => { tile.statusEl.textContent = 'Connected. Waiting for the Agent to start sending frames…'; };
+  ws.onclose = () => { tile.statusEl.textContent = 'Relay connection closed.'; };
+  ws.onerror = () => { tile.statusEl.textContent = 'Relay connection error.'; };
+  ws.onmessage = (evt) => {
+    const url = URL.createObjectURL(new Blob([evt.data], { type: 'image/jpeg' }));
+    const img = new Image();
+    img.onload = () => {
+      if (tile.canvas.width !== img.width || tile.canvas.height !== img.height) { tile.canvas.width = img.width; tile.canvas.height = img.height; }
+      tile.ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      tile.canvas.style.display = 'block';
+      tile.frames++;
+      if (Date.now() - tile.lastLabel > 1000) { tile.statusEl.innerHTML = '<span class="lv-live-dot"></span>LIVE — ' + tile.frames + ' fps'; tile.frames = 0; tile.lastLabel = Date.now(); }
+    };
+    img.src = url;
+  };
+}
+async function lvStop(sid) {
+  const tile = lvTiles.get(sid);
+  if (!tile) return;
+  if (tile.ws) { try { tile.ws.close(); } catch (e) {} }
+  lvTiles.delete(sid);
+  tile.el.remove();
+  lvUpdateStatus();
+  lvWallSync();
+  try { await api('/liveview/session/' + sid + '/stop', { method: 'POST' }); } catch (e) {}
+}
+
+// Show All (15-Sep-2026): opens a same-origin pop-up window and lays out one tile per
+// currently-live session in it, like a CCTV monitor wall — no per-employee/monitor picking,
+// just everything that's live right now, and it keeps itself in sync as screens start/stop
+// while it's open (lvWallSync is called from lvAddTile/lvStop/lvSwitchDesktop above).
+function lvOpenWall() {
+  if (lvWallWin && !lvWallWin.closed) { lvWallWin.focus(); lvWallSync(); return; }
+  lvWallWin = window.open('', 'smartept-liveview-wall', 'width=1280,height=800');
+  if (!lvWallWin) { $('#lv-status').textContent = 'Could not open the Show All window — check your browser\'s pop-up blocker.'; return; }
+  lvWallWin.document.title = 'SmartEPT LiveView — Show All';
+  lvWallWin.document.head.innerHTML = '<meta charset="utf-8">'
+    + '<style>'
+    + 'html,body{margin:0;height:100%;background:#0b0e13;overflow:hidden;font-family:system-ui,sans-serif}'
+    + '#lv-wall{display:grid;width:100vw;height:100vh;gap:3px;background:#000}'
+    + '.lv-wtile{position:relative;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center}'
+    + '.lv-wtile canvas{max-width:100%;max-height:100%}'
+    + '.lv-wtile .lv-wlbl{position:absolute;left:8px;bottom:7px;color:#e6e9ee;font-size:12px;font-weight:600;'
+    + 'background:rgba(5,20,24,.6);padding:3px 9px;border-radius:6px;pointer-events:none;backdrop-filter:blur(2px)}'
+    // Hover-to-reveal full screen button (15-Sep-2026) — same expand/compress icon pair
+    // and requestFullscreen()/exitFullscreen() pattern the main LiveView grid's tile
+    // header button already uses, just surfaced on hover here instead of always-on,
+    // since a wall tile has no header bar to put a persistent button in.
+    + '.lv-wtile .lv-wfs,.lv-wtile .lv-wcap{position:absolute;top:7px;width:28px;height:28px;border:none;border-radius:6px;'
+    + 'display:flex;align-items:center;justify-content:center;color:#e6e9ee;background:rgba(5,20,24,.65);'
+    + 'cursor:pointer;opacity:0;transition:opacity .15s;backdrop-filter:blur(2px)}'
+    + '.lv-wtile .lv-wfs{right:7px}'
+    + '.lv-wtile .lv-wcap{right:41px}'
+    + '.lv-wtile:hover .lv-wfs,.lv-wtile:hover .lv-wcap{opacity:1}'
+    + '.lv-wtile .lv-wfs:hover,.lv-wtile .lv-wcap:hover{background:rgba(5,20,24,.9)}'
+    + '#lv-wempty{color:#8b95a3;font-size:14px;display:flex;align-items:center;justify-content:center;height:100vh}'
+    + '</style>';
+  lvWallWin.document.body.innerHTML = '<div id="lv-wall"></div>';
+  lvWallWin.addEventListener('resize', lvWallLayout);
+  lvWallWin.addEventListener('beforeunload', () => {
+    if (lvWallTimer) { clearInterval(lvWallTimer); lvWallTimer = null; }
+    lvWallWin = null;
+    lvWallMirrors.clear();
+  });
+  // Swap each wall tile's own expand/compress icon when full screen is entered/exited —
+  // mirrors the main grid's document-level listener, scoped to this pop-up's document.
+  lvWallWin.document.addEventListener('fullscreenchange', () => {
+    lvWallMirrors.forEach((m) => {
+      const isFs = lvWallWin.document.fullscreenElement === m.wrap;
+      m.fsBtn.innerHTML = isFs ? LV_ICON_COMPRESS : LV_ICON_EXPAND;
+      m.fsBtn.title = isFs ? 'Exit full screen' : 'Full screen';
+    });
+  });
+  lvWallTimer = setInterval(lvWallRender, 150);
+  lvWallSync();
+}
+// Recomputes the grid so it stays "adjusted" to whatever shape the wall window is —
+// more columns in a wide window, more rows in a tall one — rather than a fixed square.
+function lvWallLayout() {
+  if (!lvWallWin || lvWallWin.closed) return;
+  const grid = lvWallWin.document.getElementById('lv-wall');
+  const n = lvTiles.size;
+  if (!grid || !n) return;
+  const w = lvWallWin.innerWidth || 1280, h = lvWallWin.innerHeight || 800;
+  const cols = Math.max(1, Math.min(n, Math.ceil(Math.sqrt(n * (w / h)))));
+  const rows = Math.ceil(n / cols);
+  grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+  grid.style.gridTemplateRows = 'repeat(' + rows + ', 1fr)';
+}
+// Adds/removes wall tiles to match lvTiles exactly, then relayouts. Safe to call any time —
+// a no-op if the wall isn't open.
+function lvWallSync() {
+  if (!lvWallWin || lvWallWin.closed) return;
+  const grid = lvWallWin.document.getElementById('lv-wall');
+  if (!grid) return;
+  lvWallMirrors.forEach((m, sid) => {
+    if (!lvTiles.has(sid)) { m.wrap.remove(); lvWallMirrors.delete(sid); }
+  });
+  if (!lvTiles.size) {
+    grid.innerHTML = '<div id="lv-wempty">No live screens right now — start one from the panel behind this window.</div>';
+    grid.style.gridTemplateColumns = ''; grid.style.gridTemplateRows = '';
+    return;
+  }
+  if (lvWallWin.document.getElementById('lv-wempty')) grid.innerHTML = '';
+  lvTiles.forEach((tile, sid) => {
+    if (lvWallMirrors.has(sid)) {
+      lvWallMirrors.get(sid).lbl.textContent = tile.empLabel + ' · Desktop ' + (tile.monitorIndex + 1);
+      return;
+    }
+    const wrap = lvWallWin.document.createElement('div');
+    wrap.className = 'lv-wtile';
+    const canvas = lvWallWin.document.createElement('canvas');
+    const lbl = lvWallWin.document.createElement('div');
+    lbl.className = 'lv-wlbl';
+    lbl.textContent = tile.empLabel + ' · Desktop ' + (tile.monitorIndex + 1);
+    // Hover-reveal full screen button (15-Sep-2026) — click toggles JUST this one
+    // wall tile into the browser's real full screen, same Fullscreen API the main
+    // grid's tile button already uses; lvWallWin's own fullscreenchange listener
+    // (see lvOpenWall) flips the icon back when it exits (Esc, or the button again).
+    const fsBtn = lvWallWin.document.createElement('button');
+    fsBtn.className = 'lv-wfs';
+    fsBtn.title = 'Full screen';
+    fsBtn.innerHTML = LV_ICON_EXPAND;
+    fsBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (lvWallWin.document.fullscreenElement === wrap) {
+        lvWallWin.document.exitFullscreen && lvWallWin.document.exitFullscreen().catch(() => {});
+      } else {
+        wrap.requestFullscreen && wrap.requestFullscreen().catch(() => {});
+      }
+    };
+    // Instant screenshot (15-Sep-2026) — same hover-reveal treatment as the full screen
+    // button above, sat just to its left; both just call the shared lvCapture() helper.
+    const capBtn = lvWallWin.document.createElement('button');
+    capBtn.className = 'lv-wcap';
+    capBtn.title = 'Take screenshot';
+    capBtn.innerHTML = LV_ICON_CAMERA;
+    capBtn.onclick = (e) => {
+      e.stopPropagation();
+      lvCapture(canvas, tile.empLabel + '_Desktop' + (tile.monitorIndex + 1));
+    };
+    wrap.appendChild(canvas);
+    wrap.appendChild(lbl);
+    wrap.appendChild(fsBtn);
+    wrap.appendChild(capBtn);
+    grid.appendChild(wrap);
+    lvWallMirrors.set(sid, { wrap, canvas, ctx: canvas.getContext('2d'), lbl, fsBtn, capBtn });
+  });
+  lvWallLayout();
+}
+// The actual "streaming": each tick, copy whatever's already drawn on a live tile's own
+// canvas onto its mirror in the wall window. No second WebSocket/relay connection per
+// screen and no re-decoding JPEGs — just a cheap canvas-to-canvas blit of a frame that's
+// already been received and painted once.
+function lvWallRender() {
+  if (!lvWallWin || lvWallWin.closed) { if (lvWallTimer) { clearInterval(lvWallTimer); lvWallTimer = null; } return; }
+  lvWallMirrors.forEach((m, sid) => {
+    const tile = lvTiles.get(sid);
+    if (!tile || tile.canvas.style.display === 'none') return;
+    if (m.canvas.width !== tile.canvas.width || m.canvas.height !== tile.canvas.height) {
+      m.canvas.width = tile.canvas.width; m.canvas.height = tile.canvas.height;
+    }
+    m.ctx.drawImage(tile.canvas, 0, 0);
+  });
+}
 
 // ---- 7. policies ----
 const POLICY_TYPES = [
@@ -4760,6 +5267,27 @@ const RULE_ACTION_LABEL = {
   NOTIFY: 'Notify manager', CLOSE: 'Full Block & Close',
 };
 
+// 18-Sep-2026 (Standard/Enforcer/Commander): Standard has no enforcement, so
+// this whole screen drops to track-only — no Blocked/Violation status, no
+// Notify/Close actions, no Protections column, and the Enforcement/Device
+// control cards disappear. The server (feature:enforcement on the rules PUT
+// and the enforcement/* routes) is still the real gate; this just stops the
+// UI from offering a control that would 403 the moment it's saved.
+const RULE_ORDER_STANDARD = ['TRACKED'];
+const RULE_ACTIONS_STANDARD = ['WARN', 'SCREENSHOT'];
+function rulePlanStatuses() { return hasPlanFeature('enforcement') ? RULE_ORDER : RULE_ORDER_STANDARD; }
+function rulePlanActions() { return hasPlanFeature('enforcement') ? RULE_ACTIONS : RULE_ACTIONS_STANDARD; }
+function applyPlanRulesUi() {
+  const en = hasPlanFeature('enforcement');
+  const addStatus = $('#rule-add-status');
+  if (addStatus) addStatus.innerHTML = rulePlanStatuses().map((sx) => '<option value="' + sx + '">' + RULE_LABEL[sx] + '</option>').join('');
+  const bulk = $('#rule-action');
+  if (bulk) bulk.innerHTML = '<option value="">Set all blocked to&hellip;</option>'
+    + rulePlanActions().map((a) => '<option value="' + a + '">' + RULE_ACTION_LABEL[a] + '</option>').join('');
+  const th = $('#rule-th-prot');
+  if (th) th.style.display = en ? '' : 'none';
+}
+
 // ---- Protections: block an activity, not the application -------------------
 //
 // A protection is orthogonal to Status and to What happens. "WhatsApp allowed,
@@ -4770,8 +5298,8 @@ const RULE_ACTION_LABEL = {
 // It decides which boxes are offered, which are greyed with a reason, and which
 // carry a consequence warning. Null until it loads; everything is offered
 // un-annotated in that window rather than the screen refusing to render.
-const RULE_PROTECTIONS = ['file', 'image', 'camera'];
-const RULE_PROTECTION_LABEL = { file: 'Files', image: 'Images', camera: 'Camera' };
+const RULE_PROTECTIONS = ['file', 'image', 'camera', 'video'];
+const RULE_PROTECTION_LABEL = { file: 'Files', image: 'Images', camera: 'Camera', video: 'Video' };
 // What the Rules screen actually shows. "Block all file sharing" is ONE switch
 // that covers files and images through every method the agent guards - the
 // attach dialog, clipboard paste and drag-and-drop - because a client asking
@@ -4779,9 +5307,16 @@ const RULE_PROTECTION_LABEL = { file: 'Files', image: 'Images', camera: 'Camera'
 // underlying model still stores file and image independently, so granular
 // control survives for anyone who needs it via the API; the console is simply
 // the common case made simple.
+//
+// 'video' (16-Sep-2026, Ejaz): offered on EVERY row, experimental, even where
+// no mechanism exists yet — ruleCap() below still says UNVERIFIED not
+// UNSUPPORTED for it almost everywhere, which is what keeps the box checkable
+// rather than greyed. What actually happens on a given PC is in the row's own
+// tooltip, never assume from the box being present that it does something.
 const RULE_PROTECTION_GROUPS = [
   { key: 'files', keys: ['file', 'image'], label: 'Block file sharing', sub: '' },
   { key: 'camera', keys: ['camera'], label: 'Block camera', sub: '' },
+  { key: 'video', keys: ['video'], label: 'Block video streaming', sub: 'experimental' },
 ];
 let RULE_CAPS = null;
 
@@ -4864,7 +5399,9 @@ function rulesFromPolicy(pol, kind) {
   return out;
 }
 async function initRules() {
-  $('#rule-rows').innerHTML = '<tr><td colspan="6" class="mut">Loading…</td></tr>';
+  applyPlanRulesUi();
+  const cs = hasPlanFeature('enforcement') ? 6 : 5;
+  $('#rule-rows').innerHTML = '<tr><td colspan="' + cs + '" class="mut">Loading…</td></tr>';
   try {
     // Fetched once per screen load, not per row: fifty applications would
     // otherwise be fifty requests. A failure here is not fatal — the rules
@@ -4879,10 +5416,11 @@ async function initRules() {
     renderRules();
     if (!RULES.length) $('#rule-msg').innerHTML = 'No rules yet. Pick a <b>profile</b> above to start (Banking or General), then <b>Save rules</b>.';
   } catch (e) {
-    $('#rule-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="6" class="mut">' + esc(e.message) + '</td></tr>';
+    $('#rule-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="' + cs + '" class="mut">' + esc(e.message) + '</td></tr>';
   }
 }
 function renderRules() {
+  const en = hasPlanFeature('enforcement');
   const q = ($('#rule-q').value || '').toLowerCase();
   const list = RULES.map((r, i) => ({ r, i })).filter(({ r }) => !q || r.item.toLowerCase().includes(q));
   $('#rule-rows').innerHTML = list.map(({ r, i }) => '<tr>'
@@ -4894,12 +5432,12 @@ function renderRules() {
     + '</td>'
     + '<td>' + (r.kind === 'app' ? 'Application' : 'Website') + '</td>'
     + '<td><select data-rule-status="' + i + '" class="rst rst-' + r.status + '">'
-    + RULE_ORDER.map((sx) => '<option value="' + sx + '"' + (sx === r.status ? ' selected' : '') + '>' + RULE_LABEL[sx] + '</option>').join('')
+    + rulePlanStatuses().map((sx) => '<option value="' + sx + '"' + (sx === r.status ? ' selected' : '') + '>' + RULE_LABEL[sx] + '</option>').join('')
     + '</select></td>'
     + '<td>' + ruleActionCell(r, i) + '</td>'
-    + '<td>' + ruleProtectionCell(r, i) + '</td>'
+    + (en ? ('<td>' + ruleProtectionCell(r, i) + '</td>') : '')
     + '<td><button class="btn danger" data-rule-del="' + i + '" type="button">Remove</button></td></tr>').join('')
-    || '<tr><td colspan="6" class="mut">No rules match. Add one above or load defaults.</td></tr>';
+    || '<tr><td colspan="' + (en ? 6 : 5) + '" class="mut">No rules match. Add one above or load defaults.</td></tr>';
 }
 
 // The protection checkboxes. Rendered for EVERY row whatever its status —
@@ -4945,7 +5483,21 @@ function ruleProtectionCell(r, i) {
   const warn = RULE_PROTECTIONS.some((p) => r.protections && r.protections[p] && ruleCap(r, p).status === 'BROWSER_WIDE')
     ? '<div style="font-size:10.5px;color:var(--warn,#b54708);margin-top:2px">⚠ Browser-wide, not just this site</div>' : '';
 
-  return parts + warn;
+  // "Block All" — a convenience over the per-row checkboxes above, not a
+  // separate stored protection: it just ticks every OFFERED group at once for
+  // this row. Nothing to offer when at most one group is available, since
+  // then it would be a second way to do exactly what the one checkbox does.
+  const offeredGroups = RULE_PROTECTION_GROUPS.filter((g) => {
+    const caps = g.keys.map((k) => ruleCap(r, k));
+    return (caps.find((c) => c.status !== 'UNSUPPORTED') || caps[0]).status !== 'UNSUPPORTED';
+  });
+  const allOn = offeredGroups.length > 0 && offeredGroups.every((g) => g.keys.some((k) => r.protections && r.protections[k]));
+  const blockAll = offeredGroups.length > 1
+    ? '<label style="display:block;font-size:11px;margin-top:2px;font-weight:600" title="Ticks every protection above for this row. Does not change Allowed/Blocked status.">'
+      + '<input type="checkbox" data-rule-prot-all="' + i + '"' + (allOn ? ' checked' : '') + '> Block All</label>'
+    : '';
+
+  return parts + blockAll + warn;
 }
 
 // The per-row action. Allowed/Tracked items have nothing to do when they fire,
@@ -4957,7 +5509,7 @@ function ruleActionCell(r, i) {
   const never = r.kind === 'app' && RULE_NEVER_ENFORCE.includes(base);
   const confirm = r.kind === 'app' && RULE_CONFIRM_ENFORCE.includes(base);
 
-  const opts = RULE_ACTIONS.map((a) => {
+  const opts = rulePlanActions().map((a) => {
     // Refused server-side too — this just explains it before the click.
     const off = (a === 'CLOSE' && never) ? ' disabled' : '';
     return '<option value="' + a + '"' + (a === r.action ? ' selected' : '') + off + '>'
@@ -5026,8 +5578,14 @@ async function saveRules() {
     // Per-rule actions. Saved separately from the policy because this endpoint
     // validates properly — it refuses to enforce against Windows itself, and
     // requires a confirmation for the tools people work with.
-    await saveRuleActions('application', RULE_POL.app, 'app');
-    await saveRuleActions('website', RULE_POL.site, 'site');
+    // 18-Sep-2026: this endpoint is feature:enforcement-gated server-side, and
+    // on Standard every row is LOG with no protections anyway (nothing this
+    // screen offers a Standard admin can produce anything else) — skip the
+    // call entirely rather than 403 on a save that has nothing to persist.
+    if (hasPlanFeature('enforcement')) {
+      await saveRuleActions('application', RULE_POL.app, 'app');
+      await saveRuleActions('website', RULE_POL.site, 'site');
+    }
 
     msg.style.color = 'var(--ok)'; msg.textContent = '\u2713 Saved & applied company-wide — agents pick it up on their next heartbeat (~30s).';
     initRules();
@@ -5129,6 +5687,22 @@ $('#rule-rows').addEventListener('change', (e) => {
     renderRules();
     return;
   }
+  const all = e.target.closest('[data-rule-prot-all]');
+  if (all) {
+    const r = RULES[+all.dataset.ruleProtAll];
+    r.protections = r.protections || {};
+    // Every OFFERED group's keys, same test ruleProtectionCell used to decide
+    // whether to render this checkbox at all — never touches a key the row
+    // could not even offer.
+    RULE_PROTECTION_GROUPS.forEach((g) => {
+      const caps = g.keys.map((k) => ruleCap(r, k));
+      const cap = caps.find((c2) => c2.status !== 'UNSUPPORTED') || caps[0];
+      if (cap.status === 'UNSUPPORTED') return;
+      g.keys.forEach((k) => { r.protections[k] = all.checked; });
+    });
+    renderRules();
+    return;
+  }
   const c = e.target.closest('[data-rule-confirm]');
   if (c) RULES[+c.dataset.ruleConfirm].confirmed = c.checked;
 });
@@ -5161,6 +5735,15 @@ $('#rule-action').addEventListener('change', (e) => {
 let ENF = null;
 
 async function initEnforcement() {
+  // 18-Sep-2026: Standard has no enforcement feature at all — hide the whole
+  // Enforcement/diagnostics/Device-control section rather than show a screen
+  // whose every action would 403. Checked here (not just in applyPlanRulesUi)
+  // so a stale-open tab or a downgrade mid-session never leaves the working
+  // controls visible; the actual API calls below never fire either.
+  if (!hasPlanFeature('enforcement')) {
+    ['#enf-diag-card', '#enf-card', '#dev-card'].forEach((sel) => { const el = $(sel); if (el) el.style.display = 'none'; });
+    return;
+  }
   // Loaded alongside, not awaited: a diagnostics panel that fails must never
   // stop the screen that actually turns enforcement on and off.
   initEnforcementDiagnostics();
@@ -5173,6 +5756,7 @@ async function initEnforcement() {
       const u = $('#dev-usb'); if (u) u.checked = !!ENF.block_removable_storage;
       const c = $('#dev-cam'); if (c) c.checked = !!ENF.block_camera_device;
       const b = $('#dev-web'); if (b) b.checked = !!ENF.block_browser_uploads;
+      const m = $('#dev-media'); if (m) m.checked = !!ENF.block_media_streaming;
     }
     if (!ENF) { body.textContent = 'Unavailable.'; return; }
 
@@ -5414,7 +5998,7 @@ function wireEnforcement() {
 // one click fire N requests.
 for (const box of document.querySelectorAll('#dev-card [data-dev]')) box.addEventListener('change', async (e) => {
   const on = e.target.checked;
-  const what = { block_camera_device: 'Camera', block_browser_uploads: 'Browser uploads' }[e.target.dataset.dev] || 'USB storage';
+  const what = { block_camera_device: 'Camera', block_browser_uploads: 'Browser uploads', block_media_streaming: 'Media streaming' }[e.target.dataset.dev] || 'USB storage';
   const msg = $('#dev-msg'); msg.style.color=''; msg.textContent = 'Saving\u2026';
   try {
     await api('/enforcement/device-control', { method: 'POST', body: JSON.stringify({ [e.target.dataset.dev]: on }) });
@@ -6991,11 +7575,15 @@ async function loadLicense() {
     const pill = (txt, color) => `<span style="display:inline-block;padding:3px 10px;border-radius:999px;font-weight:700;font-size:12px;background:${color}22;color:${color}">${txt}</span>`;
     const STATUS_COLORS = { active: '#16A34A', expired: '#D97706', unconfigured: '#6B7B90' };
     const color = d.operational ? (STATUS_COLORS[d.status] || '#16A34A') : '#DC2626';
+    // Buy more seats, renew, or raise a support ticket — same client portal a
+    // cloud tenant uses, on-prem included (d.central_url is per-install, from
+    // LicenseClient::baseUrl(), so a white-labelled Central still links right).
+    const portalLine = `<div class="mut" style="margin-bottom:10px">Need to buy more seats, renew, or raise a support ticket? <a href="${d.central_url}/client" target="_blank" rel="noopener"><b>Open the SmartEPT client portal ↗</b></a></div>`;
     if (!d.configured) {
       const left = d.evaluation_days_left;
-      box.innerHTML = left > 0
+      box.innerHTML = portalLine + (left > 0
         ? `${pill('EVALUATION', '#D97706')} <span class="hint">free evaluation — <b>${left} day${left === 1 ? '' : 's'} left</b> (ends ${d.evaluation_ends_at}). After that, monitoring stops until a licence key is entered below.</span>`
-        : `${pill('EVALUATION ENDED', '#DC2626')} <span class="hint"><b>Monitoring is blocked.</b> The 7-day evaluation has ended — enter your licence key below to resume instantly. Get a key from the client portal or WhatsApp 90000 98877.</span>`;
+        : `${pill('EVALUATION ENDED', '#DC2626')} <span class="hint"><b>Monitoring is blocked.</b> The 7-day evaluation has ended — enter your licence key below to resume instantly. Get a key from the <a href="${d.central_url}/client" target="_blank" rel="noopener">client portal</a> or WhatsApp 90000 98877.</span>`);
       return;
     }
     const rows = [
@@ -7004,6 +7592,12 @@ async function loadLicense() {
       ['Company', d.company || '—'],
       ['Plan', (d.plan || '—') + (d.kind ? ' · ' + d.kind : '') + (d.deployment ? ' · ' + d.deployment.replace('_', '-') : '')],
       ['Device seats', d.device_limit != null ? `${d.devices_registered} registered / ${d.device_limit} licensed` : `${d.devices_registered} registered`],
+      // LiveView Phase 4 (14-Sep-2026): the Licence screen showed every feature EXCEPT
+      // this one — d.features came back from the API but nothing rendered it. ponytail:
+      // one row for the one feature that's actually admin-configurable today; a generic
+      // features table can wait until a second one needs showing here.
+      ['LiveView', `<b>${(d.features && d.features.liveview_max_concurrent) || 1}</b> concurrent session${((d.features && d.features.liveview_max_concurrent) || 1) === 1 ? '' : 's'}`
+        + (d.features && d.features.liveview_max_concurrent ? '' : ' <span class="mut">(default — not set on this licence)</span>')],
       // Finding 1.3/1.4 — the licensed count is now a rule, so show it being spent.
       ['Users in use', (() => {
         const s = d.seats || {}; const lim = s.limit;
@@ -7018,7 +7612,7 @@ async function loadLicense() {
       ['Source', d.source === 'file' ? 'Offline licence file (this PC)' : (d.central_url ? 'SmartEPT Central (online)' : '—')],
     ];
     if (d.scope === 'company') rows.unshift(['Scope', 'This licence belongs to <b>' + esc(d.scope_company || d.company || 'your company') + '</b> — issued and managed by SmartEPT Central']);
-    box.innerHTML = '<table>' + rows.map(([k, v]) => `<tr><th style="text-align:left;white-space:nowrap;padding:6px 18px 6px 0">${k}</th><td>${v}</td></tr>`).join('') + '</table>'
+    box.innerHTML = portalLine + '<table>' + rows.map(([k, v]) => `<tr><th style="text-align:left;white-space:nowrap;padding:6px 18px 6px 0">${k}</th><td>${v}</td></tr>`).join('') + '</table>'
       + (d.last_error ? `<div class="mut" style="color:#DC2626;margin-top:8px">Last error: ${d.last_error}</div>` : '')
       + (d.scope === 'installation' && ME && ME.role === 'SUPER_ADMIN'
         ? '<div class="mut" style="margin-top:8px">Cloud tenants on this install carry their <b>own</b> licences — see the <b>Tenants</b> screen.</div>' : '');
@@ -7051,6 +7645,7 @@ $('#lic-import').onclick = async () => {
       ? '✓ Licence activated from file — monitoring is licensed.'
       : ('File rejected: ' + (d.last_error || d.status) + (d.status === 'server_mismatch' ? ' (this file is locked to a different machine)' : ''));
     loadLicense();
+    refreshMe();
   } catch (e) { $('#lic-file-msg').textContent = e.message; }
 };
 $('#lic-check').onclick = async () => {
@@ -7059,6 +7654,7 @@ $('#lic-check').onclick = async () => {
     const d = await api('/license/validate', { method: 'POST' });
     $('#lic-msg').textContent = d.status === 'active' ? '✓ Valid — bundle refreshed.' : 'Central answered: ' + (d.last_error || d.status);
     loadLicense();
+    refreshMe();
   } catch (e) { $('#lic-msg').textContent = e.message; }
 };
 
@@ -7474,7 +8070,7 @@ const HELP = {
   policies: ['Policies', '<h5>What</h5>The control room: 12 policy types (monitoring master switch, screenshots, webcam presence, app/site rules, network, USB, breaks, attendance, compliance scoring) with versioned edit forms and an assignment panel.<h5>Why</h5>Nothing is captured because the software can — everything is captured because a policy you wrote says so, and the version trail shows what applied when.<h5>How</h5>Pick a type, create or edit a policy (each save bumps the version; agents pick it up on the next heartbeat), then assign it to the company, a branch, department, team, employee or single device. More specific assignments win.'],
   biometric: ['Biometric', '<h5>What</h5>Door-punch integration: connect a biometric attendance API — <b>eTimeOffice</b> or <b>eSSL (eTimeTrackLite)</b> — and its punches import into Attendance &amp; payroll automatically, plus the punch log, CSV import, biometric-ID-to-employee mapping, and a daily reconciliation of first punch vs first agent login.<h5>Why</h5>The gap between "in the office" and "at the system" is invisible to either source alone — the mismatch report exposes it in minutes per employee.<h5>How</h5>In Biometric Device Setup, pick the <b>provider</b> first — the form then asks only for that vendor\'s fields. eTimeOffice needs the API base URL, endpoint, corporate ID and credentials; eSSL needs the eTimeTrackLite Web API URL, the reader\'s serial number and the Web API login. Press Test connection to preview punches, then Save with automatic sync on — or press Sync now anytime.<h5>Several branches, floors and readers</h5>Add <b>one entry per physical reader</b> and give each its own Branch, Floor/location and <b>Punch direction</b>. Use <b>IN only</b> / <b>OUT only</b> where entry and exit have separate readers. Use <b>IN + OUT</b> where one reader is used both ways: SmartEPT works the direction out from that employee\'s punch sequence for the day — 1st IN, 2nd OUT, 3rd IN, 4th OUT — and re-checks the whole day on every sync, so a late or repeated punch never leaves the sequence wrong. <b>Automatic</b> is the original behaviour: the IN/OUT machine IDs decide, then the feed\'s own flag. Employee codes match automatically by employee code or biometric ID (use the prefix field when the feed drops a letter); anything unmatched appears under Map biometric ID → employee, and old punches back-fill once mapped. The mismatch report reads: OK, MISMATCH over 15 minutes, or NO_BIOMETRIC.'],
   integrations: ['API & Integrations', '<h5>What</h5>SmartEPT as an integration hub: API keys let external devices/apps push attendance IN and read it OUT; outbound targets push attendance to SmartPRS or other systems automatically.<h5>Why</h5>No manual CSV shuffling between your gate devices, SmartPRS and SmartEPT — secure API keys in, HMAC-signed pushes out.<h5>How</h5>Create a key (shown once), give it ingest/read scope. Add an outbound target with its URL + shared secret; Test push sends a day now, the nightly job ships the previous day. The Integration guide card has the exact URLs, JSON and signature check for the other side.'],
-  license: ['Licence', '<h5>What</h5>This server\'s SmartEPT licence: the key, the plan and company it belongs to, how many device seats are licensed vs registered, the expiry date with its grace window, and when the server last confirmed all of this with SmartEPT Central. A server with no key runs a <b>7-day free evaluation</b>, then monitoring stops until a key is entered.<h5>Why</h5>The licence is what ties your installation to what you purchased — seats, plan features and validity. Only licence metadata travels to Central: screenshots, activity and camera data never leave this server. If a paid renewal is missed, agents keep working through the grace days so a busy week never stops monitoring mid-shift; trials stop the moment they end.<h5>How</h5>Paste the key from your order email or the client portal and click "Save & validate" — the server confirms it with Central instantly and then re-checks once a day on its own. "Validate now" forces a fresh check after a renewal or seat upgrade. If the status shows EXPIRED, renew from the client portal; the seats line tells you when you\'re close to the licensed device limit.'],
+  license: ['Licence', '<h5>What</h5>This server\'s SmartEPT licence: the key, the plan and company it belongs to, how many device seats are licensed vs registered, the expiry date with its grace window, and when the server last confirmed all of this with SmartEPT Central. A server with no key runs a <b>7-day free evaluation</b>, then monitoring stops until a key is entered.<h5>Why</h5>The licence is what ties your installation to what you purchased — seats, plan features and validity. Only licence metadata travels to Central: screenshots, activity and camera data never leave this server. If a paid renewal is missed, agents keep working through the grace days so a busy week never stops monitoring mid-shift; trials stop the moment they end.<h5>How</h5>Paste the key from your order email or the <a href="https://smartept.com/client" target="_blank" rel="noopener">client portal</a> and click "Save & validate" — the server confirms it with Central instantly and then re-checks once a day on its own. "Validate now" forces a fresh check after a renewal or seat upgrade. If the status shows EXPIRED, renew from the <a href="https://smartept.com/client" target="_blank" rel="noopener">client portal</a>; the seats line tells you when you\'re close to the licensed device limit.'],
   ops: ['Audit & Ops', '<h5>What</h5>Three operational views in one place: the full audit trail (every admin action, export, screenshot view and licence event with who, when and from which IP), storage consumed by screenshot/webcam evidence per company, and the state of your database backups.<h5>Why</h5>Monitoring software must itself be accountable — when an employee questions an action, the audit trail shows exactly who did what. Storage growth and backups are the two quiet things that sink servers: full disks and "we never had a backup".<h5>How</h5>Filter the trail by action text or date range. Backups run automatically every night at 01:30 (newest 14 kept in storage/app/backups — copy them off this PC for real safety); "Back up now" runs one immediately before risky changes. If a company\'s evidence storage grows fast, tighten its screenshot policy, shorten retention, or use \'Free up storage\' to bulk-delete old screenshots and logs by date range — violation evidence is kept unless you explicitly say otherwise, and every cleanup is itself audit-logged.'],
   reports: ['Reports & Exports', '<h5>What</h5>CSV exports — attendance, productivity, compliance, daily-summary scores and the classic monthly attendance register — plus an on-screen monthly summary with payable days.<h5>Why</h5>These are the hand-off artifacts: payroll wants the register and payable days, managers want productivity, HR wants compliance, and the MD wants the one-page summary.<h5>How</h5>Set the date range (or month for the register and summary), click Export, and the file downloads ready to open in Excel. The monthly summary renders here on screen: working days, P/A/H/L counts, payable days (P + 0.5×H + L) and average productivity. Every export is recorded in the audit log with who ran it and for which dates.'],
 };

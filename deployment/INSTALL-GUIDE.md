@@ -18,6 +18,13 @@ difference is the operating-system wrapper. Prerequisites on Linux/macOS: **PHP 
 and **MySQL/MariaDB** running (the installer names the exact `apt`/`brew` commands if
 anything is missing). After install the console is at **`http://<server>:8080/admin`**.
 
+**LiveView** (watch an employee's screen live, including multiple screens at once)
+ships as a pre-built, self-contained relay binary — **no Node.js, npm, or anything
+else to install on the server.** The installer registers it as a background service
+(Windows service / systemd / launchd, matching the console's own auto-start row
+above) and copies its shared secret from the `.env` this install just generated —
+nothing to run or configure by hand, ever.
+
 ---
 
 ## Production install on Windows Server with IIS

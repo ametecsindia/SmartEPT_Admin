@@ -87,6 +87,38 @@ else
   echo "       * * * * * cd $APP_DIR && php artisan schedule:run >/dev/null 2>&1"
 fi
 
+# --- LiveView relay (launchd) -------------------------------------------------
+# 14-Sep-2026, rebuilt as a real production step (no Node.js dependency) 15-Sep-2026:
+# relay/dist/smartept-relay-macos is a SELF-CONTAINED compiled binary (built with
+# `npm run build` from relay/server.js — see relay/package.json), so this needs no
+# Node.js/npm at all, not even to run it as a launch agent. Same "install once,
+# invisible forever" contract as the console's own launch agent above. The shared
+# secret is copied straight from the .env APP_KEY this install just generated. A
+# missing binary is a note, not a failure — LiveView is optional.
+if [ -f relay/dist/smartept-relay-macos ]; then
+  chmod +x relay/dist/smartept-relay-macos
+  grep '^APP_KEY=' .env | cut -d= -f2- > relay/relay-secret.txt
+  RELAY_PLIST="$HOME/Library/LaunchAgents/com.ametecs.smartept-relay.plist"
+  cat > "$RELAY_PLIST" <<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.ametecs.smartept-relay</string>
+  <key>ProgramArguments</key><array>
+    <string>$APP_DIR/relay/dist/smartept-relay-macos</string>
+  </array>
+  <key>WorkingDirectory</key><string>$APP_DIR/relay</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+</dict></plist>
+XML
+  launchctl unload "$RELAY_PLIST" 2>/dev/null || true
+  launchctl load "$RELAY_PLIST"
+  echo "[ok] LiveView relay installed as a launch agent — starts automatically at login"
+else
+  echo "[note] relay/dist/smartept-relay-macos not found — LiveView will not be available."
+fi
+
 IP=$(ipconfig getifaddr en0 2>/dev/null || echo localhost)
 echo "============================================================"
 echo "  DONE. SmartEPT console:  http://$IP:8080/admin"

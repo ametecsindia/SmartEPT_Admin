@@ -54,7 +54,7 @@
         </div>
     @endif
 
-    <div class="note">Need help? Ametecs India Private Limited · sales@ametecsindia.com · WhatsApp 90000 98877.<br>© 2026 SmartEPT. All rights reserved.</div>
+    <div class="note">Need help, a renewal, or want to buy more seats? <a href="https://smartept.com/client" target="_blank" rel="noopener">Client portal</a> · sales@ametecsindia.com · WhatsApp 90000 98877.<br>© 2026 SmartEPT. All rights reserved.</div>
 </div>
 </body>
 </html>

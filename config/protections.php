@@ -31,6 +31,31 @@
  *
  * Moving an entry from UNVERIFIED to SUPPORTED requires evidence from the VM
  * runbook, not optimism.
+ *
+ * TWO SEPARATE VIDEO-BLOCKING MECHANISMS EXIST (16-Sep-2026) — do not confuse
+ * them when reading video_cdn_block below:
+ *
+ *   1. THIS file's `video` protection / video_cdn_block. Per-rule, company-wide
+ *      only, and only actually blocks the two sites in video_cdn_domains
+ *      below — everywhere else the tick is recorded but not enforced, exactly
+ *      as this file already says.
+ *
+ *   2. The Media Control local proxy (smartept-enforcer's internal/mediaproxy),
+ *      switched on by the company-wide "Block media streaming" toggle in
+ *      Device Control, AND, per employee, by that employee's media_block_mode
+ *      (EmployeeController, EnforcerSyncController::mediaControlForEmployee).
+ *      This one decrypts the browser's own HTTPS in Chrome/Edge and drops
+ *      responses that look like video by Content-Type, so it is not limited
+ *      to a fixed domain list — it is what actually reaches Instagram,
+ *      Facebook, TikTok and any other site, not just YouTube/X. It does NOT
+ *      reach Firefox, Safari, or a desktop app that isn't a browser.
+ *
+ * The two are independent and both currently run: a company or an employee
+ * can have #2 armed while #1's per-row CDN blocks (or lack of one) do their
+ * own separate, narrower thing on top. They have not been merged — ticking
+ * `video` on a Rules-screen row does not, today, arm #2. See the project's
+ * media-streaming-control-status doc for the reasoning and the option to
+ * unify them later.
  */
 
 return [
@@ -52,6 +77,10 @@ return [
         'camera' => [
             'label'   => 'Camera Block',
             'summary' => 'The application keeps working, including files it already has. It cannot open the camera to take a photo or video.',
+        ],
+        'video' => [
+            'label'   => 'Video / Media Streaming Block',
+            'summary' => 'The application or site keeps opening — chat, browsing, everything else works. Video/reel playback inside it is what this targets. EXPERIMENTAL: offered everywhere at Ejaz\'s request (16-Sep-2026) even where no mechanism exists yet, so the console is honest about which rows are actually enforced today — see the note on each row.',
         ],
     ],
 
@@ -111,6 +140,35 @@ return [
                 'AnyDesk does not distinguish an image from any other file, so Image Sharing Block adds nothing to File Sharing Block here.',
             ],
         ],
+        'video_cdn_block' => [
+            'where'  => 'SmartEPT enforcement service',
+            'how'    => "Some sites stream actual video from a CDN domain that is separate from the page you browse (YouTube's page is youtube.com; the video itself streams from googlevideo.com). Where that split is real, only the video-CDN domain is added to the machine's site blocklist — the page domain is left off it — so the site opens, but playback fails. See config('protections.video_cdn_domains') for the exact domains this is wired for.",
+            'blind_spots' => [
+                'Only works on sites where the split above is real and known. Most social apps (Instagram, Facebook, TikTok) serve video from the same CDN hostnames as photos and everything else, so there is no domain to block without also breaking the rest of the app — ticking this box there records the request but SmartEPT does not act on it yet.',
+                'No mechanism exists for a desktop application (Discord, Steam, Zoom, etc.) at all — video inside an app, not a browser, would need a different approach entirely (a managed browser extension or similar), not yet built.',
+                'Verified only in theory (documented by third-party filtering vendors for YouTube, and observed for X/Twitter). Never yet run against a real Windows PC with SmartEPT\'s own blocklist mechanism — do not promise this to a client until it is.',
+            ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Video-CDN domains for video_cdn_block
+    |--------------------------------------------------------------------------
+    |
+    | The ONLY sites this mechanism can actually do something for: item (as
+    | policy_rules stores it) => the CDN domain(s) added to the site blocklist
+    | when that item's `video` protection is ticked. The item's own domain is
+    | deliberately NOT added here — it must stay reachable.
+    |
+    | Adding an entry here is a claim about how the platform's CDN is shaped,
+    | not a claim that SmartEPT has verified it end to end. Move to a "verified"
+    | note only with a dated VM test, same rule as the rest of this file.
+    */
+    'video_cdn_domains' => [
+        'youtube.com'  => ['googlevideo.com'],
+        'x.com'        => ['video.twimg.com'],
+        'twitter.com'  => ['video.twimg.com'],
     ],
 
     /*
@@ -133,12 +191,19 @@ return [
             'image'  => ['status' => 'UNSUPPORTED', 'mechanism' => null,
                          'note' => 'Same as File Sharing Block: not enforceable while the application runs. Use Full Block & Close, or Camera Block for photos taken in-app.'],
             'camera' => ['status' => 'UNVERIFIED', 'mechanism' => 'camera_consent_store'],
+            // Offered everywhere at Ejaz's request (16-Sep-2026) even though no
+            // mechanism exists for a desktop application yet — UNVERIFIED, not
+            // UNSUPPORTED, is the honest word for "checkable, not enforced".
+            'video'  => ['status' => 'UNVERIFIED', 'mechanism' => null,
+                         'note' => 'No verified mechanism for video inside a desktop application yet. The tick is recorded; nothing on the PC currently acts on it.'],
         ],
         'WEBSITE' => [
             'file'   => ['status' => 'BROWSER_WIDE', 'mechanism' => 'browser_file_dialog_switch'],
             'image'  => ['status' => 'BROWSER_WIDE', 'mechanism' => 'browser_file_dialog_switch',
                          'note' => 'A browser cannot tell an image upload from any other upload, so this does the same thing as File Sharing Block.'],
             'camera' => ['status' => 'BROWSER_WIDE', 'mechanism' => 'browser_camera_policy'],
+            'video'  => ['status' => 'UNVERIFIED', 'mechanism' => 'video_cdn_block',
+                         'note' => 'Only enforced on sites listed in protections.video_cdn_domains (currently YouTube and X/Twitter). On every other site the tick is recorded but not currently enforced — most sites serve video from the same place as everything else, with nothing to block separately.'],
         ],
     ],
 
@@ -229,5 +294,35 @@ return [
         'outlook.office.com' => ['_inherit' => 'WEBSITE'],
         'onedrive.live.com' => ['_inherit' => 'WEBSITE'],
         'dropbox.com'       => ['_inherit' => 'WEBSITE'],
+
+        // Video streaming — the sites researched 16-Sep-2026. Two carry a real,
+        // documented CDN split (video_cdn_domains above); the rest are named
+        // here specifically so the console tells the truth about each one
+        // instead of one generic WEBSITE note covering platforms that behave
+        // very differently underneath.
+        'youtube.com' => [
+            'video' => ['status' => 'UNVERIFIED', 'mechanism' => 'video_cdn_block',
+                        'note' => 'YouTube streams video from a separate domain (googlevideo.com) from the page itself. Blocking just that domain should leave the site browsable with video failing to play. Documented technique elsewhere; never yet run on a SmartEPT-managed PC — verify on the enforcer VM before promising it to a client.'],
+        ],
+        'x.com' => [
+            'video' => ['status' => 'UNVERIFIED', 'mechanism' => 'video_cdn_block',
+                        'note' => 'X/Twitter streams video from video.twimg.com, separate from the images domain (pbs.twimg.com) and the site itself. Same unverified-on-our-stack caveat as YouTube.'],
+        ],
+        'twitter.com' => [
+            'video' => ['status' => 'UNVERIFIED', 'mechanism' => 'video_cdn_block',
+                        'note' => 'Same as x.com — the two hostnames are the same product.'],
+        ],
+        'instagram.com' => [
+            'video' => ['status' => 'UNVERIFIED', 'mechanism' => null,
+                        'note' => 'Best available evidence says Instagram serves photos, Stories, feed video and Reels from the SAME CDN hostnames — no separate video domain the way YouTube has. Ticking this is recorded but very likely cannot be enforced without also breaking the photo feed. Needs a real traffic capture before this can move past "recorded only".'],
+        ],
+        'facebook.com' => [
+            'video' => ['status' => 'UNVERIFIED', 'mechanism' => null,
+                        'note' => 'A possible video-only subdomain (video-*.fbcdn.net, separate from photos on scontent-*.fbcdn.net) is reported by one unverified source — not confirmed by SmartEPT. Needs a real traffic capture before this can be enforced. The tick is recorded, not acted on, until then.'],
+        ],
+        'tiktok.com' => [
+            'video' => ['status' => 'UNVERIFIED', 'mechanism' => null,
+                        'note' => 'TikTok IS short video — there is no "app open, video off" state to aim for the way there is for YouTube. Ticking this is recorded but cannot be enforced as a partial block; the only real lever for TikTok is blocking it outright.'],
+        ],
     ],
 ];

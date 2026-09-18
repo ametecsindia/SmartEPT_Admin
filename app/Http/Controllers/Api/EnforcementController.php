@@ -132,6 +132,10 @@ class EnforcementController extends Controller
                 'block_removable_storage' => (bool) \App\Models\Company::withoutGlobalScopes()->whereKey($companyId)->value('block_removable_storage'),
                 'block_camera_device'     => (bool) \App\Models\Company::withoutGlobalScopes()->whereKey($companyId)->value('block_camera_device'),
                 'block_browser_uploads'   => (bool) \App\Models\Company::withoutGlobalScopes()->whereKey($companyId)->value('block_browser_uploads'),
+                // Media Control: video blocking via the SmartEPT Media Control
+                // browser extension. Same company-wide switch shape as the rest
+                // of this card — see EnforcerSyncController::mediaControlFor().
+                'block_media_streaming'   => (bool) \App\Models\Company::withoutGlobalScopes()->whereKey($companyId)->value('block_media_streaming'),
                 // THREE different numbers, because they mean three different things and the
                 // console was conflating them (Ejaz, 27-Aug-2026: "one agent had already
                 // logged in to other PC, but the Enforcement section says 0 PCs").
@@ -434,6 +438,7 @@ class EnforcementController extends Controller
             'block_removable_storage' => ['sometimes', 'boolean'],
             'block_camera_device'     => ['sometimes', 'boolean'],
             'block_browser_uploads'   => ['sometimes', 'boolean'],
+            'block_media_streaming'   => ['sometimes', 'boolean'],
         ]);
         if ($data === []) {
             return response()->json(['error' => 'nothing to change'], 422);

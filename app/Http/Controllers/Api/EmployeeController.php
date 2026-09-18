@@ -460,6 +460,11 @@ class EmployeeController extends Controller
             'enforcement_exempt_from'  => ['nullable', 'date'],
             'enforcement_exempt_until' => ['nullable', 'date', 'after_or_equal:enforcement_exempt_from'],
             'enforcement_exempt_reason' => ['nullable', 'string', 'max:191'],
+            // Per-employee media-streaming block override (16-Sep-2026, Ejaz).
+            // null = inherit the company's "Block media streaming" switch;
+            // BLOCKED/ALLOWED force it on/off for this one employee. See
+            // EnforcerSyncController::policy() and config/protections.php.
+            'media_block_mode'     => ['nullable', 'in:BLOCKED,ALLOWED'],
             'gate_mode'            => ['nullable', 'in:REQUIRED,EXCLUDED'],
             'gate_mode_from'       => ['nullable', 'date'],
             'gate_mode_until'      => ['nullable', 'date', 'after_or_equal:gate_mode_from'],

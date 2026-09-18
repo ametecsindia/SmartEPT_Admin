@@ -237,6 +237,11 @@ class AuthController extends Controller
     {
         $user->loadMissing('role', 'company');
 
+        // 18-Sep-2026: Standard/Enforcer/Commander — so the console can grey out
+        // a plan-gated screen (e.g. LiveView) for admins too, not just rely on
+        // the API 403ing after a click. Same governing() lookup EnsureFeature uses.
+        $licence = \App\Models\InstallationLicense::governing($user->company);
+
         return [
             'id'                   => $user->id,
             'name'                 => $user->name,
@@ -251,6 +256,8 @@ class AuthController extends Controller
             'permissions'          => $user->permissionSlugs(),
             // Lets UIs force the change-password screen after a temp-password login.
             'must_change_password' => (bool) $user->must_change_password,
+            'plan_tier'            => $licence->tier(),
+            'plan_features'        => $licence->bundle['features'] ?? [],
         ];
     }
 

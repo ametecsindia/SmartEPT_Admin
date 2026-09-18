@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\DbMaintenanceController;
 use App\Http\Controllers\Api\DiagnosticsController;
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\LicenseController;
+use App\Http\Controllers\Api\LiveViewController;
 use App\Http\Controllers\Api\UpdateController;
 use App\Http\Controllers\Api\MeetingController;
 use App\Http\Controllers\Api\AgentMeetingController;
@@ -206,12 +207,24 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
         Route::post('update/install', [UpdateController::class, 'install']);
     });
 
+    // ---- LiveView (Phase 4, 14-Sep-2026): now on its own permission slugs
+    // (2026_09_14_000100_seed_liveview_permissions.php), same shape as meeting.* above —
+    // superseding the Phase 3 POC's blanket role:SUPER_ADMIN,COMPANY_ADMIN gate.
+    // 18-Sep-2026: Standard/Enforcer/Commander — Live View is a Commander-only
+    // feature. 'stop' stays ungated (ending a session must always work, same
+    // reasoning as enforcement/disable below).
+    Route::post('liveview/session/start', [LiveViewController::class, 'start'])->middleware(['permission:liveview.start', 'feature:live_view']);
+    Route::post('liveview/session/{session}/stop', [LiveViewController::class, 'stop'])->middleware('permission:liveview.stop');
+
     // 'licensed' is inherited from the group above — no longer listed here.
     Route::prefix('agent')->middleware(['active-employee', 'throttle:600,1'])->group(function () {
         // Bootstrap (no consent gate — these establish identity + consent).
         Route::post('register-device', [DeviceController::class, 'register']);
         Route::get('policy', [PolicyController::class, 'agentBundle']);
         Route::post('heartbeat', [DeviceController::class, 'heartbeat']);
+        // Fast LiveView-only sibling to the heartbeat above (15-Sep-2026) — see
+        // LiveViewController::poll()'s docblock for why this exists separately.
+        Route::get('liveview/poll', [LiveViewController::class, 'poll']);
         // Section 10: the agent's explicit sign-out (revokes this device's session).
         Route::post('session-logout', [DeviceController::class, 'sessionLogout']);
         Route::post('consent', [ConsentController::class, 'store']);
@@ -462,7 +475,10 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
 
     // ---- Per-rule actions (Rules screen): its own controller because these decide which
     // programs a company's PCs refuse to open, and PolicyController validates nothing by design.
-    Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,COMPLIANCE_OFFICER')->group(function () {
+    // 18-Sep-2026: Standard/Enforcer/Commander — the Rules screen configures
+    // WHAT enforcement blocks, so it needs the 'enforcement' feature same as
+    // the Enforcement group below.
+    Route::middleware(['role:SUPER_ADMIN,COMPANY_ADMIN,COMPLIANCE_OFFICER', 'feature:enforcement'])->group(function () {
         Route::get('policies/{type}/{policy}/rules', [PolicyRuleController::class, 'index']);
         Route::put('policies/{type}/{policy}/rules', [PolicyRuleController::class, 'replace']);
         // What File / Image / Camera protection can actually be enforced, per item.
@@ -483,21 +499,33 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
     Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,COMPLIANCE_OFFICER')->group(function () {
         Route::get('enforcement/audit-report', [EnforcementController::class, 'auditReport']);
         Route::get('enforcement/diagnostics', [EnforcementDiagnosticsController::class, 'index']);
-        // 27-Aug-2026: arm directly, no learning period (Ejaz). promote() is untouched and
-        // still refuses without a clean report — this is the deliberate operator path.
-        Route::post('enforcement/enable', [EnforcementController::class, 'enable']);
-        Route::post('enforcement/start-audit', [EnforcementController::class, 'startAudit']);
-        Route::post('enforcement/promote', [EnforcementController::class, 'promote']);
+        // The kill switch — comment above always said this is never gated, but
+        // until 18-Sep-2026 nothing in this whole block carried 'feature:enforcement'
+        // either, so that was true by accident, not by design. Now that everything
+        // else below gets the real gate, 'disable' is pulled out here explicitly so
+        // it stays reachable on role alone: a downgraded company must always be able
+        // to turn OFF enforcement it's still running under an old policy.
         Route::post('enforcement/disable', [EnforcementController::class, 'disable']);
-        Route::post('enforcement/device-control', [EnforcementController::class, 'deviceControl']);
-        Route::post('enforcement/audit-event/{id}/resolve', [EnforcementController::class, 'resolveAuditEvent']);
 
-        // Enrolment admin: minting is the ONLY place an enrolment secret ever exists.
-        Route::get('enforcer/enrollment-tokens', [EnforcerEnrollmentController::class, 'tokens']);
-        Route::post('enforcer/enrollment-tokens', [EnforcerEnrollmentController::class, 'mint']);
-        Route::post('enforcer/enrollment-tokens/{id}/revoke', [EnforcerEnrollmentController::class, 'revoke']);
-        Route::get('enforcer/machines', [EnforcerEnrollmentController::class, 'machines']);
-        Route::post('enforcer/machines/{id}/revoke', [EnforcerEnrollmentController::class, 'revokeMachine']);
+        // 18-Sep-2026 (Standard/Enforcer/Commander): everything that ARMS or
+        // CONFIGURES enforcement needs the plan feature — this is the gap that let
+        // a Standard-tier company toggle enforcement on and use Device Control.
+        Route::middleware('feature:enforcement')->group(function () {
+            // 27-Aug-2026: arm directly, no learning period (Ejaz). promote() is untouched and
+            // still refuses without a clean report — this is the deliberate operator path.
+            Route::post('enforcement/enable', [EnforcementController::class, 'enable']);
+            Route::post('enforcement/start-audit', [EnforcementController::class, 'startAudit']);
+            Route::post('enforcement/promote', [EnforcementController::class, 'promote']);
+            Route::post('enforcement/device-control', [EnforcementController::class, 'deviceControl']);
+            Route::post('enforcement/audit-event/{id}/resolve', [EnforcementController::class, 'resolveAuditEvent']);
+
+            // Enrolment admin: minting is the ONLY place an enrolment secret ever exists.
+            Route::get('enforcer/enrollment-tokens', [EnforcerEnrollmentController::class, 'tokens']);
+            Route::post('enforcer/enrollment-tokens', [EnforcerEnrollmentController::class, 'mint']);
+            Route::post('enforcer/enrollment-tokens/{id}/revoke', [EnforcerEnrollmentController::class, 'revoke']);
+            Route::get('enforcer/machines', [EnforcerEnrollmentController::class, 'machines']);
+            Route::post('enforcer/machines/{id}/revoke', [EnforcerEnrollmentController::class, 'revokeMachine']);
+        });
     });
 
     // ---- Policy Engine ----

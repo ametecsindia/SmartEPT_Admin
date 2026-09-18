@@ -108,6 +108,9 @@ class EnsureLicensed
                 'reason' => $reason,
                 'message' => $this->message($license, $reason),
                 'admin_can_fix' => $this->isRescueUser($request),
+                // So the locked-out wall can link straight to the right client
+                // portal (per-install Central, not a hardcoded default).
+                'central_url' => $this->client->baseUrl(),
             ],
         ], 403);
     }

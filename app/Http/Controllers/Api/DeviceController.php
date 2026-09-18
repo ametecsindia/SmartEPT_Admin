@@ -270,6 +270,9 @@ class DeviceController extends Controller
             'service_version' => ['nullable', 'string', 'max:32'],
             'sync_pending'   => ['nullable', 'integer', 'min:0'],
             'client_time'    => ['nullable', 'date'],
+            // LiveView multi-screen (14-Sep-2026): screen.getAllDisplays().length, so the
+            // admin's monitor picker can offer "Desktop 1..N" for what this PC actually has.
+            'monitor_count'  => ['nullable', 'integer', 'min:1', 'max:16'],
         ]);
 
         $device = EmployeeDevice::where('device_uuid', $data['device_uuid'])->firstOrFail();
@@ -299,6 +302,7 @@ class DeviceController extends Controller
             'service_version'   => $data['service_version'] ?? $device->service_version,
             'sync_pending_count' => $data['sync_pending'] ?? $device->sync_pending_count,
             'agent_health'      => $health,
+            'monitor_count'     => $data['monitor_count'] ?? $device->monitor_count,
             'last_heartbeat_at' => now(),
         ]);
 
@@ -361,7 +365,36 @@ class DeviceController extends Controller
             'gate_status' => $gateStatus,    // QA Phase 2 (A3): {gate_required, open, message, reason}
             'meeting' => $meeting,
             'meeting_reminder' => $meetingReminder, // Admin #9: approaching-meeting reminder
+            'liveview_requested' => $this->liveviewRequestedFor($device), // Phase 3 POC (12-Sep-2026): plan §7 Option A
         ]);
+    }
+
+    /**
+     * LiveView Phase 3 POC (plan §7, Option A): the Agent has no persistent
+     * connection to anything (finding 1.1), so the heartbeat — already round-tripping
+     * every ~30s — is the one channel available for "a stream is wanted for you".
+     * Mirrors the existing `hb.enforcement` piggyback just above this method: same
+     * shape of problem, same solution, no new infrastructure.
+     *
+     * 15-Sep-2026: this ~30s cadence made every Start (and every restart after a
+     * Stop) feel "stuck" for up to 30s — fine for enforcement/meeting sync, not for
+     * a UI the admin is staring at. LiveViewController::poll() now gives the Agent a
+     * dedicated fast-cadence sibling (LIVEVIEW_POLL_MS) for just this signal; this
+     * heartbeat copy stays as the low-cost fallback so a poll hiccup self-heals
+     * within one heartbeat instead of hanging forever.
+     *
+     * Returns one block per 'connecting' LiveViewSession this device currently has
+     * (15-Sep-2026: was a single object|null — see LiveViewSession::connectingFor()'s
+     * docblock for why that starved every monitor but the newest), each with its own
+     * one-time stream token, for main.js's sendHeartbeat() to start capturing.
+     */
+    private function liveviewRequestedFor(EmployeeDevice $device): array
+    {
+        $tokens = app(\App\Services\LiveViewTokenService::class);
+
+        return \App\Models\LiveViewSession::connectingFor($device->device_uuid)
+            ->map(fn ($session) => $session->toAgentRequest($tokens))
+            ->all();
     }
 
     /**

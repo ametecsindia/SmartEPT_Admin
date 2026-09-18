@@ -185,4 +185,39 @@ class InstallationLicense extends Model
             default => false,
         };
     }
+
+    /**
+     * The plan's Standard/Enforcer/Commander label, if the governing licence
+     * carries one (18-Sep-2026). Null on a licence issued before this feature —
+     * callers must treat null as "don't restrict", never as "no plan".
+     */
+    public function tier(): ?string
+    {
+        return $this->bundle['tier'] ?? null;
+    }
+
+    /**
+     * Does the plan behind this licence include $key (e.g. 'enforcement',
+     * 'live_view')? Read by EnsureFeature and the enforcer sync data-level gate.
+     *
+     * Preserves two pre-existing behaviours exactly — these are not new
+     * commercial rules (18-Sep-2026 brief): the 7-day/no-key evaluation window
+     * (not yet configured() at all) and a Cloud trial licence (kind='trial')
+     * both keep full, Commander-equivalent feature access, same as before this
+     * gate existed. A licence issued before 'tier' existed (bundle has no
+     * 'features' key at all) also passes — never retroactively restrict an
+     * old licence just because this column is new.
+     */
+    public function hasFeature(string $key): bool
+    {
+        if (! $this->configured() || ($this->bundle['kind'] ?? null) === 'trial') {
+            return true;
+        }
+
+        if (! array_key_exists('features', $this->bundle ?? [])) {
+            return true;
+        }
+
+        return (bool) ($this->bundle['features'][$key] ?? false);
+    }
 }

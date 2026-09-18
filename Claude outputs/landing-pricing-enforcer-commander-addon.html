@@ -1,0 +1,39 @@
+<!--
+  DRAFT — Enforcer/Commander teaser for the public pricing section (landing.html)
+
+  WHERE THIS GOES: inside the "pricing" CMS section (/admin/landing → edit the
+  "pricing" section's HTML), right after the closing </div> of the
+  <div class="npx-feat">...</div> block and BEFORE <div class="pr-foot">...
+
+  WHY NOT FULL PRICING CARDS FOR ENFORCER/COMMANDER: this section's whole pitch
+  is "One product. Every feature. Two ways to buy." — one calculator, one price
+  slider, no tier concept at all. Turning that into three tiers means reworking
+  the slider/calculator JS too (the same PLANS[0]-style rework already done for
+  /buy's checkout page), and Enforcer/Commander aren't priced yet anyway, so a
+  full calculator would just show "Custom quote" everywhere — worse UX than a
+  simple, honest teaser. This block adds the mention without touching the
+  calculator, its JS, or the existing Standard-tier copy (which already says
+  "Every standard feature included" — that line doesn't need to change).
+
+  HOW TO APPLY: paste this block into the pricing section's HTML in the CMS
+  editor, then Preview (/cms-preview) before Publish as usual. It uses only
+  classes/colors already defined elsewhere on the page (btn, btn-light, the
+  same teal gradient as the "popular" Perpetual card), so no new CSS is needed.
+
+  The /buy?tier=enforcer link uses the tier selector already shipped on /buy
+  this session — once Enforcer/Commander are seeded (see the main project doc,
+  §6), this deep-links straight to that tab.
+-->
+<div class="npx-addon" style="margin-top:28px;background:linear-gradient(135deg,#0E7C8F,#1899AE);border-radius:18px;padding:26px 28px;color:#fff;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:18px">
+  <div style="max-width:560px">
+    <div style="font-weight:800;font-size:17px;margin-bottom:5px">Need to actively block distractions, not just monitor them?</div>
+    <div style="font-size:13.5px;color:rgba(255,255,255,.92);line-height:1.6">
+      <b>SmartEPT Enforcer</b> adds real-time app &amp; website blocking on top of everything above.
+      <b>SmartEPT Commander</b> adds live screen viewing too. Same one-time or subscription choice &mdash; ask us for pricing.
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+    <a class="btn btn-light" href="/buy?tier=enforcer" style="white-space:nowrap">Get a quote for Enforcer / Commander &rarr;</a>
+    <a href="https://wa.me/919000098877?text=Hi%20Ametecs%2C%20I%27d%20like%20pricing%20for%20SmartEPT%20Enforcer%20%2F%20Commander" target="_blank" style="font-size:11.5px;color:rgba(255,255,255,.85)">...or ask on WhatsApp</a>
+  </div>
+</div>

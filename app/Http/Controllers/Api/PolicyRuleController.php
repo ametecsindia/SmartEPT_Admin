@@ -118,6 +118,7 @@ class PolicyRuleController extends Controller
             'rules.*.protections.file'     => ['nullable', 'boolean'],
             'rules.*.protections.image'    => ['nullable', 'boolean'],
             'rules.*.protections.camera'   => ['nullable', 'boolean'],
+            'rules.*.protections.video'    => ['nullable', 'boolean'],
         ]);
 
         $companyId = (int) $request->user()->company_id;

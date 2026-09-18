@@ -71,6 +71,12 @@ Schedule::call(function () {
 // a false alarm on the one indicator everything else is diagnosed from (2-Sep-2026).
 })->everyMinute()->name('scheduler-heartbeat')->withoutOverlapping(5);
 
+// LiveView Phase 4 (14-Sep-2026): end sessions the Agent stopped heartbeating on —
+// see EndStaleLiveViewSessions's docblock. Bounded like every other sweep here
+// (2-Sep-2026 rule): a killed run must self-heal on the next minute, not lock stale
+// concurrency slots for 24h.
+Schedule::command('smartept:end-stale-liveview-sessions')->everyMinute()->withoutOverlapping(2);
+
 // Live-board self-heal (Admin #3/#4): close any break/meeting status segment left open
 // across a day boundary (agent killed mid-break → a 16-hour "On break" ghost) so the live
 // dashboard never shows an impossible multi-hour break. The dashboard also self-heals on

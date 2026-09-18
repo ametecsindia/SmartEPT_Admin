@@ -98,6 +98,42 @@ else
   echo "       * * * * * cd $APP_DIR && php artisan schedule:run >/dev/null 2>&1"
 fi
 
+# --- 6) LiveView relay (systemd) ---------------------------------------------
+# 14-Sep-2026, rebuilt as a real production step (no Node.js dependency) 15-Sep-2026:
+# relay/dist/smartept-relay-linux is a SELF-CONTAINED compiled binary (built with
+# `npm run build` from relay/server.js — see relay/package.json), so this server needs
+# no Node.js/npm at all, not even to run it as a service. Same "install once, invisible
+# forever" contract as smartept-admin above. The shared secret is copied straight from
+# the .env APP_KEY this install just generated. A missing binary is a note, not a
+# failure — LiveView is optional, everything else in SmartEPT works without it.
+if [ -f relay/dist/smartept-relay-linux ]; then
+  chmod +x relay/dist/smartept-relay-linux
+  grep '^APP_KEY=' .env | cut -d= -f2- > relay/relay-secret.txt
+  if [ "$(id -u)" = "0" ] && command -v systemctl >/dev/null 2>&1; then
+    cat > /etc/systemd/system/smartept-relay.service <<UNIT
+[Unit]
+Description=SmartEPT LiveView relay
+After=network.target
+
+[Service]
+WorkingDirectory=$APP_DIR/relay
+ExecStart=$APP_DIR/relay/dist/smartept-relay-linux
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+    systemctl daemon-reload
+    systemctl enable --now smartept-relay
+    echo "[ok] LiveView relay installed as service 'smartept-relay' (survives reboot)"
+  else
+    echo "[note] Not root or no systemd — start the relay manually with:  ./relay/dist/smartept-relay-linux"
+  fi
+else
+  echo "[note] relay/dist/smartept-relay-linux not found — LiveView will not be available."
+fi
+
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 echo "============================================================"
 echo "  DONE. SmartEPT console:  http://${IP:-localhost}:8080/admin"

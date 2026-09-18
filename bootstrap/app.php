@@ -32,6 +32,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'consent'    => \App\Http\Middleware\EnsureConsent::class,
             'tracking-mode' => \App\Http\Middleware\EnforceTrackingMode::class,
             'licensed'   => \App\Http\Middleware\EnsureLicensed::class,
+            // 18-Sep-2026: Standard/Enforcer/Commander plan-feature gate, stacks
+            // (AND) with role:/permission: — see EnsureFeature's own docblock.
+            'feature'    => \App\Http\Middleware\EnsureFeature::class,
             'active-employee' => \App\Http\Middleware\EnsureActiveEmployment::class,
             // 26-Aug-2026: refuse tracking ingestion from a device whose session has ended.
             'live-session' => \App\Http\Middleware\EnsureLiveDeviceSession::class,

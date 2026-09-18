@@ -1,0 +1,31 @@
+<service>
+	<id>smarteptliveviewrelay.exe</id>
+	<name>SmartEPT LiveView Relay</name>
+	<description>SmartEPT LiveView relay — WebSocket frame pipe between the Agent and the admin console. Auto-restarts on crash.</description>
+	<executable>C:\laragon\bin\nodejs\node-v22\node.exe</executable>
+	<argument>--harmony</argument>
+	<argument>C:\laragon\www\smartept\relay\node_modules\node-windows\lib\wrapper.js</argument>
+	<argument>--file</argument>
+	<argument>C:\laragon\www\smartept\relay\server.js</argument>
+	<argument>--scriptoptions=</argument>
+	<argument>--log</argument>
+	<argument>SmartEPT LiveView Relay wrapper</argument>
+	<argument>--grow</argument>
+	<argument>0.5</argument>
+	<argument>--wait</argument>
+	<argument>2</argument>
+	<argument>--maxrestarts</argument>
+	<argument>10</argument>
+	<argument>--abortonerror</argument>
+	<argument>n</argument>
+	<argument>--stopparentfirst</argument>
+	<argument>undefined</argument>
+	<logmode>rotate</logmode>
+	<stoptimeout>30sec</stoptimeout>
+	<serviceaccount>
+		<domain>DESKTOP-ACAS2DS</domain>
+		<user>LocalSystem</user>
+		<password></password>
+	</serviceaccount>
+	<workingdirectory>C:\laragon\www\smartept\relay</workingdirectory>
+</service>

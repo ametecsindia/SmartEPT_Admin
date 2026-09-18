@@ -211,13 +211,16 @@ class EnforcerSyncController extends Controller
         // A real Windows driver block, so it rides the machine baseline like the
         // website rules do.
         $device = (array) (\App\Models\Company::withoutGlobalScopes()->whereKey($companyId)
-            ->first(['block_removable_storage', 'block_camera_device', 'block_browser_uploads'])?->toArray() ?? []);
+            ->first(['block_removable_storage', 'block_camera_device', 'block_browser_uploads', 'block_media_streaming'])?->toArray() ?? []);
         $webProtections = $this->webProtectionsFor($companyId, (bool) ($device['block_browser_uploads'] ?? false));
         $blockRemovable = (bool) ($device['block_removable_storage'] ?? false);
         // Camera device block: same shape, disables the camera hardware itself.
         $blockCamera = (bool) ($device['block_camera_device'] ?? false);
+        // Media Control: the browser-extension video block. Same company-wide
+        // switch shape as the others; see mediaControlFor() for what it sends.
+        $mediaControl = $this->mediaControlFor($companyId, (bool) ($device['block_media_streaming'] ?? false));
 
-        if ($baseline !== [] || $sites !== [] || $protections !== [] || $webProtections !== null || $blockRemovable || $blockCamera) {
+        if ($baseline !== [] || $sites !== [] || $protections !== [] || $webProtections !== null || $blockRemovable || $blockCamera || $mediaControl !== null) {
             $specs[] = [
                 'version'                 => $version,
                 'mode'                    => $mode,
@@ -230,6 +233,7 @@ class EnforcerSyncController extends Controller
                 'web_protections'         => $webProtections,
                 'block_removable_storage' => $blockRemovable,
                 'block_camera_device'     => $blockCamera,
+                'media_control'           => $mediaControl,
             ];
         }
 
@@ -248,8 +252,16 @@ class EnforcerSyncController extends Controller
             $bundle = app(PolicyResolver::class)->bundleForEmployee($employee, $employee->currentDevice ?? null);
             $rules = $this->rulesFromBundle($bundle);
 
-            if ($rules !== []) {
-                $specs[] = [
+            // The employee's own media-control override, if they have one.
+            // null means "inherit the company switch", already covered by the
+            // MACHINE-scope spec above — nothing is sent for it in that case,
+            // and unlike $rules it must not be what gates whether this spec is
+            // built: an employee with a media override but no application
+            // rules of their own still needs an EMPLOYEE spec to carry it.
+            $employeeMedia = $this->mediaControlForEmployee($employee);
+
+            if ($rules !== [] || $employeeMedia !== null) {
+                $spec = [
                     'version'   => $version,
                     'mode'      => $mode,
                     'scope'     => 'EMPLOYEE',
@@ -265,6 +277,10 @@ class EnforcerSyncController extends Controller
                     ],
                     'rules'     => $rules,
                 ];
+                if ($employeeMedia !== null) {
+                    $spec['media_control'] = $employeeMedia;
+                }
+                $specs[] = $spec;
             }
         }
 
@@ -544,13 +560,98 @@ class EnforcerSyncController extends Controller
             return null;
         }
 
-        // Sites the admin explicitly marked Allowed become the camera exception
-        // list. Without this, switching the camera off for one site would take
-        // the company's own video-meeting tool down with it.
-        $allowed = PolicyRule::withoutGlobalScopes()
+        return [
+            'block_uploads'       => $uploads,
+            'block_camera'        => $camera,
+            // Sites the admin explicitly marked Allowed. Without this,
+            // switching the camera off for one site would take the company's
+            // own video-meeting tool down with it. The same list also
+            // exempts sites from Media Control, below — one "Allowed" list,
+            // reused, rather than a second admin control for the same idea.
+            'camera_allowed_urls' => $this->allowedWebsiteItems($companyId, $policy->id),
+            // Kept so the endpoint's audit report can name the rules that asked
+            // for this, rather than reporting an unexplained browser-wide change.
+            'requested_by'        => $items,
+        ];
+    }
+
+    /**
+     * Media Control: whether the SmartEPT Media Control browser extension
+     * should block video, company-wide, and which sites are exempted.
+     *
+     * Same shape and same reasoning as webProtectionsFor(): a browser
+     * exposes only a global switch plus exceptions, never a per-site block,
+     * so that is the DECISION this sends — never a per-site list.
+     *
+     * The exemption list reuses the WEBSITE policy's "Allowed" rows — the
+     * same list webProtectionsFor() already builds for the camera — so
+     * marking a site Allowed exempts it from both at once. A dedicated
+     * exemption list can be split out later if a client ever needs the two
+     * to differ; nobody has asked for that yet.
+     *
+     * @return array<string,mixed>|null
+     */
+    private function mediaControlFor(int $companyId, bool $enabledCompanyWide): ?array
+    {
+        if (! $enabledCompanyWide) {
+            return null;
+        }
+
+        $policy = $this->primaryPolicy(WebsitePolicy::class, $companyId, 'WEBSITE');
+        $allowed = $policy ? $this->allowedWebsiteItems($companyId, $policy->id) : [];
+
+        return [
+            'enabled'      => true,
+            'allowed_urls' => $allowed,
+        ];
+    }
+
+    /**
+     * One employee's own media-control override, or null to inherit the
+     * company-wide switch (already sent in the MACHINE-scope spec).
+     *
+     * media_block_mode is BLOCKED, ALLOWED or null — the same tri-state shape
+     * as enforcement_mode/tracking_mode elsewhere on Employee. Unlike
+     * mediaControlFor(), this MUST distinguish "off" from "no opinion": an
+     * admin who set ALLOWED for one employee needs that to override an
+     * enabled company switch, not just fail to add to it, so this returns an
+     * explicit enabled=false rather than null when the override is ALLOWED.
+     * See smartept-enforcer's store.MediaControl.Enabled doc comment for how
+     * the two scopes layer on the endpoint.
+     *
+     * @return array<string,mixed>|null
+     */
+    private function mediaControlForEmployee(Employee $employee): ?array
+    {
+        $mode = strtoupper((string) ($employee->media_block_mode ?? ''));
+        if (! in_array($mode, ['BLOCKED', 'ALLOWED'], true)) {
+            return null;
+        }
+
+        $companyId = (int) $employee->company_id;
+        $policy = $this->primaryPolicy(WebsitePolicy::class, $companyId, 'WEBSITE');
+        $allowed = $policy ? $this->allowedWebsiteItems($companyId, $policy->id) : [];
+
+        return [
+            'enabled'      => $mode === 'BLOCKED',
+            'allowed_urls' => $allowed,
+        ];
+    }
+
+    /**
+     * Sites the admin explicitly marked Allowed on the WEBSITE policy.
+     * Shared by webProtectionsFor() (camera exemptions) and mediaControlFor()
+     * (video exemptions) — one query, one source of truth for "sites this
+     * company has vouched for", rather than two copies that could drift.
+     *
+     * @return array<int,string>
+     */
+    private function allowedWebsiteItems(int $companyId, int $policyId): array
+    {
+        return PolicyRule::withoutGlobalScopes()
             ->where('company_id', $companyId)
             ->where('policy_type', 'WEBSITE')
-            ->where('policy_id', $policy->id)
+            ->where('policy_id', $policyId)
             ->where('status', 'ALLOWED')
             ->pluck('item')
             ->map(fn ($v) => trim((string) $v))
@@ -558,15 +659,6 @@ class EnforcerSyncController extends Controller
             ->unique()
             ->values()
             ->all();
-
-        return [
-            'block_uploads'       => $uploads,
-            'block_camera'        => $camera,
-            'camera_allowed_urls' => $allowed,
-            // Kept so the endpoint's audit report can name the rules that asked
-            // for this, rather than reporting an unexplained browser-wide change.
-            'requested_by'        => $items,
-        ];
     }
 
     /**
@@ -586,17 +678,63 @@ class EnforcerSyncController extends Controller
             return [];
         }
 
-        return PolicyRule::withoutGlobalScopes()
+        $blocked = PolicyRule::withoutGlobalScopes()
             ->where('company_id', $companyId)
             ->where('policy_type', 'WEBSITE')
             ->where('policy_id', $policy->id)
             ->enforcing()
             ->pluck('item')
             ->map(fn ($v) => trim((string) $v))
-            ->filter()
+            ->filter();
+
+        return $blocked->merge($this->videoCdnSitesFor($companyId, $policy->id))
             ->unique()
             ->values()
             ->all();
+    }
+
+    /**
+     * The video-CDN domains a `video` protection actually resolves to, for
+     * sites where that mechanism has a real domain to block (see
+     * config('protections.video_cdn_domains')). Added to the SAME site
+     * blocklist as a full block — a CDN-only domain refused there is
+     * indistinguishable, to the endpoint, from any other blocked host — while
+     * the site's own domain is deliberately never added on its behalf, which
+     * is what keeps the site itself reachable.
+     *
+     * Only ever reads non-enforcing rows: a row already BLOCKED/VIOLATION
+     * clears its protections client-side (admin.blade.php) before it ever
+     * reaches here, so an item cannot be both "site blocked" and "video
+     * protected" at once — nothing here needs to guard against that.
+     *
+     * @return array<int,string>
+     */
+    private function videoCdnSitesFor(int $companyId, int $policyId): array
+    {
+        $domains = (array) config('protections.video_cdn_domains', []);
+        if ($domains === []) {
+            return [];
+        }
+
+        $rules = PolicyRule::withoutGlobalScopes()
+            ->where('company_id', $companyId)
+            ->where('policy_type', 'WEBSITE')
+            ->where('policy_id', $policyId)
+            ->withProtections()
+            ->get(['item', 'protections']);
+
+        $out = [];
+        foreach ($rules as $rule) {
+            $item = strtolower(trim((string) $rule->item));
+            if (! $rule->hasProtection('video') || ! isset($domains[$item])) {
+                continue;
+            }
+            foreach ((array) $domains[$item] as $cdn) {
+                $out[] = (string) $cdn;
+            }
+        }
+
+        return $out;
     }
 
     /** @return array<int,array<string,mixed>> */
@@ -758,12 +896,21 @@ class EnforcerSyncController extends Controller
      * NOTHING was blocked, websites included.
      *
      * "No rules" has to mean no rules of either kind.
+     *
+     * 16-Sep-2026: extended for the same reason the websites gap above was a
+     * bug. An employee whose ONLY policy is their own media-block override
+     * (media_block_mode, no application or website rules of their own) has
+     * something real to enforce — omitting it here would report OFF, the
+     * endpoint would disarm on this employee's next heartbeat, and the
+     * override the admin set would never actually reach the machine.
      */
     private function employeeHasAnythingToEnforce(Employee $employee): bool
     {
         $companyId = (int) $employee->company_id;
 
-        return $this->rulesFor($companyId) !== [] || $this->sitesFor($companyId) !== [];
+        return $this->rulesFor($companyId) !== []
+            || $this->sitesFor($companyId) !== []
+            || $this->mediaControlForEmployee($employee) !== null;
     }
 
     /**

@@ -174,6 +174,11 @@ PEM;
                 'bundle' => [
                     'company' => $p['company'] ?? null,
                     'plan' => $p['plan'] ?? null,
+                    // 18-Sep-2026: Standard/Enforcer/Commander — LicenseSigner::sign()
+                    // now puts 'tier' in the signed payload; without this line it was
+                    // silently dropped here even though LicenseClient::mergeBundle()
+                    // (the phone-home path) already carries it through automatically.
+                    'tier' => $p['tier'] ?? null,
                     'device_limit' => $p['device_limit'] ?? null,
                     'kind' => $p['kind'] ?? null,
                     'deployment' => $p['deployment'] ?? null,

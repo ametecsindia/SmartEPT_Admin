@@ -1,0 +1,25 @@
+{
+  "name": "smartept-relay",
+  "version": "1.0.0",
+  "description": "SmartEPT LiveView relay — dumb WebSocket frame pipe between one Agent stream leg and one/many Admin viewer legs. No business logic, no database. Trusts only the short-lived signed token minted by the smartept Laravel app.",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "pkg . --targets node22-win-x64,node22-linux-x64,node22-macos-x64 --out-path dist",
+    "service:install": "node service-install.js",
+    "service:uninstall": "node service-uninstall.js"
+  },
+  "bin": "server.js",
+  "pkg": {
+    "targets": ["node22-win-x64", "node22-linux-x64", "node22-macos-x64"],
+    "outputPath": "dist"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "dotenv": "^16.4.5",
+    "@yao-pkg/pkg": "^6.22.0"
+  }
+}

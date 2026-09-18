@@ -266,6 +266,81 @@ class EnforcerEnrollmentTest extends TestCase
         $this->assertNotContains('youtube', $machine['sites'] ?? [], 'a warn-only website was sent as if it were enforced');
     }
 
+    /**
+     * 16-Sep-2026 (Ejaz): per-employee media-streaming blocking. An employee's
+     * own media_block_mode must reach the endpoint on THEIR overlay, override
+     * an OFF company switch, and — the regression this guards — must not be
+     * silently swallowed by employeeHasAnythingToEnforce() just because they
+     * have no application or website rules of their own.
+     */
+    public function test_an_employees_own_media_override_reaches_their_overlay_and_beats_the_company_switch(): void
+    {
+        $this->admin();
+        $token = $this->enrol($this->mintSecret())->assertCreated()->json('device_token');
+
+        $company = \App\Models\ApplicationPolicy::withoutGlobalScopes()->firstOrFail()->company_id;
+        \App\Models\EnforcementState::forCompany($company)
+            ->forceFill(['mode' => \App\Models\EnforcementState::ENFORCE])->save();
+
+        // Company-wide switch explicitly OFF, so any enabled=true seen below can
+        // only have come from the employee's own override, not inherited.
+        \App\Models\Company::withoutGlobalScopes()->whereKey($company)
+            ->update(['block_media_streaming' => false]);
+
+        $employee = \App\Models\Employee::withoutGlobalScopes()->where('company_id', $company)->firstOrFail();
+        $employee->forceFill(['media_block_mode' => 'BLOCKED'])->save();
+
+        // The heartbeat is what tells the server who is signed in and what SID
+        // their overlay is written against — the policy endpoint answers for
+        // whoever the LAST heartbeat named, exactly like the real endpoint.
+        $this->withToken($token)->postJson('/api/enforcer/heartbeat', [
+            'device_uuid' => 'MACHINE-A',
+            'windows_sid' => 'S-1-5-21-1-1-1-1001',
+            'employee_id' => $employee->id,
+        ])->assertOk()
+          // The regression this test exists for: a media-only override must
+          // still count as "something to enforce" for this employee, or the
+          // endpoint is told OFF and never applies it at all.
+          ->assertJsonPath('enforcement.kill_switch', false);
+
+        $specs = $this->withToken($token)
+            ->getJson('/api/enforcer/policy?device_uuid=MACHINE-A')
+            ->assertOk()
+            ->json('data');
+
+        $machineSpec = collect($specs)->firstWhere('scope', 'MACHINE');
+        $this->assertTrue(
+            empty($machineSpec['media_control']),
+            'the company switch is off — nothing should have been sent on the machine baseline'
+        );
+
+        $employeeSpec = collect($specs)->firstWhere('scope', 'EMPLOYEE');
+        $this->assertNotNull($employeeSpec, 'the employee overlay never reached the endpoint');
+        $this->assertTrue($employeeSpec['media_control']['enabled'] ?? false,
+            'the employee-level override never reached their overlay');
+
+        // Flip to ALLOWED with the company switch ON: the override must still
+        // win, this time forcing an explicit false through rather than being
+        // read as "no opinion".
+        \App\Models\Company::withoutGlobalScopes()->whereKey($company)->update(['block_media_streaming' => true]);
+        $employee->forceFill(['media_block_mode' => 'ALLOWED'])->save();
+
+        $specs = $this->withToken($token)
+            ->getJson('/api/enforcer/policy?device_uuid=MACHINE-A')
+            ->assertOk()
+            ->json('data');
+
+        $machineSpec = collect($specs)->firstWhere('scope', 'MACHINE');
+        $this->assertTrue($machineSpec['media_control']['enabled'] ?? false,
+            'the company switch is on — the machine baseline should carry it');
+
+        $employeeSpec = collect($specs)->firstWhere('scope', 'EMPLOYEE');
+        $this->assertNotNull($employeeSpec);
+        $this->assertArrayHasKey('media_control', $employeeSpec, 'an ALLOWED override must be sent explicitly, not omitted');
+        $this->assertFalse($employeeSpec['media_control']['enabled'],
+            'this employee opted out — their overlay must force it off even though the company switch is on');
+    }
+
     // --- re-enrolment ------------------------------------------------------
 
     public function test_re_enrolling_the_same_machine_updates_it_rather_than_duplicating(): void

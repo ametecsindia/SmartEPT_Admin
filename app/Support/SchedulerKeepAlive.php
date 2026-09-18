@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Services\UpdateClient;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Keep `artisan schedule:work` alive from the application itself (Ejaz, 2-Sep-2026:
@@ -72,16 +73,42 @@ class SchedulerKeepAlive
             }
 
             $client = app(UpdateClient::class);
-            $php = $client->canSpawn() ? $client->phpBinary() : null;
+            $canSpawn = $client->canSpawn();
+            $php = $canSpawn ? $client->phpBinary() : null;
 
             // No CLI php, or exec/popen disabled in php.ini. Nothing to do — Troubleshooting
             // stays red and tells the admin to create the scheduled task, which is correct.
+            // 16-Sep-2026: this used to fail completely silently, so a server where it
+            // never once worked (Ejaz's laragon box — canSpawn()/phpBinary() both looked
+            // fine on paper, yet no heartbeat was ever recorded) gave nobody anything to
+            // go on. One log line per reason, once per RETRY_SECONDS window (the lock
+            // above already rate-limits this), so the NEXT silent failure is diagnosable
+            // from storage/logs/laravel.log instead of requiring a fresh investigation.
             if ($php) {
+                Log::info('SchedulerKeepAlive: spawning schedule:work', ['php' => $php]);
                 self::spawn($php);
+            } elseif (! $canSpawn) {
+                Log::warning('SchedulerKeepAlive: cannot spawn — popen and proc_open are both '
+                    . 'disabled in php.ini. Create the Windows Scheduled Task / cron job manually.');
+            } else {
+                Log::warning('SchedulerKeepAlive: could not locate a PHP CLI binary '
+                    . '(checked PHP_BINDIR and PHP_BINARY). Set SMARTEPT_PHP_BINARY in .env to '
+                    . 'the full path of php.exe, or create the scheduled task manually.');
             }
         } catch (\Throwable $e) {
             // A page load must never fail because of this. On a fresh install the cache table
             // does not exist yet and Cache::get throws — that is a normal path, not an error.
+            // Still worth a log line: this catch is exactly where a real bug would otherwise
+            // hide forever, same lesson as the two branches above.
+            try {
+                Log::warning('SchedulerKeepAlive: ensure() threw, skipping this attempt', [
+                    'error' => $e->getMessage(),
+                ]);
+            } catch (\Throwable $ignored) {
+                // Logging itself is unavailable (e.g. unwritable storage/logs — see
+                // smartept_server_permissions_500s). Nothing left to do but let the request
+                // continue; Troubleshooting still shows the scheduler as red.
+            }
         }
     }
 

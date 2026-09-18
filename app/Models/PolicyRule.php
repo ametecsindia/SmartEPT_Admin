@@ -58,8 +58,12 @@ class PolicyRule extends Model
      * Keys are stored in the `protections` JSON column; an absent key is false.
      * The list will grow (microphone, clipboard, printing), which is why the
      * column is JSON and this constant is the single place the set is named.
+     *
+     * 'video' (16-Sep-2026): video/media-streaming playback. Offered on every
+     * row regardless of whether a mechanism exists yet — see
+     * config/protections.php for which items it actually does something on.
      */
-    public const PROTECTIONS = ['file', 'image', 'camera'];
+    public const PROTECTIONS = ['file', 'image', 'camera', 'video'];
 
     /** The protections actually switched on, normalised. @return array<int,string> */
     public function protectionList(): array
