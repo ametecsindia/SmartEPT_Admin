@@ -1,7 +1,12 @@
 {
-  "event": "error",
-  "code": "EADDRINUSE",
-  "message": "listen EADDRINUSE: address already in use 0.0.0.0:8098",
-  "at": "2026-09-18T11:57:19.242Z",
-  "pid": 12616
+  "event": "listening",
+  "port": 8098,
+  "address": {
+    "address": "0.0.0.0",
+    "family": "IPv4",
+    "port": 8098
+  },
+  "tls": false,
+  "at": "2026-09-19T05:36:23.206Z",
+  "pid": 7200
 }

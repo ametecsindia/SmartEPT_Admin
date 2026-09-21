@@ -62,11 +62,21 @@ class ComplianceEvaluator
 
         foreach ((array) ($policy['blocked_apps'] ?? []) as $b) {
             $entry = $this->normApp($b);
-            if ($needle !== '' && str_contains($needle, $entry)) {
-                $rule = $rules[$entry] ?? null;
-
-                return $this->verdict('BLOCKED', true, $this->actionFor($rule, $action), $rule);
+            if ($needle === '' || ! str_contains($needle, $entry)) {
+                continue;
             }
+            $rule = $rules[$entry] ?? null;
+            // policy_rules is the fresher source of truth for one item's status.
+            // An admin who marks an item ALLOWED there — including via the
+            // enforcement audit report's "Allow / dismiss" button, which writes
+            // a rule but never touches this legacy list — must win even though
+            // blocked_apps has not been re-saved to drop it. Mirrors the same
+            // check in usage.js::matchBlockedApp; the two must change together.
+            if (strtoupper((string) ($rule['status'] ?? '')) === 'ALLOWED') {
+                continue;
+            }
+
+            return $this->verdict('BLOCKED', true, $this->actionFor($rule, $action), $rule);
         }
 
         // categories: { "chrome.exe": "PRODUCTIVE", ... }
@@ -97,11 +107,17 @@ class ComplianceEvaluator
 
         foreach ((array) ($policy['blocked_sites'] ?? []) as $b) {
             $entry = $this->normSite($b);
-            if ($hay !== '' && $this->siteMatches($hay, $entry)) {
-                $rule = $rules[$entry] ?? null;
-
-                return $this->verdict('BLOCKED', true, $this->actionFor($rule, $action), $rule);
+            if ($hay === '' || ! $this->siteMatches($hay, $entry)) {
+                continue;
             }
+            $rule = $rules[$entry] ?? null;
+            // See classifyApp: policy_rules status ALLOWED beats a stale legacy
+            // blocked_sites entry.
+            if (strtoupper((string) ($rule['status'] ?? '')) === 'ALLOWED') {
+                continue;
+            }
+
+            return $this->verdict('BLOCKED', true, $this->actionFor($rule, $action), $rule);
         }
 
         foreach ((array) ($policy['categories'] ?? []) as $key => $cat) {

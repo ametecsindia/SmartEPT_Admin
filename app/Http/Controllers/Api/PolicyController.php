@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\ApplicationPolicy;
 use App\Models\AttendancePolicy;
 use App\Models\BreakPolicy;
-use App\Models\CompliancePolicy;
 use App\Models\DevicePolicy;
 use App\Models\Employee;
 use App\Models\EmployeeDevice;
@@ -40,7 +39,6 @@ class PolicyController extends Controller
         'vpn_proxy'   => VpnProxyPolicy::class,
         'break'       => BreakPolicy::class,
         'attendance'  => AttendancePolicy::class,
-        'compliance'  => CompliancePolicy::class,
     ];
 
     /** GET /api/policies/{type} */
@@ -102,7 +100,7 @@ class PolicyController extends Controller
     public function assign(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'policy_type'     => ['required', 'in:MONITORING,SCREENSHOT,WEBCAM,APPLICATION,WEBSITE,NETWORK,DEVICE,USB,VPN_PROXY,BREAK,ATTENDANCE,COMPLIANCE'],
+            'policy_type'     => ['required', 'in:MONITORING,SCREENSHOT,WEBCAM,APPLICATION,WEBSITE,NETWORK,DEVICE,USB,VPN_PROXY,BREAK,ATTENDANCE'],
             'policy_id'       => ['required', 'integer'],
             'assignable_type' => ['required', 'in:COMPANY,BRANCH,DEPARTMENT,TEAM,EMPLOYEE,DEVICE'],
             'assignable_id'   => ['required', 'integer'],

@@ -215,6 +215,11 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
     // reasoning as enforcement/disable below).
     Route::post('liveview/session/start', [LiveViewController::class, 'start'])->middleware(['permission:liveview.start', 'feature:live_view']);
     Route::post('liveview/session/{session}/stop', [LiveViewController::class, 'stop'])->middleware('permission:liveview.stop');
+    // 21-Sep-2026: the permission-based licence's own management endpoints —
+    // same gate as starting a session (whoever can start LiveView can decide
+    // who's eligible for it).
+    Route::get('liveview/permissions', [LiveViewController::class, 'permissions'])->middleware(['permission:liveview.start', 'feature:live_view']);
+    Route::post('liveview/permission', [LiveViewController::class, 'setPermission'])->middleware(['permission:liveview.start', 'feature:live_view']);
 
     // 'licensed' is inherited from the group above — no longer listed here.
     Route::prefix('agent')->middleware(['active-employee', 'throttle:600,1'])->group(function () {

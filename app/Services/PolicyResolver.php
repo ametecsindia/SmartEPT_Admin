@@ -9,7 +9,6 @@ use App\Models\Department;
 use App\Models\Team;
 use App\Models\AttendancePolicy;
 use App\Models\BreakPolicy;
-use App\Models\CompliancePolicy;
 use App\Models\DevicePolicy;
 use App\Models\Employee;
 use App\Models\EmployeeDevice;
@@ -52,7 +51,6 @@ class PolicyResolver
         'VPN_PROXY'   => VpnProxyPolicy::class,
         'BREAK'       => BreakPolicy::class,
         'ATTENDANCE'  => AttendancePolicy::class,
-        'COMPLIANCE'  => CompliancePolicy::class,
     ];
 
     /**
@@ -414,6 +412,16 @@ class PolicyResolver
 
     /**
      * All currently-effective assignments for the company, indexed for quick lookup.
+     *
+     * A slot (e.g. WEBSITE assigned to this COMPANY) can legitimately end up with
+     * more than one row — the Rules screen assigns one on its first save, and the
+     * generic Policies tab assigns another if it is ever used to create a
+     * same-type COMPANY policy too. Both survive; assign() only ever inserts.
+     * Without `orderBy('id')` the foreach below overwrote the array key in
+     * whatever order MySQL felt like handing rows back — undefined, and it
+     * showed up as an agent enforcing a stale policy the Rules screen no longer
+     * shows as blocked. Ordering by id makes the LAST (most recently assigned)
+     * row for a slot the one that wins, deterministically.
      */
     private function assignmentsFor(int $companyId, array $chain): array
     {
@@ -424,6 +432,7 @@ class PolicyResolver
             ->where('company_id', $companyId)
             ->where(fn ($q) => $q->whereNull('effective_from')->orWhere('effective_from', '<=', $today))
             ->where(fn ($q) => $q->whereNull('effective_to')->orWhere('effective_to', '>=', $today))
+            ->orderBy('id')
             ->get();
 
         // index[type][assignableType][assignableId] = policy_id
@@ -449,9 +458,6 @@ class PolicyResolver
         // Fallback: direct link stored on the employee record.
         if (! $policyId && $type === 'MONITORING' && $employee->monitoring_policy_id) {
             $policyId = $employee->monitoring_policy_id;
-        }
-        if (! $policyId && $type === 'COMPLIANCE' && $employee->compliance_policy_id) {
-            $policyId = $employee->compliance_policy_id;
         }
 
         if (! $policyId) {

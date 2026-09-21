@@ -16,9 +16,13 @@ use Illuminate\Http\Request;
  * start and issues the two short-lived signed tokens; never touches a frame.
  *
  * Phase 4 (14-Sep-2026) added: permission slugs (routes/api.php + the
- * liveview.high_quality check below), the concurrency/licence gate below, and
- * the heartbeat-timeout sweep (App\Console\Commands\EndStaleLiveViewSessions) —
+ * liveview.high_quality check below), a (since superseded) concurrency/licence
+ * gate, and the heartbeat-timeout sweep (App\Console\Commands\EndStaleLiveViewSessions) —
  * see 2026_09_14_000100_seed_liveview_permissions.php's docblock.
+ *
+ * Phase 5 (21-Sep-2026, Ejaz): licensing switched from "how many screens may be
+ * open at once" to "how many employees may be granted LiveView permission" —
+ * see the permission gate in start(), and permissions()/setPermission() below.
  */
 class LiveViewController extends Controller
 {
@@ -58,37 +62,15 @@ class LiveViewController extends Controller
             ], 403);
         }
 
-        // Concurrency/licence gate (Phase 4): a different kind of limit than
-        // LicenceSeats' registered employee/user/device seats, so it isn't forced
-        // through that service — it reads the bundle's own feature limit, same
-        // place LicenseController::payload() already reads bundle['features'].
-        $company = $request->user()->company;
-        // 18-Sep-2026: default changed 1 → 0 — Live View is a Commander-only
-        // feature now (see InstallationLicense::hasFeature('live_view')); a
-        // licence bundle that carries no liveview_max_concurrent at all must
-        // resolve to "no concurrent sessions", not "one for free".
-        $limit = InstallationLicense::governing($company)->bundle['features']['liveview_max_concurrent'] ?? 0;
-        // ponytail: nothing ever flips a session to 'live' (Phase 3 POC left that out), and
-        // the heartbeat that keeps last_heartbeat_at fresh is the Agent's own device heartbeat
-        // — which keeps firing even after the admin just closes the browser tab without
-        // clicking Stop. So a 'connecting' row can outlive its viewer indefinitely and the
-        // timeout sweep never catches it (device stays online). Found live 14-Sep-2026: an
-        // abandoned POC session blocked every new Start. Fix: a 'connecting' row only holds
-        // its concurrency slot for 2 minutes — long enough for the Agent's normal ~30s
-        // heartbeat to pick up the request — after that it's presumed abandoned and stops
-        // counting, even though the row itself stays open until the sweep or an explicit Stop
-        // closes it. Upgrade path if this isn't enough: a real viewer-side pulse endpoint so
-        // last_heartbeat_at reflects "someone is watching", not just "device is online".
-        $activeCount = LiveViewSession::where('status', '!=', 'ended')
-            ->whereNull('ended_at')
-            ->where(function ($q) {
-                $q->where('status', 'live')->orWhere('started_at', '>', now()->subMinutes(2));
-            })
-            ->count();
-        if ($activeCount >= $limit) {
+        // Permission gate (Phase 5, 21-Sep-2026, Ejaz): licensing is no longer a
+        // simultaneous-viewing cap — any number of permitted employees may be
+        // watched at once. The licensed resource is now the GRANT itself (see
+        // setPermission()'s own limit check, against bundle['features']['liveview_max_users']).
+        // An employee without the grant is never startable, full stop.
+        if (! $employee->liveview_enabled) {
             return response()->json([
-                'error' => ['code' => 'LIVEVIEW_LIMIT_REACHED', 'message' => "Your licence allows {$limit} concurrent LiveView " . str('session')->plural($limit) . '. Stop one before starting another.'],
-            ], 409);
+                'error' => ['code' => 'LIVEVIEW_NOT_PERMITTED', 'message' => 'This employee has not been granted LiveView permission. Grant it from Manage LiveView Permissions first.'],
+            ], 403);
         }
 
         $session = LiveViewSession::create([
@@ -130,6 +112,63 @@ class LiveViewController extends Controller
         $this->audit($request, 'liveview.session_stop', LiveViewSession::class, $session->id);
 
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * GET /api/liveview/permissions — the management list for the new permission-
+     * based licence (Phase 5, 21-Sep-2026): every employee plus whether they're
+     * currently granted LiveView permission, and the licence's cap on how many
+     * may be granted at once. `used` never exceeds `limit` going forward, but an
+     * already-over-limit company (a licence downgrade) keeps every existing
+     * grant — same "not retrospective" rule LicenceSeats already uses for seats.
+     */
+    public function permissions(Request $request): JsonResponse
+    {
+        $limit = InstallationLicense::governing($request->user()->company)
+            ->bundle['features']['liveview_max_users'] ?? 0;
+
+        $employees = Employee::whereNull('deleted_at')
+            ->orderBy('first_name')
+            ->get(['id', 'first_name', 'last_name', 'employee_code', 'liveview_enabled']);
+
+        return response()->json([
+            'limit'     => $limit,
+            'used'      => $employees->where('liveview_enabled', true)->count(),
+            'employees' => $employees,
+        ]);
+    }
+
+    /**
+     * POST /api/liveview/permission — grant or revoke one employee's LiveView
+     * permission. This grant is the licensed resource now, capped by
+     * bundle['features']['liveview_max_users'] — checked only when granting;
+     * revoking always succeeds.
+     */
+    public function setPermission(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'employee_id' => ['required', 'integer'],
+            'enabled'     => ['required', 'boolean'],
+        ]);
+
+        $employee = Employee::findOrFail($data['employee_id']);
+
+        if ($data['enabled'] && ! $employee->liveview_enabled) {
+            $limit = InstallationLicense::governing($request->user()->company)
+                ->bundle['features']['liveview_max_users'] ?? 0;
+            $used = Employee::where('liveview_enabled', true)->count();
+            if ($used >= $limit) {
+                return response()->json([
+                    'error' => ['code' => 'LIVEVIEW_LIMIT_REACHED', 'message' => "Your licence allows LiveView permission for {$limit} " . str('user')->plural($limit) . '. Revoke one before granting another, or buy more LiveView seats.'],
+                ], 409);
+            }
+        }
+
+        $employee->forceFill(['liveview_enabled' => (bool) $data['enabled']])->save();
+
+        $this->audit($request, 'liveview.permission_' . ($data['enabled'] ? 'grant' : 'revoke'), Employee::class, $employee->id);
+
+        return response()->json(['ok' => true, 'liveview_enabled' => $employee->liveview_enabled]);
     }
 
     /**

@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ApplicationPolicy;
 use App\Models\EmployeeDevice;
 use App\Models\EnforcementAuditEvent;
 use App\Models\EnforcementMachine;
 use App\Models\EnforcementState;
+use App\Models\PolicyAssignment;
 use App\Models\PolicyRule;
+use App\Models\WebsitePolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -293,17 +296,132 @@ class EnforcementController extends Controller
     /**
      * Mark an unexpected target as handled — allowed, or judged irrelevant — so
      * it stops holding up promotion.
+     *
+     * Before 21-Sep-2026 this ONLY stamped resolved_at, whatever the console
+     * button was labelled ("Allow / dismiss"). That satisfied the promotion
+     * gate but changed nothing about what any endpoint actually blocks — the
+     * program kept being closed by the agent or refused by AppLocker forever,
+     * which reached Ejaz as "I already allowed this, why does it keep getting
+     * blocked". ALLOW now does the real work: it creates/updates the ALLOWED
+     * policy_rule AND mirrors it into the legacy allowed_apps/allowed_sites
+     * list, so both a >=0.15 agent (which reads policy_rules status) and an
+     * agent at or below 0.14 (which only ever reads the legacy list) stop
+     * treating it as blocked. DISMISS keeps the old behaviour on purpose — for
+     * "this is noise, not relevant here" rather than "this program is fine".
      */
     public function resolveAuditEvent(Request $request, int $id): JsonResponse
     {
+        $data = $request->validate([
+            'decision' => ['nullable', 'in:ALLOW,DISMISS'],
+        ]);
+        $decision = $data['decision'] ?? 'ALLOW';
 
+        $companyId = (int) $request->user()->company_id;
         $row = EnforcementAuditEvent::withoutGlobalScopes()
-            ->where('company_id', (int) $request->user()->company_id)
+            ->where('company_id', $companyId)
             ->findOrFail($id);
+
+        if ($decision === 'ALLOW') {
+            $this->allowTarget($companyId, (string) $row->target, (int) $request->user()->id);
+        }
 
         $row->forceFill(['resolved_at' => now()])->save();
 
         return response()->json(['ok' => true, 'data' => $row]);
+    }
+
+    /**
+     * Make one reported target actually stop being blocked.
+     *
+     * Writes BOTH representations an endpoint might read: the policy_rule row
+     * (status=ALLOWED — what a >=0.15 agent and ComplianceEvaluator check) and
+     * the legacy allowed_apps/blocked_apps (or …_sites) JSON list on the
+     * resolved policy (what an agent at or below 0.14, and AppLocker's own
+     * catalogue-driven deny rules via the enforcement service, ultimately
+     * trace back to). Bumps the policy version either way, the same signal
+     * every other rule edit uses to make endpoints re-sync within ~30s.
+     */
+    private function allowTarget(int $companyId, string $target, int $userId): void
+    {
+        $target = trim($target);
+        if ($target === '') {
+            return;
+        }
+
+        // AppLocker/process reports usually carry a full path; the Rules
+        // screen only ever stores a bare name. A target with no path
+        // separator and no .exe that already looks like a domain is treated
+        // as a website — mirrors admin.blade.php's siteBlockable() heuristic.
+        $base = basename(str_replace('\\', '/', $target));
+        $isWebsite = $base === $target
+            && ! str_contains(strtolower($target), '.exe')
+            && (bool) preg_match('/^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/i', $target);
+
+        $type = $isWebsite ? 'WEBSITE' : 'APPLICATION';
+        $item = $isWebsite
+            ? trim((string) preg_replace('#^https?://#', '', (string) preg_replace('#^www\.#', '', strtolower($target))), '/ ')
+            : trim((string) preg_replace('/\.exe$/i', '', strtolower($base)));
+
+        if ($item === '') {
+            return;
+        }
+
+        $model = $type === 'APPLICATION' ? ApplicationPolicy::class : WebsitePolicy::class;
+        $allowedKey = $type === 'APPLICATION' ? 'allowed_apps' : 'allowed_sites';
+        $blockedKey = $type === 'APPLICATION' ? 'blocked_apps' : 'blocked_sites';
+
+        // The one company-wide policy the Rules screen manages (created there
+        // as "Company App/Website Rules" the first time it is saved). Reuse it
+        // rather than creating a second, competing policy of the same type.
+        $policy = $model::withoutGlobalScopes()->where('company_id', $companyId)->orderBy('id')->first();
+
+        if (! $policy) {
+            $policy = $model::create([
+                'company_id' => $companyId,
+                'name'       => $type === 'APPLICATION' ? 'Company App Rules' : 'Company Website Rules',
+                'version'    => 1,
+                $allowedKey  => [],
+                $blockedKey  => [],
+                'categories' => [],
+            ]);
+            PolicyAssignment::create([
+                'company_id'          => $companyId,
+                'policy_type'         => $type,
+                'policy_id'           => $policy->id,
+                'assignable_type'     => 'COMPANY',
+                'assignable_id'       => $companyId,
+                'assigned_by_user_id' => $userId,
+            ]);
+        }
+
+        $allowed = (array) ($policy->{$allowedKey} ?? []);
+        $blocked = (array) ($policy->{$blockedKey} ?? []);
+
+        if (! in_array($item, array_map('strtolower', array_map('strval', $allowed)), true)) {
+            $allowed[] = $item;
+        }
+        $blocked = array_values(array_filter($blocked, static fn ($b): bool => strtolower((string) $b) !== $item));
+
+        $policy->{$allowedKey} = $allowed;
+        $policy->{$blockedKey} = $blocked;
+        $policy->version = (int) $policy->version + 1;
+        $policy->save();
+
+        $rule = PolicyRule::withoutGlobalScopes()->firstOrNew([
+            'company_id'  => $companyId,
+            'policy_type' => $type,
+            'policy_id'   => $policy->id,
+            'item'        => $item,
+        ]);
+        $rule->forceFill([
+            'label'   => $rule->label ?? $item,
+            'status'  => 'ALLOWED',
+            // Never downgrade an existing rule's action; a freshly-created one
+            // starts at WARN like every other new rule on the Rules screen.
+            'action'  => $rule->exists ? $rule->action : 'WARN',
+            'version' => (int) ($rule->version ?? 0) + 1,
+        ]);
+        $rule->save();
     }
 
     /**

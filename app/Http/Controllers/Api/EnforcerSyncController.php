@@ -9,6 +9,7 @@ use App\Models\EmployeeDevice;
 use App\Models\EnforcementAuditEvent;
 use App\Models\EnforcementMachine;
 use App\Models\EnforcementState;
+use App\Models\PolicyAssignment;
 use App\Models\PolicyRule;
 use App\Models\WebsitePolicy;
 use App\Services\PolicyResolver;
@@ -399,10 +400,37 @@ class EnforcerSyncController extends Controller
      * client blocks, which is their decision and not ours — but it is written to
      * the log every time a spec is built, so it is impossible to sit unnoticed.
      *
+     * 21-Sep-2026: that oldest-wins fallback is now second choice. PolicyResolver
+     * (the per-employee agent bundle) picks the company's policy by walking
+     * PolicyAssignment, not by age — so a company with two WEBSITE policies
+     * (say, an old one from the generic Policies tab, still carrying
+     * "youtube.com" in blocked_sites, plus the current one the Rules screen
+     * shows and edits) had the machine baseline enforcing the OLD one while the
+     * agent and the admin console both agreed on the new one: the exact "the
+     * console shows it's not blocked, but it's blocked anyway" report this
+     * fixes. Resolving through the same PolicyAssignment table both endpoints
+     * agree, and the oldest-row heuristic below only fires for a tenant that
+     * predates PolicyAssignment ever being written for it.
+     *
      * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
      */
     private function primaryPolicy(string $model, int $companyId, string $label): ?object
     {
+        $assignedId = PolicyAssignment::withoutGlobalScopes()
+            ->where('company_id', $companyId)
+            ->where('policy_type', $label)
+            ->where('assignable_type', 'COMPANY')
+            ->where('assignable_id', $companyId)
+            ->orderByDesc('id') // most recently assigned wins — matches assignmentsFor()'s tie-break
+            ->value('policy_id');
+
+        if ($assignedId) {
+            $assigned = $model::withoutGlobalScopes()->find($assignedId);
+            if ($assigned) {
+                return $assigned;
+            }
+        }
+
         $policies = $model::withoutGlobalScopes()
             ->where('company_id', $companyId)
             ->orderBy('id')

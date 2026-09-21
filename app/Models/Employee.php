@@ -20,6 +20,9 @@ class Employee extends Model
         // same day and sort differently as text.
         'enforcement_exempt_from'  => 'date',
         'enforcement_exempt_until' => 'date',
+        // LiveView permission grant (21-Sep-2026) — the licensed resource for
+        // LiveView now; see LiveViewController::setPermission().
+        'liveview_enabled' => 'boolean',
     ];
 
     public function branch()      { return $this->belongsTo(Branch::class); }

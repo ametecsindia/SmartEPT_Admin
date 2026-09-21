@@ -752,8 +752,9 @@
     <!-- 6b. LIVEVIEW (Phase 4, 14-Sep-2026) — ported from the Phase 3 POC (liveview-poc.blade.php),
          swapped onto the console's own api()/can() instead of the POC's standalone login/fetch.
          Multi-screen (14-Sep-2026): Start adds a tile to the grid instead of replacing a single
-         viewer, up to the licence's liveview_max_concurrent (server is still the real gate — this
-         is just matching UX to what the licence already enforces). -->
+         viewer. 21-Sep-2026: the licence no longer caps simultaneous screens — it caps how many
+         employees may be GRANTED permission (Manage LiveView Permissions); the Employee dropdown
+         only ever offers permitted employees, and the server is still the real gate either way. -->
     <div class="view" id="v-liveview">
       <div class="card">
         <h3>Watch employees' screens <span class="hint">live, only while this panel is open — nothing is recorded</span></h3>
@@ -768,6 +769,7 @@
           </select>
           <button class="btn solid" id="lv-start">Start</button>
           <button class="btn" id="lv-start-all" title="Start every desktop this employee has, in one grid">&#9638; All Screens</button>
+          <button class="btn" id="lv-manage-perm" title="Choose which employees can be watched via LiveView">Manage permissions</button>
           <button class="btn" id="lv-show-all" title="Show All — open every live screen in its own CCTV-style window" style="margin-left:auto">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>Show All
           </button>
@@ -1659,6 +1661,13 @@
   <div class="mhead"><div class="mt"><b>New API key</b><span>Shown once — copy it now. Store it in the external app.</span></div><button class="x" id="key-x">&#10005;</button></div>
   <div class="mbody" id="key-body"></div>
   <div class="mfoot" id="key-foot"></div>
+</div></div>
+<!-- LiveView permissions (21-Sep-2026): the permission-based licence's admin UI —
+     grant/revoke which employees may be watched via LiveView, capped by the licence. -->
+<div class="ovl" id="lvperm-ovl"><div class="modal" style="width:520px;max-height:86vh;overflow:auto">
+  <div class="mhead"><div class="mt"><b>Manage LiveView permissions</b><span id="lvperm-sub">Only permitted employees can be watched live</span></div><button class="x" id="lvperm-x">&#10005;</button></div>
+  <div class="mbody"><table><thead><tr><th>Employee</th><th style="width:90px">Permitted</th></tr></thead><tbody id="lvperm-rows"></tbody></table></div>
+  <div class="mfoot"><button class="btn" id="lvperm-close">Close</button></div>
 </div></div>
 <div class="ovl" id="tgt-ovl"><div class="modal" style="width:560px">
   <div class="mhead"><div class="mt"><b id="tgt-title">Add outbound target</b><span>SmartEPT POSTs signed attendance JSON to this URL</span></div><button class="x" id="tgt-x">&#10005;</button></div>
@@ -4537,9 +4546,10 @@ $('#dev-rows').addEventListener('click', async (e) => {
 // full capture -> relay -> browser pipeline end-to-end; only the login/fetch plumbing
 // changed, to reuse the console's own api()/can()/TOKEN instead of the POC's standalone copies.
 // Each active session is one tile in #lv-grid; lvTiles maps session_id -> its own ws/canvas/status,
-// so N screens run independently. lvMaxConcurrent is read once from /license on first open —
-// server-side LIVEVIEW_LIMIT_REACHED is still the real gate, this just mirrors it in the UI.
-let lvBound = false, lvMaxConcurrent = 1;
+// so N screens run independently. 21-Sep-2026: licensing is no longer a simultaneous-viewing
+// cap (any number of PERMITTED employees may be watched at once) — see lvLoadPermittedEmployees()
+// and the Manage LiveView Permissions panel (lvOpenPermissions()) for the real, licensed gate.
+let lvBound = false;
 const lvTiles = new Map();
 // Show All (15-Sep-2026): a separate pop-up window that mirrors every currently-live tile
 // into a CCTV-style wall, sized to fill whatever window it's in. It does NOT open a second
@@ -4585,19 +4595,17 @@ function initLiveView() {
   }
   $('#lv-start').style.display = can('liveview.start') ? '' : 'none';
   $('#lv-start-all').style.display = can('liveview.start') ? '' : 'none';
+  $('#lv-manage-perm').style.display = can('liveview.start') ? '' : 'none';
   $('#lv-quality-high').disabled = !can('liveview.high_quality');
-  employeesList().then((list) => {
-    const sel = $('#lv-employee');
-    sel.innerHTML = list.map((e) => '<option value="' + e.id + '">' + esc(fullName(e) || e.employee_code || ('#' + e.id)) + '</option>').join('');
-    lvPopulateMonitors(parseInt(sel.value, 10));
-  }).catch(() => {});
+  lvLoadPermittedEmployees();
   if (lvBound) return;
   lvBound = true;
   $('#lv-start').onclick = lvStart;
   $('#lv-start-all').onclick = lvStartAll;
   $('#lv-show-all').onclick = lvOpenWall;
+  $('#lv-manage-perm').onclick = lvOpenPermissions;
   $('#lv-employee').onchange = (e) => lvPopulateMonitors(parseInt(e.target.value, 10));
-  api('/license').then((d) => { lvMaxConcurrent = (d.features && d.features.liveview_max_concurrent) || 1; lvUpdateStatus(); }).catch(() => {});
+  $('#lvperm-x').onclick = $('#lvperm-close').onclick = () => $('#lvperm-ovl').classList.remove('open');
   // One listener for every tile: swap that tile's icon to "compress" while it's the
   // fullscreen element, and every other tile back to "expand" (covers Esc too, not just the button).
   document.addEventListener('fullscreenchange', () => {
@@ -4629,10 +4637,56 @@ function lvPopulateMonitors(empId) {
   }).catch(() => { sel.innerHTML = '<option value="0">Desktop 1</option>'; });
 }
 function lvUpdateStatus() {
-  $('#lv-status').textContent = lvTiles.size + ' of ' + lvMaxConcurrent + ' live screen' + (lvMaxConcurrent === 1 ? '' : 's') + ' in use';
+  $('#lv-status').textContent = lvTiles.size + ' live screen' + (lvTiles.size === 1 ? '' : 's') + ' open';
+}
+// 21-Sep-2026: the employee dropdown only offers employees GRANTED LiveView
+// permission (see Manage LiveView Permissions) — the server enforces this too
+// (LIVEVIEW_NOT_PERMITTED), this just keeps the UI from offering a dead end.
+function lvLoadPermittedEmployees() {
+  api('/liveview/permissions').then((d) => {
+    const sel = $('#lv-employee');
+    const prevValue = sel.value;
+    const permitted = (d.employees || []).filter((e) => e.liveview_enabled);
+    if (!permitted.length) {
+      sel.innerHTML = '';
+      $('#lv-status').textContent = 'No employees are permitted for LiveView yet — click "Manage permissions" to grant access.';
+      return;
+    }
+    sel.innerHTML = permitted.map((e) => '<option value="' + e.id + '">' + esc(fullName(e) || e.employee_code || ('#' + e.id)) + '</option>').join('');
+    if (permitted.some((e) => String(e.id) === prevValue)) sel.value = prevValue;
+    lvPopulateMonitors(parseInt(sel.value, 10));
+  }).catch(() => {});
+}
+// Manage LiveView Permissions (21-Sep-2026): this list — not concurrent viewers — is
+// what the licence now caps (bundle['features']['liveview_max_users']).
+function lvOpenPermissions() {
+  $('#lvperm-ovl').classList.add('open');
+  $('#lvperm-rows').innerHTML = '<tr><td colspan="2" class="mut">Loading…</td></tr>';
+  api('/liveview/permissions').then((d) => {
+    $('#lvperm-sub').textContent = d.used + ' of ' + d.limit + ' LiveView ' + (d.limit === 1 ? 'seat' : 'seats') + ' granted';
+    $('#lvperm-rows').innerHTML = (d.employees || []).map((e) => {
+      const name = esc(fullName(e) || e.employee_code || ('#' + e.id));
+      return '<tr><td>' + name + '</td><td><input type="checkbox" data-emp="' + e.id + '"' + (e.liveview_enabled ? ' checked' : '') + '></td></tr>';
+    }).join('') || '<tr><td colspan="2" class="mut">No employees.</td></tr>';
+    $('#lvperm-rows').querySelectorAll('input[type=checkbox]').forEach((cb) => { cb.onchange = () => lvTogglePermission(cb); });
+  }).catch(() => { $('#lvperm-rows').innerHTML = '<tr><td colspan="2" class="err">Failed to load.</td></tr>'; });
+}
+async function lvTogglePermission(cb) {
+  const empId = parseInt(cb.dataset.emp, 10);
+  const enabled = cb.checked;
+  cb.disabled = true;
+  try {
+    await api('/liveview/permission', { method: 'POST', body: JSON.stringify({ employee_id: empId, enabled: enabled }) });
+    lvOpenPermissions(); // refresh the used/limit counter
+    lvLoadPermittedEmployees(); // refresh the Start dropdown
+  } catch (e) {
+    cb.checked = !enabled;
+    toast('Failed: ' + (e.message || 'unknown error'));
+  } finally {
+    cb.disabled = false;
+  }
 }
 async function lvStart() {
-  if (lvTiles.size >= lvMaxConcurrent) { $('#lv-status').textContent = 'Limit reached — stop a screen before starting another (' + lvMaxConcurrent + ' allowed).'; return; }
   const empSel = $('#lv-employee');
   const empId = parseInt(empSel.value, 10);
   if (!empId) { $('#lv-status').textContent = 'Pick an employee first.'; return; }
@@ -4668,19 +4722,18 @@ async function lvStartAll() {
   for (let i = 0; i < n; i++) if (!already.has(i)) toStart.push(i);
   if (!toStart.length) { $('#lv-status').textContent = already.size ? 'All of this employee\'s screens are already showing.' : 'No desktops to start.'; return; }
   $('#lv-status').textContent = 'Starting all screens…';
-  let started = 0, limitHit = false;
+  let started = 0, failMsg = '';
   for (const monitorIndex of toStart) {
-    if (lvTiles.size >= lvMaxConcurrent) { limitHit = true; break; }
     try {
       const res = await api('/liveview/session/start', { method: 'POST', body: JSON.stringify({
         employee_id: empId, monitor_index: monitorIndex, quality: quality,
       }) });
       lvAddTile(res.session_id, empId, empLabel, monitorIndex, quality, res.relay_url, res.view_token);
       started++;
-    } catch (e) { limitHit = true; break; }
+    } catch (e) { failMsg = e.message || 'unknown error'; break; }
   }
   lvUpdateStatus();
-  if (limitHit) $('#lv-status').textContent += ' — started ' + started + ' of ' + toStart.length + ' (licence allows ' + lvMaxConcurrent + ' at a time).';
+  if (failMsg) $('#lv-status').textContent += ' — started ' + started + ' of ' + toStart.length + ' (' + failMsg + ').';
 }
 function lvAddTile(sid, empId, empLabel, monitorIndex, quality, relayUrl, viewToken) {
   const el = document.createElement('div');
@@ -4937,7 +4990,7 @@ const POLICY_TYPES = [
   ['monitoring', 'Monitoring (master)'], ['screenshot', 'Screenshot'], ['webcam', 'Webcam presence'],
   ['application', 'Application'], ['website', 'Website'], ['network', 'Network'],
   ['device', 'Device compliance'], ['usb', 'USB'], ['vpn_proxy', 'VPN / Proxy'],
-  ['break', 'Break'], ['attendance', 'Attendance'], ['compliance', 'Compliance scoring'],
+  ['break', 'Break'], ['attendance', 'Attendance'],
 ];
 // Field schemas mirror the policy table columns (see policy migrations).
 // t: text | bool | num | dec | time | select | list (comma-separated → JSON array) | json (raw JSON object)
@@ -5052,12 +5105,6 @@ const POLICY_FIELDS = {
     { k: 'post_shift_auto_logout_minutes', l: 'Auto sign-out after working end time (min) — blank = never', t: 'num' },
     { k: 'attendance_sources', l: 'Sources (comma-separated, e.g. AGENT, BIOMETRIC)', t: 'list', full: 1 },
     { k: 'settings', l: 'Extra settings (JSON object)', t: 'json', full: 1 },
-  ],
-  compliance: [
-    { k: 'name', l: 'Policy name', t: 'text', full: 1 },
-    { k: 'description', l: 'Description', t: 'text', full: 1 },
-    { k: 'settings', l: 'Rules (JSON: per-violation severity, action, score penalty)', t: 'json', full: 1 },
-    { k: 'is_active', l: 'Active', t: 'bool' },
   ],
 };
 let POL_LIST = [], POL_EDIT_ID = null;
@@ -5797,7 +5844,12 @@ function enfMarkup(mode) {
     ? '<div style="overflow-x:auto"><table><thead><tr><th>Program</th><th>Times seen</th><th>PC</th><th></th></tr></thead><tbody>'
       + list.map((r) => '<tr><td>' + esc(r.target) + '</td><td>' + (r.occurrences || 1) + '</td>'
         + '<td class="mut">' + esc(r.device_uuid || '\u2014') + '</td>'
-        + '<td>' + (r.expected ? '' : '<button class="btn" data-enf-resolve="' + r.id + '" type="button">Allow / dismiss</button>') + '</td></tr>').join('')
+        + '<td>' + (r.expected ? '' : (
+          '<button class="btn" data-enf-resolve="' + r.id + '" data-enf-decision="ALLOW" type="button" '
+          + 'title="Staff genuinely use this \u2014 add it to Allowed so it stops being blocked.">Allow</button> '
+          + '<button class="btn" data-enf-resolve="' + r.id + '" data-enf-decision="DISMISS" type="button" '
+          + 'title="Just clear this from the report. Does NOT change what is blocked \u2014 use Allow for that.">Dismiss</button>'
+        )) + '</td></tr>').join('')
       + '</tbody></table></div>'
     : '<p class="mut">' + empty + '</p>';
 
@@ -6015,7 +6067,17 @@ for (const box of document.querySelectorAll('#dev-card [data-dev]')) box.addEven
 $('#enf-body').addEventListener('click', async (e) => {
   const r = e.target.closest('[data-enf-resolve]');
   if (!r) return;
-  try { await api('/enforcement/audit-event/' + r.dataset.enfResolve + '/resolve', { method: 'POST' }); initEnforcement(); }
+  // ALLOW does real work server-side (adds the item to Allowed apps/sites so
+  // it actually stops being blocked); DISMISS only clears the report row.
+  // Before this split, one "Allow / dismiss" button did the DISMISS-only
+  // thing regardless of intent, so clicking it never stopped the program
+  // from being blocked — it just went quiet in this report.
+  const decision = r.dataset.enfDecision === 'DISMISS' ? 'DISMISS' : 'ALLOW';
+  try {
+    await api('/enforcement/audit-event/' + r.dataset.enfResolve + '/resolve', { method: 'POST', body: JSON.stringify({ decision }) });
+    initEnforcement();
+    toast(decision === 'ALLOW' ? 'Allowed — added to your rules, endpoints pick it up on their next heartbeat (~30s).' : 'Dismissed from the report.');
+  }
   catch (err) { toast(err.message || 'Could not update'); }
 });
 
@@ -7596,8 +7658,11 @@ async function loadLicense() {
       // this one — d.features came back from the API but nothing rendered it. ponytail:
       // one row for the one feature that's actually admin-configurable today; a generic
       // features table can wait until a second one needs showing here.
-      ['LiveView', `<b>${(d.features && d.features.liveview_max_concurrent) || 1}</b> concurrent session${((d.features && d.features.liveview_max_concurrent) || 1) === 1 ? '' : 's'}`
-        + (d.features && d.features.liveview_max_concurrent ? '' : ' <span class="mut">(default — not set on this licence)</span>')],
+      // 21-Sep-2026: re-labelled — the licence now caps how many employees may be
+      // GRANTED LiveView permission (Manage LiveView Permissions, on the LiveView
+      // screen), not how many screens may be open at once.
+      ['LiveView', `permission for up to <b>${(d.features && d.features.liveview_max_users) || 0}</b> employee${((d.features && d.features.liveview_max_users) || 0) === 1 ? '' : 's'}`
+        + (d.features && d.features.liveview_max_users ? '' : ' <span class="mut">(none granted on this licence — contact Ametecs to add LiveView seats)</span>')],
       // Finding 1.3/1.4 — the licensed count is now a rule, so show it being spent.
       ['Users in use', (() => {
         const s = d.seats || {}; const lim = s.limit;
