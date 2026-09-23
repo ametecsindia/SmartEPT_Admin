@@ -24,6 +24,28 @@ class M10AlertsTest extends TestCase
         parent::setUp();
         $this->seed(DatabaseSeeder::class);
         $this->travelTo(now()->startOfDay()->addHours(10)); // avoid midnight flake
+        // 23-Sep-2026: automatic emails are OFF until approved in Notifications — switch them on
+        // for the seeded company (plus the server error report at the travelled 10:00).
+        $cid = Employee::first()->company_id;
+        \App\Models\Setting::put('notify_prefs:company:' . $cid, json_encode([
+            'device_offline' => ['on' => true, 'roles' => ['COMPANY_ADMIN']],
+            'violation_spike' => ['on' => true, 'roles' => ['COMPANY_ADMIN']],
+            'late_login' => ['on' => true, 'roles' => ['COMPANY_ADMIN'], 'minutes' => 15, 'hour' => 9],
+        ]));
+        \App\Models\Setting::put('notify_prefs', json_encode([
+            'error_digest' => ['on' => true, 'roles' => ['SUPER_ADMIN', 'COMPANY_ADMIN'], 'hour' => 10],
+        ]));
+    }
+
+    public function test_switched_off_alert_sends_nothing(): void
+    {
+        \App\Models\Setting::put('notify_prefs:company:' . Employee::first()->company_id, json_encode([]));
+        $this->makeDevice('off-1', 'ONLINE', now()->subHours(2));
+
+        $this->artisan('smartept:alerts')->assertSuccessful();
+
+        $this->assertSame('OFFLINE', EmployeeDevice::where('device_uuid', 'off-1')->value('current_status'));
+        $this->assertSame(0, MailLog::where('kind', 'device_offline')->where('status', 'sent')->count());
     }
 
     private function makeDevice(string $uuid, string $status, $lastBeat): EmployeeDevice
@@ -119,5 +141,22 @@ class M10AlertsTest extends TestCase
         $this->assertStringContainsString('error', strtolower($mail->subject));
 
         @unlink($log);
+    }
+
+    public function test_late_login_list_sent_once_a_day_after_chosen_hour(): void
+    {
+        $e = Employee::first();
+        \App\Models\EmployeeAttendanceLog::withoutGlobalScopes()->create([
+            'company_id' => $e->company_id, 'employee_id' => $e->id, 'work_date' => now()->toDateString(),
+            'source' => 'CLIENT', 'late_minutes' => 40,
+        ]);
+
+        $this->artisan('smartept:alerts')->assertSuccessful();
+        $this->artisan('smartept:alerts')->assertSuccessful();
+
+        $sent = MailLog::where('kind', 'late_login')->where('status', 'sent')->get();
+        $this->assertGreaterThan(0, $sent->count());
+        $this->assertSame(1, $sent->pluck('to')->countBy()->max()); // once per person per day
+        $this->assertStringContainsString('late logins today', $sent->first()->subject);
     }
 }

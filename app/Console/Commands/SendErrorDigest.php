@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Models\User;
 use App\Services\MailService;
 use Illuminate\Console\Command;
 
@@ -13,12 +12,22 @@ use Illuminate\Console\Command;
  */
 class SendErrorDigest extends Command
 {
-    protected $signature = 'smartept:error-digest {--hours=24} {--max-lines=40}';
+    protected $signature = 'smartept:error-digest {--hours=24} {--max-lines=40} {--force : send now, ignoring the chosen hour}';
 
     protected $description = 'Email admins a digest of application errors logged in the last 24 hours.';
 
     public function handle(): int
     {
+        // Scheduled hourly; sends only at the hour chosen in Audit & Ops → Notifications (23-Sep-2026).
+        if (! $this->option('force') && (int) now()->format('G') !== (int) MailService::pref('error_digest', 'hour', 7)) {
+            return self::SUCCESS;
+        }
+        if (! MailService::enabled('error_digest')) {
+            $this->info('Error digest is switched off in Notifications.');
+
+            return self::SUCCESS;
+        }
+
         $hours = (int) $this->option('hours');
         $max = (int) $this->option('max-lines');
         $since = now()->subHours($hours);
@@ -62,16 +71,14 @@ class SendErrorDigest extends Command
             . "\n\nRepeated errors usually mean a queue/mail/storage misconfiguration or a bug worth reporting to Ametecs support (WhatsApp 90000 98877)."
             . "\n\n— SmartEPT";
 
-        $admins = User::query()
-            ->where('status', 'ACTIVE')
-            ->whereHas('role', fn ($q) => $q->whereIn('slug', ['SUPER_ADMIN', 'COMPANY_ADMIN']))
-            ->get(['id', 'email', 'company_id']);
-
-        foreach ($admins as $admin) {
-            MailService::send($admin->email, "SmartEPT daily error digest — {$total} error(s)", $body, 'error_digest', $admin->company_id);
+        $vars = ['total' => $total, 'hours' => $hours, 'lines' => implode("\n", $matches)
+            . ($total > count($matches) ? "\n… and " . ($total - count($matches)) . ' more (see storage/logs/laravel.log).' : '')];
+        $to = MailService::recipients('error_digest');
+        foreach ($to as $email => $companyId) {
+            MailService::send($email, "SmartEPT daily error digest — {$total} error(s)", $body, 'error_digest', $companyId, $vars);
         }
 
-        $this->warn("Digest sent: {$total} error(s), " . $admins->count() . ' recipient(s).');
+        $this->warn("Digest sent: {$total} error(s), " . count($to) . ' recipient(s).');
 
         return self::SUCCESS;
     }

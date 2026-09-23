@@ -29,6 +29,8 @@ class QaPhase1Test extends TestCase
     {
         parent::setUp();
         $this->seed(DatabaseSeeder::class);
+        // Behaviour tests run on ONE clock: company = app timezone (ApplyCompanyTimezone, 23-Sep-2026).
+        \App\Models\Company::withoutGlobalScopes()->update(['timezone' => config('app.timezone')]);
         $this->travelTo(now()->startOfDay()->addHours(10));
 
         $this->adminToken = $this->login('admin@ametecs.io');

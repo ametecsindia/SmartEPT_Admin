@@ -137,4 +137,70 @@ class MailConfigController extends Controller
             ? response()->json(['ok' => true, 'message' => 'Test email sent to ' . $user->email . ' — check the inbox (and spam).'])
             : response()->json(['ok' => false, 'message' => 'Send failed: ' . $error], 422);
     }
+
+    /**
+     * GET /api/ops/notify-prefs — Audit & Ops → Notifications.
+     * company = the caller's OWN company alerts (its admin decides); server = Super Admin only.
+     */
+    public function notifyPrefs(): JsonResponse
+    {
+        $user = auth()->user();
+
+        return response()->json([
+            'company' => $user->company_id ? MailService::prefs((int) $user->company_id) : null,
+            'server'  => $user->isSuperAdmin() ? MailService::prefs(null) : null,
+            'templates' => MailService::TEMPLATES, // built-in wording + {placeholders} for the editor
+        ]);
+    }
+
+    /** PUT /api/ops/notify-prefs {scope: company|server, prefs:{kind:{on,roles,extra,subject,body,threshold|minutes|hours|hour}}} */
+    public function saveNotifyPrefs(Request $request): JsonResponse
+    {
+        $user = auth()->user();
+        $data = $request->validate([
+            'scope' => ['required', 'in:company,server'],
+            'prefs' => ['required', 'array'],
+            'prefs.*.on' => ['boolean'],
+            'prefs.*.roles' => ['array'],
+            'prefs.*.roles.*' => ['in:SUPER_ADMIN,COMPANY_ADMIN,HR_ADMIN,MANAGER'],
+            'prefs.*.extra' => ['nullable', 'string', 'max:1000'],
+            'prefs.violation_spike.threshold' => ['integer', 'min:1', 'max:100000'],
+            'prefs.late_login.minutes' => ['integer', 'min:1', 'max:600'],
+            'prefs.device_offline.minutes' => ['integer', 'min:1', 'max:10080'],
+            'prefs.gate_long_break.hours' => ['numeric', 'min:0.1', 'max:24'],
+            'prefs.*.subject' => ['nullable', 'string', 'max:250'],
+            'prefs.*.body' => ['nullable', 'string', 'max:10000'],
+            'prefs.*.hour' => ['integer', 'min:0', 'max:23'],
+        ]);
+
+        if ($data['scope'] === 'server' && ! $user->isSuperAdmin()) {
+            return response()->json(['message' => 'Only a Super Admin can change server notifications.'], 403);
+        }
+        $companyId = $data['scope'] === 'company' ? (int) $user->company_id : null;
+        if ($data['scope'] === 'company' && ! $companyId) {
+            return response()->json(['message' => 'Your account is not linked to a company.'], 422);
+        }
+
+        $merged = MailService::prefs($companyId);
+        foreach ($merged as $kind => $cur) {
+            $merged[$kind] = array_merge($cur, array_intersect_key((array) ($data['prefs'][$kind] ?? []), $cur));
+        }
+        Setting::put(MailService::prefsKey($companyId), json_encode($merged));
+
+        $this->audit($request, 'SETTINGS_NOTIFY_PREFS_UPDATE', $companyId ? Company::class : Setting::class, $companyId,
+            array_map(fn ($p) => ! empty($p['on']), $merged));
+
+        return response()->json(['ok' => true, 'prefs' => $merged]);
+    }
+
+    /** GET /api/ops/mail-log — last 100 email attempts; a company admin sees only their company's. */
+    public function mailLog(): JsonResponse
+    {
+        $user = auth()->user();
+
+        return response()->json(['data' => \App\Models\MailLog::query()
+            ->when(! $user->isSuperAdmin(), fn ($q) => $q->where('company_id', $user->company_id))
+            ->latest('id')->limit(100)
+            ->get(['id', 'to', 'subject', 'kind', 'status', 'error', 'created_at'])]);
+    }
 }

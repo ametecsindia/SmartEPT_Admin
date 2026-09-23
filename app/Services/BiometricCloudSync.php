@@ -188,7 +188,11 @@ class BiometricCloudSync
         $msg = sprintf('OK — %d fetched, %d new, %d duplicate, %d corrected, %d unmapped', count($rows), count($inserts), $dupes, $corrected, $unmapped)
             . ($resequenced ? sprintf(', %d re-sequenced IN/OUT', $resequenced) : '')
             . ($codes ? ('. Unmatched: ' . implode(', ', $codes)) : '');
-        $d->forceFill(['last_sync_at' => now(), 'last_sync_result' => mb_substr($msg, 0, 490)])->save();
+        // 23-Sep-2026: a good sync (automatic OR "Sync now") clears the failure streak, and puts a
+        // row the old auto-disable broke (status '' / ERROR, not a valid enum value) back to ACTIVE.
+        $d->forceFill(['last_sync_at' => now(), 'last_sync_result' => mb_substr($msg, 0, 490)]
+            + (in_array($d->status, ['ACTIVE', 'INACTIVE'], true) ? [] : ['status' => 'ACTIVE']))->save();
+        \Illuminate\Support\Facades\Cache::forget('biosync:fails:' . $d->id);
 
         return [
             'ok'              => true,

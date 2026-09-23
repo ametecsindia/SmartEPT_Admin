@@ -12,9 +12,27 @@ Artisan::command('smartept:about', function () {
 
 // Nightly: complete yesterday's attendance sheet (auto-absent / half-day / stale
 // sessions) FIRST, so the summaries that follow score a finished sheet.
-Schedule::command('smartept:mark-attendance')->dailyAt('00:15');
-Schedule::command('smartept:daily-summary')->dailyAt('00:30');
-Schedule::command('smartept:purge-expired')->dailyAt('02:00');
+// 23-Sep-2026: EVERY job in this file runs IN-PROCESS (Schedule::call), not as a spawned
+// `php artisan` child — biometric auto-sync included, which is why punches only arrived after a
+// manual "Sync now" (that button runs in-process; the scheduled copy never started). When the
+// schedule runs inline from a web request (SchedulerKeepAlive::runInline) a Schedule::command
+// has to launch a separate PHP CLI process from php-fpm/IIS, which can fail silently — while the
+// in-process heartbeat closure keeps Troubleshooting green. Same command, same lock, no child.
+// 23-Sep-2026 (Ejaz): 00:15 on EACH COMPANY'S clock (Organisation tab), not the server's. A
+// dailyAt() is evaluated on the server timezone, so on a multi-company server "yesterday" and
+// "00:15" were server time. Every 15 minutes, each company whose local time is 00:15–00:29
+// gets its own run for its own local yesterday. No company timezone → server timezone.
+Schedule::call(function () {
+    \App\Models\Company::withoutGlobalScopes()->get(['id', 'timezone'])->each(function ($c) {
+        $tz = $c->timezone && in_array($c->timezone, timezone_identifiers_list(), true) ? $c->timezone : config('app.timezone');
+        $local = now($tz);
+        if ($local->hour === 0 && $local->minute >= 15 && $local->minute < 30) {
+            Artisan::call('smartept:mark-attendance', ['--company' => $c->id, '--date' => $local->copy()->subDay()->toDateString()]);
+        }
+    });
+})->everyFifteenMinutes()->name('mark-attendance')->withoutOverlapping(30);
+Schedule::call(fn () => Artisan::call('smartept:daily-summary'))->name('daily-summary')->dailyAt('00:30');
+Schedule::call(fn () => Artisan::call('smartept:purge-expired'))->name('purge-expired')->dailyAt('02:00');
 
 // R2-1: daily licence phone-home to SmartEPT Central (metadata only — the hard wall).
 // withoutOverlapping (21-Aug-2026): the command walks every tenant row and each
@@ -23,28 +41,29 @@ Schedule::command('smartept:purge-expired')->dailyAt('02:00');
 // 2-Sep-2026: bounded — see the note on smartept:auto-logout below. An unbounded lock left
 // by a killed run would skip the NEXT day's phone-home too, and the licence wall is the last
 // thing that should fail silently. 2h is far longer than the walk can legitimately take.
-Schedule::command('smartept:validate-license')->dailyAt('01:00')->withoutOverlapping(120);
+Schedule::call(fn () => Artisan::call('smartept:validate-license'))->name('validate-license')->dailyAt('01:00')->withoutOverlapping(120);
 
 // R2-2: ops alerts — silent-agent sweep + violation-spike watch (admin emails),
 // and a morning digest of application errors so problems never hide in the log.
-Schedule::command('smartept:alerts')->everyThirtyMinutes();
-Schedule::command('smartept:error-digest')->dailyAt('07:30');
+Schedule::call(fn () => Artisan::call('smartept:alerts'))->name('alerts')->everyThirtyMinutes();
+// 23-Sep-2026: hourly tick; the command sends only at the hour chosen in Audit & Ops → Notifications.
+Schedule::call(fn () => Artisan::call('smartept:error-digest'))->name('error-digest')->hourly();
 
 // R2-4: nightly gzipped data backup into storage/app/backups (keeps newest 14).
-Schedule::command('smartept:backup-database')->dailyAt('01:30');
+Schedule::call(fn () => Artisan::call('smartept:backup-database'))->name('backup-database')->dailyAt('01:30');
 
 // 17-Jul: outbound integration push (SmartEPT → SmartPRS etc.) — previous day at 02:00.
-Schedule::command('smartept:push-integrations')->dailyAt('02:00');
+Schedule::call(fn () => Artisan::call('smartept:push-integrations'))->name('push-integrations')->dailyAt('02:00');
 
 // Cloud biometric punch import (eTimeOffice-style APIs). Ejaz 18-Jul: sync must be
 // CONTINUOUS like the heartbeat, not hourly — every 5 minutes for every device with
 // automatic sync ticked, so the Biometric Gate reacts to punches within minutes.
-Schedule::command('smartept:biometric-sync')->everyFiveMinutes();
-Schedule::command('smartept:build-archives')->everyMinute()->withoutOverlapping(15); // Employee Archive ZIP builder (24-Jul); bounded 2-Sep-2026
+Schedule::call(fn () => Artisan::call('smartept:biometric-sync'))->name('biometric-sync')->everyFiveMinutes();
+Schedule::call(fn () => Artisan::call('smartept:build-archives'))->name('build-archives')->everyMinute()->withoutOverlapping(15); // Employee Archive ZIP builder (24-Jul); bounded 2-Sep-2026
 
 // Section 2: advance meeting statuses + auto-close meeting sessions at the scheduled
 // end (so "Meeting" status ends on time even if the employee never presses End).
-Schedule::command('smartept:close-meetings')->everyMinute();
+Schedule::call(fn () => Artisan::call('smartept:close-meetings'))->name('close-meetings')->everyMinute();
 
 // 19-Aug-2026 (Ejaz): post-shift auto logout. mark-attendance already closes forgotten
 // sessions, but only at 00:15 the next day — long enough for a stale check_out_at to reach
@@ -58,7 +77,7 @@ Schedule::command('smartept:close-meetings')->everyMinute();
 // That is indistinguishable from "the feature does not work" and is the shape of the
 // symptom Ejaz has now reported three times. A bound just longer than the interval means a
 // crashed run self-heals on the next pass. `smartept:why-no-signout` reports the lock state.
-Schedule::command('smartept:auto-logout')->everyFiveMinutes()->withoutOverlapping(10);
+Schedule::call(fn () => Artisan::call('smartept:auto-logout'))->everyFiveMinutes()->name('auto-logout')->withoutOverlapping(10); // in-process — see mark-attendance note
 
 // QA Phase 3 (B6): scheduler self-diagnosis. A 1-minute closure stamps a heartbeat
 // cache key; Help → Troubleshooting turns RED when it goes stale — the tell-tale that
@@ -75,7 +94,7 @@ Schedule::call(function () {
 // see EndStaleLiveViewSessions's docblock. Bounded like every other sweep here
 // (2-Sep-2026 rule): a killed run must self-heal on the next minute, not lock stale
 // concurrency slots for 24h.
-Schedule::command('smartept:end-stale-liveview-sessions')->everyMinute()->withoutOverlapping(2);
+Schedule::call(fn () => Artisan::call('smartept:end-stale-liveview-sessions'))->name('end-stale-liveview-sessions')->everyMinute()->withoutOverlapping(2);
 
 // Live-board self-heal (Admin #3/#4): close any break/meeting status segment left open
 // across a day boundary (agent killed mid-break → a 16-hour "On break" ghost) so the live

@@ -131,6 +131,29 @@ class BiometricDeviceController extends Controller
         return response()->json($result, $result['ok'] ? 200 : 422);
     }
 
+    /** GET /api/integrations/biometric/live-sync — the company's server-side live auto-sync setting. */
+    public function liveSync(Request $request): JsonResponse
+    {
+        $cfg = json_decode((string) \App\Models\Setting::get(\App\Services\GateService::liveSyncKey($request->user()->company_id), ''), true) ?: [];
+
+        return response()->json(['on' => ! empty($cfg['on']), 'seconds' => (int) ($cfg['seconds'] ?? 60)]);
+    }
+
+    /**
+     * PUT /api/integrations/biometric/live-sync — {on, seconds}. 23-Sep-2026: saved on the SERVER
+     * (it used to live only in the admin's browser), so door punches keep flowing with every
+     * browser closed. GateService::pullDoorPunchesSoon() applies it.
+     */
+    public function saveLiveSync(Request $request): JsonResponse
+    {
+        $data = $request->validate(['on' => ['required', 'boolean'], 'seconds' => ['required', 'integer', 'min:1', 'max:86400']]);
+        $cfg = ['on' => (bool) $data['on'], 'seconds' => (int) $data['seconds']];
+        \App\Models\Setting::put(\App\Services\GateService::liveSyncKey($request->user()->company_id), json_encode($cfg));
+        $this->audit($request, 'UPDATE', 'BiometricLiveSync', $request->user()->company_id, $cfg);
+
+        return response()->json($cfg);
+    }
+
     /** POST /api/integrations/biometric/devices/{device}/sync — pull punches right now. */
     public function syncNow(Request $request, BiometricDevice $device, BiometricCloudSync $sync): JsonResponse
     {

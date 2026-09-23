@@ -27,7 +27,7 @@ class MarkAttendance extends Command
 {
     use ResolvesLocalNow;
 
-    protected $signature = 'smartept:mark-attendance {--date= : YYYY-MM-DD (defaults to yesterday)}';
+    protected $signature = 'smartept:mark-attendance {--date= : YYYY-MM-DD (defaults to yesterday)} {--company= : Only this company id (the scheduler runs it per company, at 00:15 on that company\'s own clock)}';
     protected $description = 'Close stale sessions and complete the attendance sheet (ABSENT / HALF_DAY) for a day';
 
     /** Cap for auto-closed sessions: an agent that died on Friday must not credit a whole weekend. */
@@ -46,6 +46,7 @@ class MarkAttendance extends Command
         $absent = 0;
         $halfDay = 0;
         Employee::withoutGlobalScopes()->where('employment_status', 'ACTIVE')
+            ->when($this->option('company'), fn ($q, $id) => $q->where('company_id', (int) $id))
             ->chunkById(200, function ($employees) use ($calendar, $derivation, $date, &$absent, &$halfDay) {
                 foreach ($employees as $employee) {
                     // Weekly offs / holidays are never marked — no ABSENT (or HALF_DAY)
@@ -119,6 +120,7 @@ class MarkAttendance extends Command
         EmployeeLoginSession::withoutGlobalScopes()->with('employee.shift')
             ->whereNull('logout_at')
             ->whereDate('login_at', '<=', $date)
+            ->when($this->option('company'), fn ($q, $id) => $q->where('company_id', (int) $id))
             ->chunkById(200, function ($sessions) use (&$closed) {
                 foreach ($sessions as $session) {
                     $loginDay = $session->login_at->toDateString();

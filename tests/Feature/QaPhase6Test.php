@@ -23,6 +23,8 @@ class QaPhase6Test extends TestCase
     {
         parent::setUp();
         $this->seed(DatabaseSeeder::class);
+        // Behaviour tests run on ONE clock: company = app timezone (ApplyCompanyTimezone, 23-Sep-2026).
+        \App\Models\Company::withoutGlobalScopes()->update(['timezone' => config('app.timezone')]);
         // Fixed "now" so the future-checkout + range boundaries are deterministic.
         $this->travelTo(\Illuminate\Support\Carbon::parse('2026-07-23 15:00:00'));
 

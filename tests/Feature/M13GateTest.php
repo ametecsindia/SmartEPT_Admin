@@ -182,6 +182,23 @@ class M13GateTest extends TestCase
         $this->assertSame(600, (int) $break->duration_seconds);
     }
 
+    /** 23-Sep-2026: walking out after the shift is the day closing, not an "Other break". */
+    public function test_out_punch_after_shift_end_is_not_a_break(): void
+    {
+        $this->addPunchDevice();
+        $this->punch('IN', now());
+        EmployeeLoginSession::create([
+            'company_id' => $this->employee->company_id, 'employee_id' => $this->employee->id,
+            'login_at' => now(),
+        ]);
+        $this->employee->shift->update(['start_time' => '09:00:00', 'end_time' => '18:00:00', 'crosses_midnight' => false]);
+
+        $this->travelTo(now()->setTime(18, 5));
+        $this->punch('OUT', now()->subMinutes(3));
+
+        $this->assertSame(0, EmployeeBreakLog::where('employee_id', $this->employee->id)->count());
+    }
+
     public function test_tiny_out_in_merges_away(): void
     {
         $this->addPunchDevice();
@@ -225,6 +242,10 @@ class M13GateTest extends TestCase
             'company_id' => $this->employee->company_id, 'employee_id' => $this->employee->id,
             'login_at' => now()->subHours(6),
         ]);
+
+        // 23-Sep-2026: the long-break email is OFF until approved in Audit & Ops → Notifications.
+        \App\Models\Setting::put('notify_prefs:company:' . $this->employee->company_id,
+            json_encode(['gate_long_break' => ['on' => true, 'roles' => ['COMPANY_ADMIN', 'HR_ADMIN'], 'hours' => 3]]));
 
         // 50-minute break → compliance event, no HR mail.
         $this->punch('OUT', now()->subHours(5));

@@ -2,12 +2,13 @@
 
 namespace App\Console\Commands;
 
+use App\Models\EmployeeAttendanceLog;
 use App\Models\EmployeeComplianceEvent;
 use App\Models\EmployeeDevice;
 use App\Models\MailLog;
-use App\Models\User;
 use App\Services\MailService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * R2-2: operational alert emails — the server tells admins about problems
@@ -31,97 +32,154 @@ class SendOpsAlerts extends Command
     {
         $this->sweepOfflineDevices();
         $this->checkViolationSpikes();
+        $this->sendLateLogins();
 
         return self::SUCCESS;
     }
 
     private function sweepOfflineDevices(): void
     {
+        // 1) Status: unchanged — a PC silent for the server's offline limit is marked OFFLINE.
         $minutes = (int) ($this->option('offline-minutes') ?: config('smartept.offline_alert_minutes', 30));
 
         $gone = EmployeeDevice::query()
-            ->with('employee:id,first_name,last_name,employee_code')
             ->where('current_status', '!=', 'OFFLINE')
             ->where('last_heartbeat_at', '<', now()->subMinutes($minutes))
-            ->get();
-
-        if ($gone->isEmpty()) {
-            $this->info('Offline sweep: all agents healthy.');
-
-            return;
-        }
+            ->get(['id', 'company_id']);
 
         foreach ($gone->groupBy('company_id') as $companyId => $devices) {
             EmployeeDevice::whereIn('id', $devices->pluck('id'))
                 ->update(['current_status' => 'OFFLINE', 'agent_health' => 'STOPPED']);
+            $this->warn("Offline sweep: {$devices->count()} device(s) flagged for company {$companyId}.");
+        }
+        if ($gone->isEmpty()) {
+            $this->info('Offline sweep: all agents healthy.');
+        }
 
-            $lines = $devices->map(fn ($d) => sprintf(
+        // 2) Email (23-Sep-2026): each company chooses AFTER how many minutes of silence it is
+        //    told (Audit & Ops → Notifications). One email per silence per PC: the heartbeat
+        //    time it went quiet at is remembered, so the same outage is never re-reported.
+        $silent = EmployeeDevice::query()
+            ->with('employee:id,first_name,last_name,employee_code')
+            ->where('current_status', 'OFFLINE')
+            ->where('last_heartbeat_at', '>', now()->subDays(2)) // ignore long-retired PCs
+            ->get();
+
+        foreach ($silent->groupBy('company_id') as $companyId => $devices) {
+            $p = MailService::prefs((int) $companyId)['device_offline'];
+            if (empty($p['on'])) {
+                continue;
+            }
+            $alertAfter = max(1, (int) ($this->option('offline-minutes') ?: $p['minutes']));
+            $due = $devices->filter(fn ($d) => $d->last_heartbeat_at->lt(now()->subMinutes($alertAfter))
+                && Cache::get('smartept:offline_alerted:' . $d->id) !== $d->last_heartbeat_at->toIso8601String());
+            if ($due->isEmpty()) {
+                continue;
+            }
+
+            $lines = $due->map(fn ($d) => sprintf(
                 '- %s (%s) — last heartbeat %s',
                 $d->computer_name ?: $d->device_uuid,
                 $d->employee?->fullName() ?? 'unassigned',
                 optional($d->last_heartbeat_at)->format('d M Y H:i') ?? 'never'
             ))->implode("\n");
+            $vars = ['count' => $due->count(), 'minutes' => $alertAfter, 'devices' => $lines];
+            $t = MailService::TEMPLATES['device_offline'];
 
-            $body = "The following monitored PCs stopped reporting more than {$minutes} minutes ago and are now marked OFFLINE:\n\n"
-                . $lines
-                . "\n\nIf the PC is on and in use, the SmartEPT agent may have been stopped — ask IT to check it. "
-                . "Data recorded while offline syncs automatically when the agent returns.\n\n— SmartEPT";
-
-            foreach ($this->companyAdmins((int) $companyId) as $admin) {
-                MailService::send($admin->email, 'SmartEPT alert: ' . $devices->count() . ' device(s) went offline', $body, 'device_offline', (int) $companyId);
+            foreach (array_keys(MailService::recipients('device_offline', (int) $companyId)) as $email) {
+                MailService::send($email, MailService::render($t['subject'], $vars), MailService::render($t['body'], $vars), 'device_offline', (int) $companyId, $vars);
             }
-
-            $this->warn("Offline sweep: {$devices->count()} device(s) flagged for company {$companyId}.");
+            foreach ($due as $d) {
+                Cache::put('smartept:offline_alerted:' . $d->id, $d->last_heartbeat_at->toIso8601String(), now()->addDays(3));
+            }
+            $this->warn("Offline alert: {$due->count()} device(s) emailed for company {$companyId}.");
         }
     }
 
     private function checkViolationSpikes(): void
     {
-        $threshold = (int) ($this->option('spike-threshold') ?: config('smartept.violation_spike_threshold', 20));
         $hourTag = now()->format('Y-m-d H:00');
 
         $counts = EmployeeComplianceEvent::query()
             ->where('created_at', '>=', now()->subHour())
             ->selectRaw('company_id, count(*) as total')
             ->groupBy('company_id')
-            ->having('total', '>=', $threshold)
             ->pluck('total', 'company_id');
 
+        $spikes = 0;
         foreach ($counts as $companyId => $total) {
+            // Each company sets its own limit in Audit & Ops → Notifications (23-Sep-2026).
+            $threshold = (int) ($this->option('spike-threshold')
+                ?: MailService::pref('violation_spike', 'threshold', 0, (int) $companyId)
+                ?: config('smartept.violation_spike_threshold', 20));
+            if ($total < $threshold) {
+                continue;
+            }
+            $spikes++;
             $subject = "SmartEPT alert: violation spike — {$total} events in the last hour [{$hourTag}]";
 
-            // One alert per company per hour (subject carries the hour tag).
+            // One alert per company per hour — matched on the hour tag, because the count
+            // in the subject changes as more violations arrive (23-Sep-2026).
+            // One alert per company per clock hour (kind + company + hour — independent of the
+            // subject, which the company may have reworded).
             if (MailLog::where('kind', 'violation_spike')->where('company_id', $companyId)
-                ->where('subject', $subject)->exists()) {
+                ->where('created_at', '>=', now()->startOfHour())->exists()) {
                 continue;
             }
 
-            $body = "SmartEPT recorded {$total} compliance violations in the last hour — well above the alert threshold of {$threshold}.\n\n"
-                . "A spike usually means a policy change that is too strict, one team testing limits, or a misconfigured application/website rule. "
-                . "Open the console → Violations to see who and what, and → Usage & Compliance for the day's detail.\n\n— SmartEPT";
+            $vars = ['total' => $total, 'threshold' => $threshold, 'hour' => $hourTag];
+            $t = MailService::TEMPLATES['violation_spike'];
+            $body = MailService::render($t['body'], $vars);
 
-            foreach ($this->companyAdmins((int) $companyId) as $admin) {
-                MailService::send($admin->email, $subject, $body, 'violation_spike', (int) $companyId);
+            foreach (array_keys(MailService::recipients('violation_spike', (int) $companyId)) as $email) {
+                MailService::send($email, $subject, $body, 'violation_spike', (int) $companyId, $vars);
             }
 
             $this->warn("Violation spike: {$total} events for company {$companyId}.");
         }
 
-        if ($counts->isEmpty()) {
+        if ($spikes === 0) {
             $this->info('Violation check: no spikes.');
         }
     }
 
-    /** Active admin accounts for a company (plus super admins, who see everything). */
-    private function companyAdmins(int $companyId)
+    /**
+     * Late logins (23-Sep-2026): ONE email per company per day, at the hour that company
+     * chose, listing everyone who logged in later than their limit today. late_minutes is
+     * written when the employee first logs in / punches (AttendanceDerivation) — read only.
+     */
+    private function sendLateLogins(): void
     {
-        return User::query()
-            ->where('status', 'ACTIVE')
-            ->where(function ($q) use ($companyId) {
-                $q->where('company_id', $companyId)
-                    ->orWhereNull('company_id'); // super admins
-            })
-            ->whereHas('role', fn ($q) => $q->whereIn('slug', ['SUPER_ADMIN', 'COMPANY_ADMIN']))
-            ->get(['id', 'email', 'company_id']);
+        $today = now()->toDateString();
+
+        $rows = EmployeeAttendanceLog::withoutGlobalScopes()
+            ->with('employee:id,first_name,last_name,employee_code')
+            ->whereDate('work_date', $today)
+            ->where('late_minutes', '>', 0)
+            ->selectRaw('company_id, employee_id, MAX(late_minutes) as late_minutes')
+            ->groupBy('company_id', 'employee_id')
+            ->get();
+
+        foreach ($rows->groupBy('company_id') as $companyId => $late) {
+            $p = MailService::prefs((int) $companyId)['late_login'];
+            if (empty($p['on']) || (int) now()->format('G') < (int) $p['hour']) {
+                continue;
+            }
+            $late = $late->filter(fn ($r) => $r->late_minutes >= (int) $p['minutes'])->sortByDesc('late_minutes');
+            if ($late->isEmpty() || MailLog::where('kind', 'late_login')->where('company_id', $companyId)
+                ->where('created_at', '>=', now()->startOfDay())->exists()) {
+                continue; // one list per company per day
+            }
+
+            $vars = ['date' => $today, 'minutes' => (int) $p['minutes'], 'count' => $late->count(),
+                'list' => $late->map(fn ($r) => sprintf('- %s (%s) — %d min late',
+                    $r->employee?->fullName() ?? 'Employee #' . $r->employee_id, $r->employee?->employee_code ?? '-', $r->late_minutes))->implode("\n")];
+            $t = MailService::TEMPLATES['late_login'];
+
+            foreach (array_keys(MailService::recipients('late_login', (int) $companyId)) as $email) {
+                MailService::send($email, MailService::render($t['subject'], $vars), MailService::render($t['body'], $vars), 'late_login', (int) $companyId, $vars);
+            }
+            $this->warn("Late logins: {$late->count()} employee(s) for company {$companyId}.");
+        }
     }
 }

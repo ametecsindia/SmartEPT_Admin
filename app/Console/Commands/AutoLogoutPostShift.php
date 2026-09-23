@@ -45,7 +45,8 @@ class AutoLogoutPostShift extends Command
     protected $signature = 'smartept:auto-logout
         {--dry-run : List what would be closed, change nothing}
         {--explain : Print EVERY open session with the reason it was or was not signed out}
-        {--now= : Treat this instant as "now" (Y-m-d H:i:s) — for testing}';
+        {--now= : Treat this instant as "now" (Y-m-d H:i:s) — for testing}
+        {--employee= : Only this employee id (the agent heartbeat runs it per device — 23-Sep-2026)}';
 
     protected $description = 'Sign out agents that never signed out, N minutes after their shift ends';
 
@@ -78,6 +79,7 @@ class AutoLogoutPostShift extends Command
             // Nothing older than 3 days: those belong to the nightly sweep, and reaching
             // further back would rewrite months of settled history on first deploy.
             ->where('login_at', '>=', $now->copy()->subDays(3))
+            ->when($this->option('employee'), fn ($q, $id) => $q->where('employee_id', (int) $id))
             ->chunkById(200, function ($sessions) use ($resolver, $status, $now, $dry, $explain, &$closed, &$open, &$reasons) {
                 foreach ($sessions as $session) {
                     $open++;

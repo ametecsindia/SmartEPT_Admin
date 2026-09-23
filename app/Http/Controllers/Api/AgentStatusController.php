@@ -93,9 +93,15 @@ class AgentStatusController extends Controller
         // then the attendance check-in — so a materialisation race can't render "—".
         $attendance = EmployeeAttendanceLog::where('employee_id', $employee->id)
             ->whereDate('work_date', $today)->first();
+        // 23-Sep-2026 (Ejaz): the check_in_at fallback was the DOOR punch on a biometric site, so
+        // the agent showed the gate time first and then flipped to the sign-in time. Two separate
+        // values now: Sign IN never falls back to a door punch, and Gate IN is its own field.
         $firstLogin = $attendance?->first_login_at
             ?? EmployeeLoginSession::where('employee_id', $employee->id)->whereDate('login_at', $today)->min('login_at')
-            ?? $attendance?->check_in_at;
+            ?? (($attendance?->check_in_source ?? null) === 'BIOMETRIC' ? null : $attendance?->check_in_at);
+        // First door IN of the day; null where the company has no biometric reader.
+        $gateIn = \App\Models\BiometricLog::withoutGlobalScopes()->where('employee_id', $employee->id)
+            ->whereDate('punched_at', $today)->whereIn('punch_type', ['IN', 'BREAK_IN'])->min('punched_at');
 
         // Timeline-additive split + meeting time (the parts the legacy sums never carried).
         $totals = app(StatusService::class)->dayTotals($employee->id, $today);
@@ -104,6 +110,7 @@ class AgentStatusController extends Controller
             'employee'            => ['id' => $employee->id, 'name' => $employee->fullName()],
             'date'                => $today,
             'logged_in_at'        => $firstLogin,
+            'gate_in_at'          => $gateIn,
             'active_seconds'      => $activeSeconds,
             'idle_seconds'        => $idleSeconds,
             'break_seconds'       => $breakSeconds,

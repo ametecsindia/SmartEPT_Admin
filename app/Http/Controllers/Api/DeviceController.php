@@ -283,6 +283,34 @@ class DeviceController extends Controller
         // agent running happily while every screen said the employee was signed out. The
         // device row now answers directly, so an agent can never outlive its session by more
         // than one heartbeat (~30s) whatever else went wrong.
+        // 23-Sep-2026: post-shift auto sign-out used to depend ONLY on the background scheduler
+        // (cron / scheduled task). Where that is not running — production, 22/23-Sep — nobody
+        // was ever signed out and the agent tracked all evening. The agent heartbeats every
+        // ~30s, so run the same per-employee close right here: no scheduler needed. It is the
+        // SAME command the scheduler runs (one rule, not two), throttled to once a minute per
+        // employee. If it closes the session it revokes the device, and the check below 401s,
+        // which is what makes the agent drop to its login screen.
+        if ($device->employee_id && $device->session_status === 'ACTIVE'
+            && Cache::add('autologout-hb:' . $device->employee_id, 1, 60)) {
+            try {
+                \Illuminate\Support\Facades\Artisan::call('smartept:auto-logout', ['--employee' => $device->employee_id]);
+                $device->refresh();
+            } catch (\Throwable $e) {
+                report($e); // never fail a heartbeat over this
+            }
+        }
+
+        // 23-Sep-2026: "Block agent sign-in outside these hours" also ends a RUNNING agent once
+        // the window (start .. end + N) has passed. Auto sign-out above works from the login-
+        // session row; this works from the device itself, so an agent with no open session row
+        // (or one resumed from a stored token) cannot keep tracking outside the shift either.
+        $shift = $device->employee?->shift;
+        if ($device->session_status === 'ACTIVE' && $shift?->restrict_login_to_shift
+            && ! $shift->coversSignInAt($this->localNow($device->company_id))) {
+            $device->revokeAgentToken();
+            $device->update(['session_status' => 'FORCE_LOGOUT', 'force_logout_at' => $this->localNow($device->company_id), 'current_status' => 'OFFLINE']);
+        }
+
         if ($device->unbound_at || $device->session_status !== 'ACTIVE') {
             return response()->json([
                 'error' => ['code' => 'SESSION_ENDED', 'message' => 'This device session has ended. Please sign in again.'],

@@ -948,10 +948,10 @@
         <h3>Biometric Device Setup <span class="hint">connect a cloud attendance API — punches sync continuously (every 5 minutes) into Attendance, payroll and the Biometric Gate</span></h3>
         <table><thead><tr><th>Reader</th><th>Where</th><th>Direction</th><th>API</th><th>Auto sync</th><th>Status</th><th>Last sync</th><th>Last result</th><th>Punches</th><th></th></tr></thead><tbody id="biodev-rows"></tbody></table>
         <div id="bio-livesync" style="margin-top:14px;padding:12px 14px;border:1px solid var(--border-2);border-radius:10px;background:var(--card-2)">
-          <label style="margin:0">Live auto-sync <span class="hint">calls the API and syncs on a timer while this page is open — no scheduler needed</span></label>
+          <label style="margin:0">Live auto-sync <span class="hint">saved on the server — keeps pulling door punches every N seconds with this page closed, on every agent check-in</span></label>
           <div class="row" style="align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">
             <span class="mut" style="font-size:12px">Every</span>
-            <input id="bls-n" type="number" min="5" value="60" style="width:90px">
+            <input id="bls-n" type="number" min="1" value="60" style="width:90px">
             <select id="bls-unit" style="width:130px"><option value="sec">seconds</option><option value="min">minutes</option></select>
             <button class="btn solid" id="bls-start">Start</button>
             <button class="btn" id="bls-stop" style="display:none">Stop</button>
@@ -1090,7 +1090,7 @@
         <div style="overflow-x:auto">
         <table id="pr-table"><thead><tr>
           <th>Date</th><th>Code</th><th>Employee</th><th>Dept</th><th title="Reporting Manager">Manager</th>
-          <th>Logged in</th><th>Logged out</th>
+          <th title="First door (biometric) IN punch">Gate IN</th><th>Logged in</th><th title="Minutes from the door IN punch to the first agent sign-in">Gate→PC (mins)</th><th>Logged out</th>
           <th title="Actual Present Hrs (Logged out - Logged in)">Actual Present</th>
           <th title="Working (hh:mm)">Working</th><th title="Idle (hh:mm)">Idle</th>
           <th title="Number of Breaks">Breaks</th><th title="Break time Availed (hh:mm)">Break Availed</th>
@@ -1104,7 +1104,7 @@
           <th title="Minutes past the shift start time, from the attendance sheet">Late (min)</th>
           <th title="Actual Present − (Working + Idle + Break). Positive = signed-in time nothing was recorded for; negative = overlapping records double-counting the same minutes">Unaccounted</th>
           <th title="Why this row's Actual Present is not simply sign-out − sign-in">Data Issue</th>
-        </tr></thead><tbody id="pr-rows"><tr><td colspan="24" class="mut">Pick a range and press Show.</td></tr></tbody></table>
+        </tr></thead><tbody id="pr-rows"><tr><td colspan="26" class="mut">Pick a range and press Show.</td></tr></tbody></table>
         </div>
         <div class="mut" id="pr-note" style="margin-top:8px"></div>
       </div>
@@ -1341,6 +1341,32 @@
             <span class="mut" id="mg-msg"></span>
           </div>
         </div>
+      </div>
+      <div class="card" id="notify-card" style="display:none">
+        <h3>Notifications <span class="hint">which automatic alert emails go out, to whom and when — nothing is sent until you tick it</span></h3>
+        <div id="nt-co-wrap" style="display:none">
+          <h4 style="margin:4px 0 8px;font-size:13px">My company's alerts <span class="hint">sent only about YOUR company, to the people you choose</span></h4>
+          <div style="overflow-x:auto"><table style="width:100%;font-size:13px">
+            <thead><tr><th style="width:60px">Send?</th><th>Email</th><th>When</th><th>Send to</th><th>Also send to (emails, comma-separated)</th></tr></thead>
+            <tbody id="nt-co-rows"></tbody>
+          </table></div>
+          <div class="row" style="margin-top:10px"><button class="btn solid" id="nt-co-save">Save company alerts</button><span class="mut" id="nt-co-msg"></span></div>
+        </div>
+        <div id="nt-sv-wrap" style="display:none;margin-top:14px">
+          <h4 style="margin:4px 0 8px;font-size:13px">Server alerts <span class="hint">Super Admin — technical, not about any one company</span></h4>
+          <div style="overflow-x:auto"><table style="width:100%;font-size:13px">
+            <thead><tr><th style="width:60px">Send?</th><th>Email</th><th>When</th><th>Send to</th><th>Also send to (emails, comma-separated)</th></tr></thead>
+            <tbody id="nt-sv-rows"></tbody>
+          </table></div>
+          <div class="row" style="margin-top:10px"><button class="btn solid" id="nt-sv-save">Save server alerts</button><span class="mut" id="nt-sv-msg"></span></div>
+        </div>
+        <p class="mut" style="font-size:12px;margin:10px 0 0">Always sent, because a person asks for them: password-reset codes, the data-clear verification code and "Send test email".</p>
+        <details style="margin-top:14px"><summary style="cursor:pointer;font-weight:600">Recent emails (last 100 — sent, failed or blocked)</summary>
+          <div style="overflow-x:auto;margin-top:8px"><table style="width:100%;font-size:12px">
+            <thead><tr><th>When</th><th>To</th><th>Subject</th><th>Result</th></tr></thead>
+            <tbody id="nt-log"><tr><td colspan="4" class="mut">…</td></tr></tbody>
+          </table></div>
+        </details>
       </div>
       <div class="card" id="gcs-card">
         <h3>Cloud Storage (Google Cloud) <span class="hint">keep screenshots &amp; evidence in your own GCS bucket — no server setup</span></h3>
@@ -6248,6 +6274,7 @@ function bdApplyProvider() {
   if ($('#bd-user')) $('#bd-user').placeholder = essl ? 'Web API username' : 'API username';
 }
 async function loadBioDevices() {
+  blsLoadServer();
   try {
     const d = await api('/integrations/biometric/devices');
     bdDevices = d.data || [];
@@ -6379,9 +6406,27 @@ $('#bd-syncnow').onclick = async () => {
 // Live auto-sync (browser timer) — syncs every configured device every N sec/min while this
 // page is open, independent of the OS scheduler. The setting survives a refresh.
 let BLS_TIMER = null, BLS_RUNNING = false;
-function blsSaveCfg() { try { localStorage.setItem('ept_bio_livesync', JSON.stringify({ on: BLS_RUNNING, n: $('#bls-n').value, unit: $('#bls-unit').value })); } catch (e) { /* private mode */ } }
+function blsSaveCfg() {
+  try { localStorage.setItem('ept_bio_livesync', JSON.stringify({ on: BLS_RUNNING, n: $('#bls-n').value, unit: $('#bls-unit').value })); } catch (e) { /* private mode */ }
+  // 23-Sep-2026: the SERVER now runs this setting (GateService::pullDoorPunchesSoon) — the
+  // browser timer below only adds to it while this page is open.
+  api('/integrations/biometric/live-sync', { method: 'PUT', body: JSON.stringify({ on: BLS_RUNNING, seconds: Math.round(blsIntervalMs() / 1000) }) }).catch(() => {});
+}
+let BLS_SERVER_LOADED = false;
+async function blsLoadServer() {
+  if (BLS_SERVER_LOADED) return;
+  BLS_SERVER_LOADED = true;
+  try {
+    const c = await api('/integrations/biometric/live-sync');
+    if ($('#bls-n')) $('#bls-n').value = c.seconds >= 60 && c.seconds % 60 === 0 ? c.seconds / 60 : c.seconds;
+    if ($('#bls-unit')) $('#bls-unit').value = c.seconds >= 60 && c.seconds % 60 === 0 ? 'min' : 'sec';
+    if (c.on && !BLS_RUNNING) blsStart(true);
+    if (!c.on && BLS_RUNNING) blsStop();
+    if ($('#bls-status') && c.on) $('#bls-status').textContent = 'Running on the server — every ' + c.seconds + 's.';
+  } catch (e) { BLS_SERVER_LOADED = false; }
+}
 function blsIntervalMs() {
-  const n = Math.max(5, parseInt($('#bls-n').value, 10) || 60);
+  const n = Math.max(1, parseInt($('#bls-n').value, 10) || 60);
   return (($('#bls-unit').value === 'min') ? n * 60 : n) * 1000;
 }
 async function blsTick() {
@@ -6840,7 +6885,7 @@ function prSetRange(from, to) { $('#pr-from').value = from; $('#pr-to').value = 
 function isoDate(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 async function loadProductivity() {
   const from = $('#pr-from').value || today(), to = $('#pr-to').value || today();
-  $('#pr-rows').innerHTML = '<tr><td colspan="24" class="mut">Loading…</td></tr>';
+  $('#pr-rows').innerHTML = '<tr><td colspan="26" class="mut">Loading…</td></tr>';
   try {
     const r = await api('/reports/productivity?from=' + from + '&to=' + to);
     PROD_ROWS = r.data || [];
@@ -6852,7 +6897,9 @@ async function loadProductivity() {
       '<td><b>' + esc(x.name) + '</b></td>' +
       '<td class="mut">' + esc(x.department || '—') + '</td>' +
       '<td class="mut">' + esc(x.reporting_manager || '—') + '</td>' +
+      '<td>' + esc(x.gate_in || '—') + '</td>' +
       '<td>' + esc(x.first_in || '—') + '</td>' +
+      '<td data-sort="' + (x.gate_to_pc_minutes||0) + '">' + (x.gate_to_pc_minutes || 0) + '</td>' +
       '<td' + (x.live && x.last_out ? ' title="Live — current time is used as logout for today\'s productivity"' : '') + '>' + esc(x.last_out || '—') + (x.live && x.last_out ? ' <span class="mut" style="font-size:8px">now</span>' : '') + '</td>' +
       '<td data-sort="' + x.present_seconds + '" title="Logged out − Logged in (today: current time)">' + hms(x.present_seconds) + '</td>' +
       '<td data-sort="' + x.work_seconds + '"><b>' + hms(x.work_seconds) + '</b></td>' +
@@ -6873,10 +6920,10 @@ async function loadProductivity() {
       // inside a minute is per-event rounding and reads as a clean dash.
       '<td data-sort="' + (x.unaccounted_seconds||0) + '">' + prUnacc(x.unaccounted_seconds) + '</td>' +
       '<td class="mut" style="font-size:10px">' + esc(x.data_issue_text || '') + '</td></tr>'
-    ).join('') : '<tr><td colspan="24" class="mut">No activity in this range.</td></tr>';
+    ).join('') : '<tr><td colspan="26" class="mut">No activity in this range.</td></tr>';
     $('#pr-note').textContent = PROD_ROWS.length + ' rows · ' + from + ' → ' + to + ' · Actual Present = Logged out − Logged in (for today, the current time is used as logout so the % is live) · Productive = Working + Meeting · Non-Productive = Idle + Break Exceed · Net Hrs = Actual Present − Allotted break · Productive % = Productive ÷ Net Hrs. Allotted break = shift allowance, pro-rated on early logout. An extract of today uses the same current-time-as-logout values. Unaccounted = Actual Present − (Working + Idle + Break): + means signed-in time nothing was recorded for, − means overlapping records counting the same minutes twice — a blank column is a day that reconciles exactly.';
     attachTableFilter($('#pr-q'), '#pr-rows');
-  } catch (e) { $('#pr-rows').innerHTML = '<tr><td colspan="24" class="mut">' + esc(e.message) + '</td></tr>'; }
+  } catch (e) { $('#pr-rows').innerHTML = '<tr><td colspan="26" class="mut">' + esc(e.message) + '</td></tr>'; }
 }
 // Reconciliation cell: ±hh:mm, dash when the day balances to within a minute.
 function prUnacc(sec) {
@@ -6889,15 +6936,15 @@ function prUnacc(sec) {
 const hhmm = (sec) => { const m = Math.max(0, Math.round((sec || 0) / 60)); return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
 function prCSV() {
   // Exact headers from the client's Productivity Excel template (RAW sheet), kept verbatim.
-  const head = ['Emp. ID','Employee','Department','Reporting Manager','Date','Logged in','Logged out','Actual Present Hrs (Logged out - Logged in)','Working (hh:mm)','Idle (hh:mm)','Number of Breaks','Break time Availed  (hh:mm)','Allotted break (hh:mm)','Meeting Time','Break Exceed Mins (Break Time - Allotted Time)','Productive Hrs (Working + Meeting)','Non Productive Hrs (Idle + Break Exceed)','Net Hrs (Actual Logged Hours-Allotted Break)','Productive% [ Productive Hrs/ Net Hrs]','Late Login (mins)','Unaccounted Mins (Present − Working − Idle − Break)','Data Issue'];
-  const rows = PROD_ROWS.map((x) => [x.employee_code,x.name,x.department,x.reporting_manager,x.work_date,x.first_in,x.last_out,hhmm(x.present_seconds),hhmm(x.work_seconds),hhmm(x.idle_seconds),x.break_count,hhmm(x.break_seconds),hhmm(x.allotted_break_seconds),hhmm(x.meeting_seconds),hhmm(x.break_exceed_seconds),hhmm(x.productive_seconds),hhmm(x.non_productive_seconds),hhmm(x.net_working_seconds),(x.productivity==null?'':x.productivity+'%'),(x.late_minutes||0),Math.round((x.unaccounted_seconds||0)/60),(x.data_issue_text||'')]);
+  const head = ['Emp. ID','Employee','Department','Reporting Manager','Date','Logged in','Logged out','Actual Present Hrs (Logged out - Logged in)','Working (hh:mm)','Idle (hh:mm)','Number of Breaks','Break time Availed  (hh:mm)','Allotted break (hh:mm)','Meeting Time','Break Exceed Mins (Break Time - Allotted Time)','Productive Hrs (Working + Meeting)','Non Productive Hrs (Idle + Break Exceed)','Net Hrs (Actual Logged Hours-Allotted Break)','Productive% [ Productive Hrs/ Net Hrs]','Late Login (mins)','Unaccounted Mins (Present − Working − Idle − Break)','Data Issue','Gate IN','Gate to PC (mins)'];
+  const rows = PROD_ROWS.map((x) => [x.employee_code,x.name,x.department,x.reporting_manager,x.work_date,x.first_in,x.last_out,hhmm(x.present_seconds),hhmm(x.work_seconds),hhmm(x.idle_seconds),x.break_count,hhmm(x.break_seconds),hhmm(x.allotted_break_seconds),hhmm(x.meeting_seconds),hhmm(x.break_exceed_seconds),hhmm(x.productive_seconds),hhmm(x.non_productive_seconds),hhmm(x.net_working_seconds),(x.productivity==null?'':x.productivity+'%'),(x.late_minutes||0),Math.round((x.unaccounted_seconds||0)/60),(x.data_issue_text||''),(x.gate_in||''),(x.gate_to_pc_minutes||0)]);
   const csv = [head, ...rows].map((r) => r.map((c) => '"' + String(c==null?'':c).replace(/"/g,'""') + '"').join(',')).join('\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
   a.download = 'SmartEPT-Productivity-Report-' + $('#pr-from').value + '_' + $('#pr-to').value + '.csv'; a.click(); URL.revokeObjectURL(a.href);
 }
 function prPDF() {
   const from = $('#pr-from').value, to = $('#pr-to').value;
-  const rowsHtml = PROD_ROWS.map((x) => '<tr><td>' + esc(x.work_date) + '</td><td>' + esc(x.employee_code||'') + '</td><td>' + esc(x.name) + '</td><td>' + esc(x.department||'') + '</td><td>' + esc(x.reporting_manager||'—') + '</td><td>' + esc(x.first_in||'—') + '</td><td>' + esc(x.last_out||'—') + '</td><td>' + hhmm(x.present_seconds) + '</td><td>' + hhmm(x.work_seconds) + '</td><td>' + hhmm(x.idle_seconds) + '</td><td>' + x.break_count + '</td><td>' + hhmm(x.break_seconds) + '</td><td>' + hhmm(x.allotted_break_seconds) + '</td><td>' + hhmm(x.meeting_seconds) + '</td><td>' + hhmm(x.break_exceed_seconds) + '</td><td>' + hhmm(x.productive_seconds) + '</td><td>' + hhmm(x.non_productive_seconds) + '</td><td>' + hhmm(x.net_working_seconds) + '</td><td>' + (x.productivity==null?'—':Number(x.productivity).toFixed(0)+'%') + '</td><td>' + (x.late_minutes||0) + '</td><td>' + (Math.abs(x.unaccounted_seconds||0) <= 60 ? '—' : (x.unaccounted_seconds > 0 ? '+' : '−') + hhmm(Math.abs(x.unaccounted_seconds))) + '</td><td>' + esc(x.data_issue_text||'') + '</td></tr>').join('');
+  const rowsHtml = PROD_ROWS.map((x) => '<tr><td>' + esc(x.work_date) + '</td><td>' + esc(x.employee_code||'') + '</td><td>' + esc(x.name) + '</td><td>' + esc(x.department||'') + '</td><td>' + esc(x.reporting_manager||'—') + '</td><td>' + esc(x.first_in||'—') + '</td><td>' + esc(x.last_out||'—') + '</td><td>' + hhmm(x.present_seconds) + '</td><td>' + hhmm(x.work_seconds) + '</td><td>' + hhmm(x.idle_seconds) + '</td><td>' + x.break_count + '</td><td>' + hhmm(x.break_seconds) + '</td><td>' + hhmm(x.allotted_break_seconds) + '</td><td>' + hhmm(x.meeting_seconds) + '</td><td>' + hhmm(x.break_exceed_seconds) + '</td><td>' + hhmm(x.productive_seconds) + '</td><td>' + hhmm(x.non_productive_seconds) + '</td><td>' + hhmm(x.net_working_seconds) + '</td><td>' + (x.productivity==null?'—':Number(x.productivity).toFixed(0)+'%') + '</td><td>' + (x.late_minutes||0) + '</td><td>' + (Math.abs(x.unaccounted_seconds||0) <= 60 ? '—' : (x.unaccounted_seconds > 0 ? '+' : '−') + hhmm(Math.abs(x.unaccounted_seconds))) + '</td><td>' + esc(x.data_issue_text||'') + '</td><td>' + esc(x.gate_in||'—') + '</td><td>' + (x.gate_to_pc_minutes||0) + '</td></tr>').join('');
   const co = ($('#company-name') ? $('#company-name').textContent : 'Company');
   const w = window.open('', '_blank');
   w.document.write('<html><head><title>SmartEPT Productivity ' + from + ' to ' + to + '</title><style>'
@@ -6909,7 +6956,7 @@ function prPDF() {
     + '@media print{.np{display:none}}</style></head><body>'
     + '<div class="hd"><div><h1>Productivity Report</h1><div class="sub">' + esc(co) + ' · ' + from + ' → ' + to + ' · SmartEPT by Ametecs</div></div>'
     + '<button class="np" onclick="window.print()" style="padding:8px 14px;background:#0E7C8F;color:#fff;border:none;border-radius:7px;cursor:pointer">Print / Save PDF</button></div>'
-    + '<table><thead><tr><th>Date</th><th>Code</th><th>Employee</th><th>Dept</th><th>Manager</th><th>In</th><th>Out</th><th>Actual Present</th><th>Working</th><th>Idle</th><th>Breaks</th><th>Break Availed</th><th>Allotted</th><th>Meeting</th><th>Break Exceed</th><th>Productive</th><th>Non-Prod.</th><th>Net Hrs</th><th>Prod.%</th><th>Late (min)</th><th>Unaccounted</th><th>Data Issue</th></tr></thead><tbody>'
+    + '<table><thead><tr><th>Date</th><th>Code</th><th>Employee</th><th>Dept</th><th>Manager</th><th>In</th><th>Out</th><th>Actual Present</th><th>Working</th><th>Idle</th><th>Breaks</th><th>Break Availed</th><th>Allotted</th><th>Meeting</th><th>Break Exceed</th><th>Productive</th><th>Non-Prod.</th><th>Net Hrs</th><th>Prod.%</th><th>Late (min)</th><th>Unaccounted</th><th>Data Issue</th><th>Gate IN</th><th>Gate→PC (mins)</th></tr></thead><tbody>'
     + (rowsHtml || '<tr><td colspan="19">No data</td></tr>') + '</tbody></table>'
     + '<p style="margin-top:14px;color:#878C99;font-size:10px">Generated ' + new Date().toLocaleString() + ' · SmartEPT — Employee Productivity Tracking & Intelligence</p>'
     + '</body></html>');
@@ -7801,6 +7848,7 @@ async function loadOps() {
   loadStorageConfig();
   loadStorageQuota();
   loadMailConfig();
+  loadNotify();
   try {
     const s = await api('/ops/storage-usage');
     $('#ops-storage').innerHTML = (s.data || []).length
@@ -7923,6 +7971,91 @@ if ($('#mg-test')) $('#mg-test').onclick = async () => {
   try { const r = await api('/ops/mail-config/test', { method: 'POST', body: JSON.stringify({ scope: 'global' }) }); m.textContent = '✓ ' + r.message; }
   catch (e) { m.textContent = '✕ ' + e.message; }
 };
+// ---- Notifications: per-company alert emails + Super Admin server alerts (Ejaz, 23-Sep-2026) ----
+const NT_HOURS = (f, v) => '<select data-f="' + f + '">' + Array.from({ length: 24 }, (_, h) => '<option value="' + h + '"' + (h == v ? ' selected' : '') + '>' + String(h).padStart(2, '0') + ':00</option>').join('') + '</select>';
+const NT_CO = [
+  { k: 'device_offline', name: 'PC down / offline', what: 'A monitored PC stopped reporting. Checked every 30 minutes.',
+    when: (p) => 'After <input type="number" min="1" max="10080" data-f="minutes" value="' + p.minutes + '" style="width:70px"> minutes of silence' },
+  { k: 'violation_spike', name: 'Violations', what: 'Rule violations in your company within one hour. At most one email per hour.',
+    when: (p) => 'When <input type="number" min="1" data-f="threshold" value="' + p.threshold + '" style="width:70px"> or more in 1 hour' },
+  { k: 'late_login', name: 'Late logins', what: 'One list per day of employees who logged in late.',
+    when: (p) => 'More than <input type="number" min="1" data-f="minutes" value="' + p.minutes + '" style="width:60px"> min late — sent at ' + NT_HOURS('hour', p.hour) },
+  { k: 'gate_long_break', name: 'Long out-of-office break', what: 'The biometric door shows an employee stayed out too long.',
+    when: (p) => 'Break longer than <input type="number" min="0.1" max="24" step="0.1" data-f="hours" value="' + p.hours + '" style="width:60px"> hours' },
+  { k: 'USER_CREDENTIALS', name: 'New sign-in details', what: 'Temporary password sent to a person when an admin creates their login or resets their password.',
+    when: () => 'When an admin creates / resets a login', fixedTo: 'The person the login is for', copy: true },
+];
+const NT_SV = [
+  { k: 'error_digest', name: 'Daily server error report', what: 'Technical errors the server logged in the last 24 hours. Sent only if there were errors.',
+    when: (p) => 'Every day at ' + NT_HOURS('hour', p.hour) },
+];
+let NT_TPL = {};
+const NT_ROLES_CO = [['COMPANY_ADMIN', 'Company Admins'], ['HR_ADMIN', 'HR Admins'], ['MANAGER', 'Managers']];
+const NT_ROLES_SV = [['SUPER_ADMIN', 'Super Admins'], ['COMPANY_ADMIN', 'All Company Admins']];
+function ntRows(defs, prefs, roles) {
+  return defs.map((r) => {
+    const p = prefs[r.k] || {};
+    const to = r.fixedTo ? '<span class="mut">' + esc(r.fixedTo) + '</span>'
+      : roles.map(([v, l]) => '<label style="display:block;white-space:nowrap"><input type="checkbox" data-role="' + v + '"' + ((p.roles || []).includes(v) ? ' checked' : '') + '> ' + l + '</label>').join('');
+    const extra = (r.fixedTo && !r.copy) ? '' : '<input data-f="extra" value="' + esc(p.extra || '') + '" placeholder="' + (r.copy ? 'copy to (gets the temporary password too)' : 'e.g. it@yourcompany.com') + '" style="width:100%">';
+    const t = (NT_TPL || {})[r.k] || {};
+    const vars = (t.vars || []).map((v) => '<code>{' + esc(v) + '}</code>').join(' ');
+    return '<tr data-k="' + r.k + '"><td><input type="checkbox" data-f="on"' + (p.on ? ' checked' : '') + '></td>'
+      + '<td><b>' + esc(r.name) + '</b><div class="mut" style="font-size:12px">' + esc(r.what) + '</div>'
+      + '<a href="#" style="font-size:12px" onclick="const e=this.closest(\'tr\').nextElementSibling;e.style.display=e.style.display===\'none\'?\'\':\'none\';return false">Edit email content</a></td>'
+      + '<td>' + r.when(p) + '</td><td>' + to + '</td><td>' + extra + '</td></tr>'
+      + '<tr data-edit="' + r.k + '" style="display:none"><td></td><td colspan="4">'
+      + '<label>Subject</label><input data-c="subject" data-default="' + esc(t.subject || '') + '" value="' + esc(p.subject || t.subject || '') + '" style="width:100%">'
+      + '<label style="margin-top:6px;display:block">Message</label><textarea data-c="body" data-default="' + esc(t.body || '') + '" rows="8" style="width:100%;font-family:monospace;font-size:12px">' + esc(p.body || t.body || '') + '</textarea>'
+      + '<div class="mut" style="font-size:12px">You can use: ' + vars + ' — filled in automatically. '
+      + '<a href="#" onclick="const e=this.closest(\'tr\');e.querySelectorAll(\'[data-c]\').forEach((x)=>{x.value=x.dataset.default});return false">Reset to built-in text</a></div></td></tr>';
+  }).join('');
+}
+function ntCollect(sel) {
+  const prefs = {};
+  document.querySelectorAll(sel + ' tr[data-k]').forEach((tr) => {
+    const p = { on: tr.querySelector('[data-f="on"]').checked };
+    tr.querySelectorAll('[data-f]').forEach((el) => {
+      const f = el.dataset.f; if (f === 'on') return;
+      p[f] = f === 'extra' ? el.value.trim() : Number(el.value);
+    });
+    const roles = [...tr.querySelectorAll('[data-role]')];
+    if (roles.length) p.roles = roles.filter((c) => c.checked).map((c) => c.dataset.role);
+    // Wording: left identical to the built-in text → saved blank, so it keeps following the built-in.
+    const ed = document.querySelector(sel + ' tr[data-edit="' + tr.dataset.k + '"]');
+    if (ed) ed.querySelectorAll('[data-c]').forEach((x) => { p[x.dataset.c] = x.value.trim() === x.dataset.default.trim() ? '' : x.value; });
+    prefs[tr.dataset.k] = p;
+  });
+  return prefs;
+}
+async function loadNotify() {
+  if (!(ME && (ME.role === 'SUPER_ADMIN' || ME.role === 'COMPANY_ADMIN')) || !$('#notify-card')) return;
+  try {
+    const d = await api('/ops/notify-prefs');
+    NT_TPL = d.templates || {};
+    if (d.company) { $('#nt-co-wrap').style.display = ''; $('#nt-co-rows').innerHTML = ntRows(NT_CO, d.company, NT_ROLES_CO); }
+    if (d.server) { $('#nt-sv-wrap').style.display = ''; $('#nt-sv-rows').innerHTML = ntRows(NT_SV, d.server, NT_ROLES_SV); }
+    if (!d.company && !d.server) return;
+    $('#notify-card').style.display = '';
+  } catch (e) { return; }
+  try {
+    const rows = (await api('/ops/mail-log')).data || [];
+    $('#nt-log').innerHTML = rows.length ? rows.map((m) => '<tr><td style="white-space:nowrap">' + esc(String(m.created_at || '').replace('T', ' ').slice(0, 16))
+      + '</td><td>' + esc(m.to) + '</td><td>' + esc(m.subject) + '</td><td>'
+      + (m.status === 'sent' ? '\u2713 sent' : m.status === 'failed' ? '<span style="color:#DC2626">\u2715 failed</span>' : '<span class="mut">blocked' + (m.error ? ' — ' + esc(m.error) : '') + '</span>')
+      + '</td></tr>').join('') : '<tr><td colspan="4" class="mut">No emails yet.</td></tr>';
+  } catch (e) { $('#nt-log').innerHTML = '<tr><td colspan="4" class="mut">' + esc(e.message) + '</td></tr>'; }
+}
+[['co', 'company'], ['sv', 'server']].forEach(([id, scope]) => {
+  const b = $('#nt-' + id + '-save'); if (!b) return;
+  b.onclick = async () => {
+    const m = $('#nt-' + id + '-msg'); m.textContent = 'Saving…';
+    try {
+      await api('/ops/notify-prefs', { method: 'PUT', body: JSON.stringify({ scope, prefs: ntCollect('#nt-' + id + '-rows') }) });
+      m.textContent = '\u2713 Saved — only the ticked emails will be sent';
+    } catch (e) { m.textContent = '\u2715 ' + e.message; }
+  };
+});
 async function loadStorageConfig() {
   // Cloud Storage (GCS) bucket = shared infrastructure -> Super Admin only sees/edits it.
   const isSuper = !!(ME && ME.role === 'SUPER_ADMIN');

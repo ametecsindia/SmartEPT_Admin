@@ -28,6 +28,8 @@ class PerRuleEnforcementTest extends TestCase
     {
         parent::setUp();
         $this->seed(DatabaseSeeder::class);
+        // Behaviour tests run on ONE clock: company = app timezone (ApplyCompanyTimezone, 23-Sep-2026).
+        \App\Models\Company::withoutGlobalScopes()->update(['timezone' => config('app.timezone')]);
 
         // The learning gate is half of what this class covers, and since 27-Aug-2026 it is
         // switched OFF on every client installation (Ejaz: "no learning mechanism in the

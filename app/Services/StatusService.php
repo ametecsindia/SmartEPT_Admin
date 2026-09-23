@@ -78,7 +78,24 @@ class StatusService
                 }
 
                 // (3) Ambient activity must not clobber a manual break/meeting.
-                if (in_array($newState, self::AMBIENT_STATES, true)
+                // 23-Sep-2026: EXCEPT a door break. A BIOMETRIC break was never the employee's
+                // choice — it was inferred from an OUT punch. Real keyboard/mouse ACTIVE on
+                // their PC after it started disproves it, so it ends the break. (Before this, a
+                // missed IN punch left the live board on "Other break" for hours while the
+                // agent showed Active, and every report booked that time as break.)
+                $doorBreakDisproved = $newState === 'ACTIVE'
+                    && $current->source === 'BIOMETRIC'
+                    && in_array($current->state, self::BREAK_STATES, true)
+                    && $at->greaterThanOrEqualTo($current->started_at);
+                if ($doorBreakDisproved) {
+                    \App\Models\EmployeeBreakLog::withoutGlobalScopes()
+                        ->where('employee_id', $e->id)->where('source', 'BIOMETRIC')->whereNull('end_at')
+                        ->get()
+                        ->each(fn ($b) => $b->update([
+                            'end_at' => $at,
+                            'duration_seconds' => $b->start_at ? max(0, $at->getTimestamp() - $b->start_at->getTimestamp()) : null,
+                        ]));
+                } elseif (in_array($newState, self::AMBIENT_STATES, true)
                     && ! $resume && ! $force
                     && in_array($current->state, self::BREAK_OR_MEETING, true)) {
                     return StatusResult::unchanged($current);

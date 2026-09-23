@@ -342,6 +342,9 @@ class GateService
         $s = $this->stateFor($employee, $device);
         $open = ! $s['enabled'] || $s['state'] === 'IN';
 
+        // Every agent contact (heartbeat, gate poll) keeps this company's door punches live.
+        $this->pullDoorPunchesSoon((int) $employee->company_id);
+
         return [
             'gate_required' => $s['enabled'],
             'open' => $open,
@@ -394,6 +397,57 @@ class GateService
         }
     }
 
+    /** Setting key for Biometric → "Live auto-sync" — now stored on the SERVER, per company. */
+    public static function liveSyncKey(int $companyId): string
+    {
+        return 'bio_live_sync:company:' . $companyId;
+    }
+
+    /**
+     * Seconds between live pulls for a company: the Biometric tab's "Live auto-sync every N"
+     * value when it is switched on, else 60. Never below 1.
+     */
+    public static function liveSyncSeconds(int $companyId): int
+    {
+        try {
+            $cfg = json_decode((string) \App\Models\Setting::get(self::liveSyncKey($companyId), ''), true) ?: [];
+
+            return ! empty($cfg['on']) ? max(1, (int) ($cfg['seconds'] ?? 60)) : 60;
+        } catch (\Throwable $e) {
+            return 60;
+        }
+    }
+
+    /**
+     * 23-Sep-2026 (Ejaz: "every day I have to go to the Biometric tab and Sync, else the agent is
+     * stuck on 'punch in at the door' although they already punched"). The Biometric tab's "Live
+     * auto-sync every N seconds" used to be a timer in the ADMIN'S BROWSER — it ran only while
+     * that tab was open, which is exactly why punches flowed only after someone opened it. The
+     * setting is now stored on the server and honoured here: every agent heartbeat / gate poll
+     * pulls this company's cloud readers once N seconds have passed, after the response is sent.
+     * No scheduler, no open browser. Today's punches only (--days=1) so a 1-second cadence does
+     * not re-download two days every time; the per-device lock in the command keeps pulls from
+     * overlapping when the provider is slower than N.
+     */
+    private function pullDoorPunchesSoon(int $companyId): void
+    {
+        try {
+            if (! \Illuminate\Support\Facades\Cache::add('gate-pull:' . $companyId, 1, self::liveSyncSeconds($companyId))) {
+                return;
+            }
+            $ids = BiometricDevice::withoutGlobalScopes()->where('company_id', $companyId)
+                ->where(fn ($q) => $q->where('status', '!=', 'INACTIVE')->orWhereNull('status'))->get()
+                // Same "is this a cloud reader we pull from" rule as BiometricSync::mode().
+                ->filter(fn ($d) => ($d->sync_mode ?: ($d->sync_enabled ? 'INTERVAL' : 'MANUAL')) !== 'MANUAL')
+                ->pluck('id');
+            if ($ids->isNotEmpty()) {
+                app()->terminating(fn () => $ids->each(fn ($id) => \Illuminate\Support\Facades\Artisan::call('smartept:biometric-sync', ['--device' => $id, '--days' => 1])));
+            }
+        } catch (\Throwable $e) {
+            // never break the gate answer over this
+        }
+    }
+
     /** True when the agent is ALLOWED to run a work session right now. */
     public function isOpen(Employee $employee, ?EmployeeDevice $device = null): bool
     {
@@ -426,10 +480,26 @@ class GateService
     {
         $sessionOpen = EmployeeLoginSession::withoutGlobalScopes()
             ->where('company_id', $companyId)->where('employee_id', $employeeId)
-            ->whereNull('logout_at')->exists();
+            ->whereNull('logout_at')->latest('login_at')->first();
 
         if (! $sessionOpen) {
             return; // evening walk-out after log-off = day closing, not a break
+        }
+
+        // 23-Sep-2026: a walk-out AFTER the shift has ended is the day closing too, even while
+        // the agent session is still open (auto sign-out only fires at shift end + N). It used
+        // to open an OTHER_BREAK here, so an employee who left at 18:02 showed "Other break"
+        // until midnight and every report booked the evening as break time.
+        // "After the shift" = the session began inside the shift window and this punch is
+        // outside it (works for night shifts; an early-bird pre-shift OUT is unchanged).
+        $shiftId = Employee::withoutGlobalScopes()->whereKey($employeeId)->value('shift_id');
+        $shift = $shiftId ? \App\Models\Shift::withoutGlobalScopes()->find($shiftId) : null;
+        if ($shift && $shift->end_time) {
+            $inShift = $shift->replicate();
+            $inShift->post_shift_auto_logout_minutes = 0; // ponytail: the bare start..end window, no sign-out tail
+            if ($sessionOpen->login_at && $inShift->coversSignInAt($sessionOpen->login_at) && ! $inShift->coversSignInAt($at)) {
+                return;
+            }
         }
 
         $open = $this->openBreak($companyId, $employeeId);
@@ -496,19 +566,17 @@ class GateService
             ]);
         }
 
-        if ($minutes > self::NOTIFY_HR_OVER_MINUTES) {
+        // Email (23-Sep-2026): limit, recipients and wording come from Audit & Ops → Notifications.
+        // The flag/severity above keeps its own rule — only the email is configurable here.
+        if ($minutes > ((float) MailService::prefs($companyId)['gate_long_break']['hours']) * 60) {
             $employee = Employee::withoutGlobalScopes()->find($employeeId);
-            $hours = round($minutes / 60, 1);
-            $body = ($employee ? $employee->fullName() . ' (' . $employee->employee_code . ')' : 'An employee')
-                . " was out of office for {$hours} hours today ({$open->start_at->format('H:i')}–{$at->format('H:i')}, recorded by the biometric door)."
-                . "\n\nBeyond 3 hours the day normally counts as a half-day — the attendance sheet applies this automatically tonight; use Attendance → regularize if there is a genuine reason (client visit, medical)."
-                . "\n\n— SmartEPT";
+            $vars = ['employee' => $employee?->fullName() ?? 'An employee', 'employee_code' => $employee?->employee_code ?? '-',
+                'hours' => round($minutes / 60, 1), 'from' => $open->start_at->format('H:i'), 'to' => $at->format('H:i')];
+            $t = MailService::TEMPLATES['gate_long_break'];
 
-            User::query()->where('status', 'ACTIVE')
-                ->where(fn ($q) => $q->where('company_id', $companyId)->orWhereNull('company_id'))
-                ->whereHas('role', fn ($q) => $q->whereIn('slug', ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR_ADMIN']))
-                ->get(['id', 'email', 'company_id'])
-                ->each(fn ($admin) => MailService::send($admin->email, 'SmartEPT: long out-of-office break — ' . ($employee?->fullName() ?? ''), $body, 'gate_long_break', $companyId));
+            foreach (array_keys(MailService::recipients('gate_long_break', $companyId)) as $email) {
+                MailService::send($email, MailService::render($t['subject'], $vars), MailService::render($t['body'], $vars), 'gate_long_break', $companyId, $vars);
+            }
         }
     }
 

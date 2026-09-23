@@ -56,7 +56,12 @@ class AppServiceProvider extends ServiceProvider
     {
         try {
             $tz = \Illuminate\Support\Facades\Cache::remember('smartept:org_timezone', 3600, function () {
-                $rows = \App\Models\Company::withoutGlobalScopes()->limit(2)->pluck('timezone');
+                // 23-Sep-2026: every company sharing ONE timezone counts too — a multi-company
+                // server whose tenants are all on Asia/Kolkata (admin.smartept.com) used to fall
+                // back to APP_TIMEZONE for every console job. Mixed timezones: the per-request
+                // ApplyCompanyTimezone middleware and ResolvesLocalNow decide per company.
+                $rows = \App\Models\Company::withoutGlobalScopes()->whereNotNull('timezone')
+                    ->where('timezone', '!=', '')->distinct()->limit(2)->pluck('timezone');
 
                 return $rows->count() === 1 ? (string) $rows->first() : '';
             });

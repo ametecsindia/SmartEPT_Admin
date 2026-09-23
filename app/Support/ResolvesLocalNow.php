@@ -39,6 +39,28 @@ trait ResolvesLocalNow
         return Carbon::parse(Carbon::now($this->companyTz($companyId))->format('Y-m-d H:i:s'));
     }
 
+    /**
+     * Run $fn with the whole process clock (now(), today(), config app.timezone) on the company's
+     * Organisation-tab timezone, then put it back (23-Sep-2026). For console jobs that loop over
+     * companies: every now() inside — including in services they call — is that company's clock.
+     */
+    protected function onCompanyClock(?int $companyId, callable $fn): mixed
+    {
+        $original = config('app.timezone');
+        $tz = $this->companyTz($companyId);
+        if ($tz !== $original && in_array($tz, timezone_identifiers_list(), true)) {
+            config(['app.timezone' => $tz]);
+            date_default_timezone_set($tz);
+        }
+
+        try {
+            return $fn();
+        } finally {
+            config(['app.timezone' => $original]);
+            date_default_timezone_set($original);
+        }
+    }
+
     protected function companyTz(?int $companyId): string
     {
         if ($companyId === null) {

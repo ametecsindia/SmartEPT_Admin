@@ -155,6 +155,11 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
         Route::middleware('role:SUPER_ADMIN')->put('ops/mail-config', [\App\Http\Controllers\Api\MailConfigController::class, 'saveGlobal']);
         Route::put('ops/mail-config/company', [\App\Http\Controllers\Api\MailConfigController::class, 'saveCompany']);
         Route::post('ops/mail-config/test', [\App\Http\Controllers\Api\MailConfigController::class, 'test']);
+        // 23-Sep-2026 Notifications: each company admin decides their own company's alert emails;
+        // the server error report is Super Admin only (enforced in the controller).
+        Route::get('ops/notify-prefs', [\App\Http\Controllers\Api\MailConfigController::class, 'notifyPrefs']);
+        Route::put('ops/notify-prefs', [\App\Http\Controllers\Api\MailConfigController::class, 'saveNotifyPrefs']);
+        Route::get('ops/mail-log', [\App\Http\Controllers\Api\MailConfigController::class, 'mailLog']);
         Route::get('ops/storage-config', [StorageConfigController::class, 'show']);
         // Cloud Storage (GCS) bucket = SHARED infrastructure across all cloud tenants,
         // so only a Super Admin may change or test it. Company Admins can view only.
@@ -350,6 +355,9 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
         Route::get('devices', [BiometricDeviceController::class, 'index']);
         Route::post('devices/test-connection', [BiometricDeviceController::class, 'testConnection']);
         Route::post('devices/{device}/sync', [BiometricDeviceController::class, 'syncNow']);
+        // 23-Sep-2026: "Live auto-sync every N seconds" is stored server-side (was browser-only).
+        Route::get('live-sync', [BiometricDeviceController::class, 'liveSync']);
+        Route::put('live-sync', [BiometricDeviceController::class, 'saveLiveSync']);
         Route::post('devices', [BiometricDeviceController::class, 'store']);
         Route::put('devices/{device}', [BiometricDeviceController::class, 'update']);
         Route::delete('devices/{device}', [BiometricDeviceController::class, 'destroy']);

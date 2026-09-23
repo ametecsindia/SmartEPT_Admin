@@ -44,6 +44,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // Every API request is forced to HTTPS in production (config-gated for Laragon local).
         $middleware->api(prepend: [
             \App\Http\Middleware\ForceHttps::class,
+            // 23-Sep-2026: every API request runs on the signed-in company's Organisation-tab
+            // timezone, including on a multi-company server — see the class docblock.
+            \App\Http\Middleware\ApplyCompanyTimezone::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

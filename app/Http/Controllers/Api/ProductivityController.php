@@ -102,6 +102,23 @@ class ProductivityController extends Controller
             ->groupBy('employee_id', DB::raw('DATE(actual_start_at)'))->get()
             ->keyBy(fn ($r) => $r->employee_id . '|' . $r->d);
 
+        // 23-Sep-2026 (Ejaz): Gate → PC. First door IN and first agent sign-in per employee|date,
+        // so the day starts at the door, not at the PC, and the walk from gate to desk is its own
+        // visible number instead of vanishing (or hiding inside "Unaccounted").
+        $gateIns = \App\Models\BiometricLog::withoutGlobalScopes()->where('company_id', $companyId)
+            ->whereNotNull('employee_id')->whereIn('punch_type', ['IN', 'BREAK_IN'])
+            ->whereBetween('punched_at', [$from, $to])
+            ->when($empId, fn ($q) => $q->where('employee_id', $empId))
+            ->selectRaw('employee_id, DATE(punched_at) d, MIN(punched_at) t')
+            ->groupBy('employee_id', DB::raw('DATE(punched_at)'))->get()
+            ->keyBy(fn ($r) => $r->employee_id . '|' . $r->d);
+        $pcIns = EmployeeLoginSession::where('company_id', $companyId)
+            ->whereBetween('login_at', [$from, $to])
+            ->when($empId, fn ($q) => $q->where('employee_id', $empId))
+            ->selectRaw('employee_id, DATE(login_at) d, MIN(login_at) t')
+            ->groupBy('employee_id', DB::raw('DATE(login_at)'))->get()
+            ->keyBy(fn ($r) => $r->employee_id . '|' . $r->d);
+
         $rows = [];
 
         // 1) Completed days from the daily-summary aggregate (fast + accurate).
@@ -138,6 +155,8 @@ class ProductivityController extends Controller
                 'meeting' => (int) ($meetings[$s->employee_id . '|' . $d]->secs ?? 0),
                 'late_min' => (int) ($s->late_minutes ?? 0),
                 'score' => (float) $s->productivity_score, 'live' => false,
+                'gate_in' => $gateIns[$s->employee_id . '|' . $d]->t ?? null,
+                'pc_in' => $pcIns[$s->employee_id . '|' . $d]->t ?? null,
             ]);
         }
 
@@ -164,7 +183,7 @@ class ProductivityController extends Controller
                 $ac = $act[$emp->id] ?? null;
                 $bk = $breaks[$emp->id . '|' . $today] ?? null;
                 // Skip employees with no footprint today to keep the table meaningful.
-                if (! $a && ! $ac && ! $bk) continue;
+                if (! $a && ! $ac && ! $bk && ! isset($gateIns[$emp->id . '|' . $today])) continue;
                 $work = (int) ($ac->act ?? 0);
                 $idle = (int) ($ac->idl ?? 0);
                 $present = ($a && $a->check_in_at)
@@ -187,6 +206,8 @@ class ProductivityController extends Controller
                     'meeting' => (int) ($meetings[$emp->id . '|' . $today]->secs ?? 0),
                     'late_min' => (int) ($a->late_minutes ?? 0),
                     'score' => $present > 0 ? round($work / max($present, 1) * 100, 1) : 0, 'live' => true,
+                    'gate_in' => $gateIns[$emp->id . '|' . $today]->t ?? null,
+                    'pc_in' => $pcIns[$emp->id . '|' . $today]->t ?? null,
                 ]);
             }
         }
@@ -229,6 +250,8 @@ class ProductivityController extends Controller
             // everything recorded inside it, so a missing (+) or double-counted (−) minute is
             // visible instead of quietly moving Productive %. V names why a row was repaired.
             'Late Login (mins)', 'Unaccounted Mins (Present − Working − Idle − Break)', 'Data Issue',
+            // W–X added 23-Sep-2026 (Ejaz): the door punch and the gate-to-desk time.
+            'Gate IN', 'Gate to PC (mins)',
         ];
 
         $ss = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
@@ -238,10 +261,10 @@ class ProductivityController extends Controller
         foreach ($headers as $i => $h) {
             $sheet->setCellValue($this->col($i + 1) . '1', $h);
         }
-        $sheet->getStyle('A1:V1')->getFont()->setBold(true);
-        $sheet->getStyle('A1:V1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+        $sheet->getStyle('A1:X1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:X1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
             ->getStartColor()->setRGB('E3F4F7');
-        $sheet->getStyle('A1:V1')->getAlignment()->setWrapText(true);
+        $sheet->getStyle('A1:X1')->getAlignment()->setWrapText(true);
 
         $DUR = '[h]:mm';   // duration — Excel-compatible, valid past 24h, never a date
         $CLK = 'h:mm';     // clock time for login/logout
@@ -293,10 +316,13 @@ class ProductivityController extends Controller
                 $sheet->setCellValueExplicit('V' . $r, (string) $x['data_issue_text'],
                     \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
             }
+            $this->putTime($sheet, 23, $r, $x['gate_in'] ?? null, $CLK);                  // Gate IN (W)
+            $sheet->setCellValue('X' . $r, (int) ($x['gate_to_pc_minutes'] ?? 0));       // Gate to PC mins (X)
+            $this->fmt($sheet, 24, $r, '0');
             $r++;
         }
 
-        foreach (range(1, 22) as $c) {
+        foreach (range(1, 24) as $c) {
             $sheet->getColumnDimension($this->col($c))->setAutoSize(true);
         }
         $sheet->freezePane('A2');
@@ -700,10 +726,20 @@ class ProductivityController extends Controller
         $meeting = (int) ($m['meeting'] ?? 0);
         $breakSecs = (int) $m['break_secs'];
 
-        // Actual Present = logout − login; when logout is missing (today / open shift) fall back
-        // to the tracked present span so the row still shows a sensible figure.
-        $clockPresent = ($firstIn && $lastOut)
-            ? max(0, (int) Carbon::parse($lastOut)->diffInSeconds(Carbon::parse($firstIn), true))
+        // 23-Sep-2026 (Ejaz): Gate → PC — door IN to first agent sign-in. The day is measured from
+        // the EARLIER of the door and the sign-in, so not one second between them is lost, and that
+        // span is accounted for as its own bucket (it is not work, idle or break).
+        $gateIn = $m['gate_in'] ?? null;
+        $pcIn = $m['pc_in'] ?? null;
+        $gateToPc = ($gateIn && $pcIn && Carbon::parse($gateIn)->lessThan(Carbon::parse($pcIn)))
+            ? (int) Carbon::parse($pcIn)->diffInSeconds(Carbon::parse($gateIn), true) : 0;
+        $dayStart = ($gateIn && (! $firstIn || Carbon::parse($gateIn)->lessThan(Carbon::parse($firstIn)))) ? $gateIn : $firstIn;
+
+        // Actual Present = logout − login (login = the day start above); when logout is missing
+        // (today / open shift) fall back to the tracked present span so the row still shows a
+        // sensible figure.
+        $clockPresent = ($dayStart && $lastOut)
+            ? max(0, (int) Carbon::parse($lastOut)->diffInSeconds(Carbon::parse($dayStart), true))
             : $trackedPresent;
 
         // 19-Aug (Ejaz, AI0043 on 14-Aug): a STALE logout — the agent died / the PC slept /
@@ -714,7 +750,7 @@ class ProductivityController extends Controller
         // The employee cannot have been present for less time than the day tracked, so floor
         // Actual Present at the tracked span (active + idle + break). Rows with a sound logout
         // are untouched, because for them logout − login is always the larger number.
-        $trackedFloor = max($trackedPresent, $work + $idle + $breakSecs);
+        $trackedFloor = max($trackedPresent, $work + $idle + $breakSecs + $gateToPc);
         $actualPresent = max($clockPresent, $trackedFloor);
         // Flagged so the console/export can show WHICH rows were repaired — a clamped row is
         // evidence of a missing sign-out that the post-shift auto-logout should have caught.
@@ -727,10 +763,10 @@ class ProductivityController extends Controller
         // missing, bound the day at the instant the server WOULD have signed them out
         // (shift end + the configured post-shift minutes, 0 when unset). Active work and
         // breaks are never cut away by the bound — only the idle tail that ran past the shift.
-        $shiftEndCap = $lastOut ? null : $this->shiftEndSeconds($emp, $date, $firstIn);
+        $shiftEndCap = $lastOut ? null : $this->shiftEndSeconds($emp, $date, $dayStart);
         $cappedAtShiftEnd = false;
         if ($shiftEndCap !== null && $shiftEndCap < $actualPresent) {
-            $actualPresent = max($work + $breakSecs, $shiftEndCap);
+            $actualPresent = max($work + $breakSecs + $gateToPc, $shiftEndCap);
             $cappedAtShiftEnd = $actualPresent < $trackedFloor;
         }
 
@@ -740,7 +776,7 @@ class ProductivityController extends Controller
         // negative delta means the buckets OVERLAP and are double-counting the same wall
         // clock. Either way it is now a number on the row instead of a silent distortion
         // of Productive %.
-        $accountedFor = $work + $idle + $breakSecs;
+        $accountedFor = $work + $idle + $breakSecs + $gateToPc;
         $unaccountedSeconds = $actualPresent - $accountedFor;
 
         $allotted = ScoringService::allottedBreakSeconds($emp->shift, $actualPresent);
@@ -768,6 +804,11 @@ class ProductivityController extends Controller
             'team' => $emp->team?->name,
             'reporting_manager' => $emp->reportingManager?->name,
             'first_in' => $firstIn ? Carbon::parse($firstIn)->format('H:i') : null,
+            'gate_in' => $gateIn ? Carbon::parse($gateIn)->format('H:i') : null,
+            'gate_to_pc_seconds' => $gateToPc,
+            // Whole minutes, on EVERY row (0 = signed in before/without a door punch) — Ejaz,
+            // 23-Sep-2026: for reference and tracking per row.
+            'gate_to_pc_minutes' => (int) round($gateToPc / 60),
             'last_out' => $lastOut ? Carbon::parse($lastOut)->format('H:i') : null,
             // present_seconds now carries Actual Present Hrs (logout − login); tracked span kept too.
             'present_seconds' => $actualPresent,

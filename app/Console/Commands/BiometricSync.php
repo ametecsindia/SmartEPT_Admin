@@ -24,6 +24,8 @@ use Illuminate\Support\Facades\Cache;
  */
 class BiometricSync extends Command
 {
+    use \App\Support\ResolvesLocalNow;
+
     protected $signature = 'smartept:biometric-sync {--device= : Sync one device id now (ignores mode/due checks)} {--days=2 : How many days back to pull}';
 
     protected $description = 'Pull punches from cloud biometric providers (eTimeOffice etc.) into attendance';
@@ -42,19 +44,28 @@ class BiometricSync extends Command
 
                 return self::FAILURE;
             }
-            $this->runDevice($sync, $device, $days);
+            $this->onCompanyClock($device->company_id, fn () => $this->runDevice($sync, $device, $days));
 
             return self::SUCCESS;
         }
 
-        $devices = BiometricDevice::withoutGlobalScopes()->where('status', 'ACTIVE')->get();
+        // 23-Sep-2026: every device except one an admin set INACTIVE. The old auto-disable wrote
+        // status 'ERROR', which the column (enum ACTIVE/INACTIVE) cannot hold — MySQL stored ''
+        // or threw — so after 5 failures (a provider blip overnight) the device silently left this
+        // list for good, and only "Sync now" in the Biometric tab (which ignores status) pulled
+        // punches. That is the "I must press Sync every day" report. Those rows are picked up again.
+        $devices = BiometricDevice::withoutGlobalScopes()
+            ->where(fn ($q) => $q->where('status', '!=', 'INACTIVE')->orWhereNull('status'))->get();
         $ran = 0;
         foreach ($devices as $d) {
-            if (! $this->isAutomatic($d) || ! $this->isDue($d)) {
-                continue;
-            }
-            $this->runDevice($sync, $d, $days);
-            $ran++;
+            // Every now()/today() for this device is its company's Organisation-tab clock.
+            $this->onCompanyClock($d->company_id, function () use ($sync, $d, $days, &$ran) {
+                if (! $this->isAutomatic($d) || ! $this->isDue($d)) {
+                    return;
+                }
+                $this->runDevice($sync, $d, $days);
+                $ran++;
+            });
         }
 
         if ($ran === 0) {
@@ -84,12 +95,18 @@ class BiometricSync extends Command
             return false;
         }
 
+        // After repeated failures: keep retrying, just slower (every 30 min), so it recovers on
+        // its own when the provider comes back — nobody has to press "Sync now".
+        if ((int) Cache::get('biosync:fails:' . $d->id, 0) >= self::CONSECUTIVE_FAILURE_CAP) {
+            return ! $d->last_sync_at || $d->last_sync_at->lte(now()->subMinutes(30));
+        }
+
         if ($this->mode($d) === 'SCHEDULED') {
             foreach ((is_array($d->sync_times) ? $d->sync_times : []) as $t) {
                 if (! preg_match('/^\d{1,2}:\d{2}$/', (string) $t)) {
                     continue;
                 }
-                // app timezone == company timezone (Asia/Kolkata) — now() is already local.
+                // now()/today() are the company's clock here — handle() runs this inside onCompanyClock().
                 $target = Carbon::today()->setTimeFromTimeString($t);
                 if (now()->betweenIncluded($target, (clone $target)->addMinutes(5))) {
                     return true;
@@ -142,14 +159,13 @@ class BiometricSync extends Command
             $fails = (int) Cache::get('biosync:fails:' . $d->id, 0) + 1;
             Cache::put('biosync:fails:' . $d->id, $fails, now()->addDay());
             if ($fails >= self::CONSECUTIVE_FAILURE_CAP) {
-                $d->forceFill([
-                    'status'           => 'ERROR',
-                    'last_sync_result' => mb_substr(sprintf('Auto-sync disabled after %d consecutive failures — %s',
+                $d->forceFill([   // 23-Sep-2026: back off to every 30 min (isDue) — never switch off
+                    'last_sync_result' => mb_substr(sprintf('%d failures in a row — auto-sync retrying every 30 min — %s',
                         $fails, $e->getMessage()), 0, 490),
                 ])->save();
             }
             $this->error(sprintf('device %d (%s): %s%s', $d->id, $d->provider ?: $d->name, $e->getMessage(),
-                $fails >= self::CONSECUTIVE_FAILURE_CAP ? ' [auto-sync disabled — fix + re-enable]' : " [failure {$fails}/" . self::CONSECUTIVE_FAILURE_CAP . ']'));
+                $fails >= self::CONSECUTIVE_FAILURE_CAP ? ' [retrying every 30 min]' : " [failure {$fails}/" . self::CONSECUTIVE_FAILURE_CAP . ']'));
         } finally {
             optional($lock)->release();
         }
