@@ -575,9 +575,13 @@ class EnforcerSyncController extends Controller
             // A browser cannot tell an image upload from any other upload, so
             // File and Image Sharing Block collapse to the same switch here.
             // The console says so before the box is ticked.
-            if (in_array('file', $list, true) || in_array('image', $list, true)) {
-                $uploads = true;
-            }
+            // 22-Sep-2026 (Ejaz, client production down): a File/Image tick on ONE site
+            // used to switch Chrome/Edge's file picker off for EVERY site — "Access to local
+            // files is disabled by your administrator", no Save As, no download folder, no
+            // WhatsApp attach — while the row the admin was looking at showed nothing ticked.
+            // Only the explicit Device control "Block browser uploads" may do that now;
+            // per-site file/image is UNSUPPORTED in config/protections.php.
+            // ponytail: per-site upload block needs a browser extension; add when one ships.
             if (in_array('camera', $list, true)) {
                 $camera = true;
             }

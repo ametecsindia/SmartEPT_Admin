@@ -333,7 +333,7 @@ class UpdateClient
     public function phpBinary(): ?string
     {
         $candidates = [];
-        if ($env = env('SMARTEPT_PHP_BINARY')) {
+        if ($env = env('SMARTEPT_PHP_BINARY') ?: getenv('SMARTEPT_PHP_BINARY')) {
             $candidates[] = $env;
         }
         $windows = str_starts_with(strtoupper(PHP_OS_FAMILY), 'WIN');
@@ -347,6 +347,23 @@ class UpdateClient
                 $candidates[] = PHP_BINARY;
             }
             $candidates[] = rtrim(dirname(PHP_BINARY), '\\/') . DIRECTORY_SEPARATOR . $exe;
+        }
+
+        // 22-Sep-2026: under Apache mod_php / php-cgi / php-fpm neither PHP_BINDIR (a
+        // compile-time path — "C:\\php" on Windows builds) nor PHP_BINARY (httpd.exe,
+        // php-cgi.exe, php-fpm) points at a CLI php, so SchedulerKeepAlive logged "could not
+        // locate a PHP CLI binary" every 3 minutes on laragon (369 times) and never spawned.
+        // The loaded php.ini and the extension dir sit next to / under the real install on
+        // every layout we ship to (laragon, XAMPP, IIS, Debian/Ubuntu packages).
+        $ver = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;
+        if ($ini = php_ini_loaded_file()) {
+            $candidates[] = dirname($ini) . DIRECTORY_SEPARATOR . $exe;
+        }
+        if ($ext = ini_get('extension_dir')) {
+            $candidates[] = dirname(rtrim($ext, '\\/')) . DIRECTORY_SEPARATOR . $exe;
+        }
+        if (! $windows) {
+            array_push($candidates, '/usr/bin/php' . $ver, '/usr/bin/php', '/usr/local/bin/php');
         }
 
         foreach ($candidates as $c) {

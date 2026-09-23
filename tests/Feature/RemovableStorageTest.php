@@ -89,4 +89,26 @@ class RemovableStorageTest extends TestCase
         $bundle = app(\App\Services\PolicyResolver::class)->bundleForEmployee($employee);
         $this->assertTrue($bundle['policies']['website']['block_browser_uploads'] ?? false, 'agent never told to guard browsers');
     }
+    /** 22-Sep-2026: one site's File tick must NOT kill the file picker in every browser. */
+    public function test_a_site_file_tick_does_not_block_uploads_browser_wide(): void
+    {
+        $companyId = (int) ApplicationPolicy::withoutGlobalScopes()->first()->company_id;
+        $secret = $this->postJson('/api/enforcer/enrollment-tokens', [])->assertCreated()->json('data.secret');
+        $token = $this->postJson('/api/enforcer/enroll', [
+            'enrollment_token' => $secret, 'machine_id' => 'MACHINE-C', 'hostname' => 'PC-03',
+            'os_version' => 'Windows 11', 'enforcement_level' => 'FULL',
+        ])->assertCreated()->json('device_token');
+        EnforcementState::forCompany($companyId)->forceFill(['mode' => EnforcementState::ENFORCE])->save();
+
+        $policy = \App\Models\WebsitePolicy::withoutGlobalScopes()->where('company_id', $companyId)->firstOrFail();
+        \App\Models\PolicyRule::withoutGlobalScopes()->create([
+            'company_id' => $companyId, 'policy_type' => 'WEBSITE', 'policy_id' => $policy->id,
+            'item' => 'drive.google.com', 'status' => 'ALLOWED', 'action' => 'LOG',
+            'protections' => ['file' => true, 'image' => true],
+        ]);
+
+        $machine = collect($this->withToken($token)->getJson('/api/enforcer/policy?device_uuid=MACHINE-C')
+            ->assertOk()->json('data'))->firstWhere('scope', 'MACHINE');
+        $this->assertFalse($machine['web_protections']['block_uploads'] ?? false, 'a site tick switched the file picker off browser-wide');
+    }
 }

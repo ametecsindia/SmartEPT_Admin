@@ -198,9 +198,12 @@ return [
                          'note' => 'No verified mechanism for video inside a desktop application yet. The tick is recorded; nothing on the PC currently acts on it.'],
         ],
         'WEBSITE' => [
-            'file'   => ['status' => 'BROWSER_WIDE', 'mechanism' => 'browser_file_dialog_switch'],
-            'image'  => ['status' => 'BROWSER_WIDE', 'mechanism' => 'browser_file_dialog_switch',
-                         'note' => 'A browser cannot tell an image upload from any other upload, so this does the same thing as File Sharing Block.'],
+            // 22-Sep-2026: was BROWSER_WIDE — one site's tick silently killed the file picker
+            // in every browser for every site. See EnforcerSyncController::webProtectionsFor.
+            'file'   => ['status' => 'UNSUPPORTED', 'mechanism' => null,
+                         'note' => 'Browsers have no per-site upload switch. To stop uploads in the whole browser, use Device control → Block browser uploads.'],
+            'image'  => ['status' => 'UNSUPPORTED', 'mechanism' => null,
+                         'note' => 'Browsers have no per-site upload switch. To stop uploads in the whole browser, use Device control → Block browser uploads.'],
             'camera' => ['status' => 'BROWSER_WIDE', 'mechanism' => 'browser_camera_policy'],
             'video'  => ['status' => 'UNVERIFIED', 'mechanism' => 'video_cdn_block',
                          'note' => 'Only enforced on sites listed in protections.video_cdn_domains (currently YouTube and X/Twitter). On every other site the tick is recorded but not currently enforced — most sites serve video from the same place as everything else, with nothing to block separately.'],

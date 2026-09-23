@@ -62,6 +62,16 @@ class SchedulerKeepAlive
     /** Called from AppServiceProvider::boot(). Cheap and silent on a healthy server. */
     public static function ensure(): void
     {
+        // 22-Sep-2026: run the schedule INSIDE the app. Spawning schedule:work needs a CLI
+        // php the web SAPI can find and a process the host does not reap; on laragon it
+        // failed 369 times in a row and on admin.smartept.com auto sign-out and the nightly
+        // attendance sheet both stopped with nobody told. Agents heartbeat every ~30s, so
+        // there is always a request to piggy-back on while anyone is signed in — which is
+        // exactly when auto sign-out is needed. Runs after the response is sent.
+        if (! app()->runningInConsole() && config('smartept.scheduler_keepalive', true)) {
+            app()->terminating(static fn () => self::runInline());
+        }
+
         try {
             if (! self::shouldSpawn()) {
                 return;
@@ -108,6 +118,40 @@ class SchedulerKeepAlive
                 // Logging itself is unavailable (e.g. unwritable storage/logs — see
                 // smartept_server_permissions_500s). Nothing left to do but let the request
                 // continue; Troubleshooting still shows the scheduler as red.
+            }
+        }
+    }
+
+    /** Set by runInline(), so an inline run is never mistaken for a real cron beating. */
+    private const INLINE_AT = 'smartept:scheduler_inline_at';
+
+    /**
+     * `schedule:run` once per minute from the tail of a web request, unless a real cron /
+     * Task Scheduler / schedule:work is already beating. Never throws.
+     *
+     * ponytail: request-driven — with zero traffic (every agent offline at night) nothing
+     * runs, so the 00:15 mark-attendance can be missed; the next auto-logout pass and the
+     * Task Scheduler / cron entry still cover that. Needs no binary, no privilege, no setup.
+     */
+    public static function runInline(): void
+    {
+        try {
+            $beat = Cache::get(self::HEARTBEAT);
+            $inline = Cache::get(self::INLINE_AT);
+            $externalAlive = $beat && Carbon::parse($beat)->greaterThan(now()->subMinutes(2))
+                && ! ($inline && Carbon::parse($inline)->greaterThan(now()->subMinutes(2)));
+            if ($externalAlive || ! Cache::add('smartept:scheduler_inline_lock', 1, 55)) {
+                return;
+            }
+
+            Cache::put(self::INLINE_AT, now()->toDateTimeString(), now()->addMinutes(30));
+            ignore_user_abort(true);
+            @set_time_limit(300);
+            \Illuminate\Support\Facades\Artisan::call('schedule:run');
+        } catch (\Throwable $e) {
+            try {
+                Log::warning('SchedulerKeepAlive: inline schedule:run failed', ['error' => $e->getMessage()]);
+            } catch (\Throwable $ignored) {
             }
         }
     }

@@ -212,7 +212,7 @@ class ProtectionsTest extends TestCase
         $res->assertJsonPath('data.items.whatsapp.camera.status', 'SUPPORTED');
         $res->assertJsonPath('data.items.anydesk.file.status', 'SUPPORTED');
         $res->assertJsonPath('data.items.anydesk.image.status', 'UNSUPPORTED');
-        $res->assertJsonPath('data.defaults.WEBSITE.file.status', 'BROWSER_WIDE');
+        $res->assertJsonPath('data.defaults.WEBSITE.file.status', 'UNSUPPORTED');
 
         // Every offered protection must name a mechanism. One without is a
         // checkbox with nothing behind it, which is the whole defect class.
@@ -287,7 +287,9 @@ class ProtectionsTest extends TestCase
         ])->assertOk();
 
         $rule = PolicyRule::withoutGlobalScopes()->where('item', 'mail.google.com')->first();
-        $this->assertSame(['file'], $rule->protectionList());
+        // 22-Sep-2026: per-site upload block is UNSUPPORTED (it was browser-wide and took
+        // the file picker away from every site). The tick is dropped; the row still saves.
+        $this->assertSame([], $rule->protectionList());
         $this->assertFalse($rule->isEnforcing(), 'a protected site must still be reachable');
     }
 

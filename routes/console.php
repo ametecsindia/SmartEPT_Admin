@@ -87,3 +87,22 @@ Schedule::call(function () {
         now()->startOfDay()
     );
 })->everyFifteenMinutes()->name('close-stale-status')->withoutOverlapping(30); // bounded 2-Sep-2026
+
+// TEMP DIAG 22-Sep-2026 — remove after auto sign-out is confirmed. Writes what the scheduler
+// itself sees (not a manual run) to storage/logs/autologout-diag.txt every minute.
+Schedule::call(function () {
+    $out = '=== ' . now()->toDateTimeString() . ' (tz ' . config('app.timezone') . ', php ' . PHP_BINARY . ")\n";
+    foreach ([['smartept:why-no-signout', ['--all' => true]], ['smartept:auto-logout', ['--dry-run' => true, '--explain' => true]]] as [$cmd, $args]) {
+        try { \Illuminate\Support\Facades\Artisan::call($cmd, $args); $out .= "--- {$cmd}\n" . \Illuminate\Support\Facades\Artisan::output(); }
+        catch (\Throwable $e) { $out .= "--- {$cmd} THREW: " . $e->getMessage() . "\n"; }
+    }
+    $db = \Illuminate\Support\Facades\DB::class;
+    $dump = function ($title, $q) use (&$out) { $out .= "--- {$title}\n"; try { foreach ($q() as $r) { $out .= json_encode($r) . "\n"; } } catch (\Throwable $e) { $out .= 'THREW: ' . $e->getMessage() . "\n"; } };
+    $dump('show create shifts', fn () => $db::select('SHOW CREATE TABLE shifts'));
+    $dump('shifts', fn () => $db::table('shifts')->get());
+    $dump('companies', fn () => $db::table('companies')->get(['id','name']));
+    $dump('employees', fn () => $db::table('employees')->whereNull('deleted_at')->get(['id','company_id','employee_code','first_name','shift_id']));
+    $dump('sessions since 20-Sep', fn () => $db::table('employee_login_sessions')->where('login_at','>=','2026-09-20')->orderBy('id')->get());
+    $dump('recent auto logouts', fn () => $db::table('employee_login_sessions')->where('logout_reason','POST_SHIFT_AUTO')->orderByDesc('id')->limit(10)->get());
+    file_put_contents(storage_path('logs/autologout-diag.txt'), $out);
+})->everyMinute()->name('temp-autologout-diag');

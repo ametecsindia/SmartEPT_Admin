@@ -52,4 +52,27 @@ class SchedulerKeepAliveTest extends TestCase
 
         $this->assertTrue(true);
     }
+    /** 22-Sep-2026: no cron at all → an inline run actually executes the schedule. */
+    public function test_inline_run_executes_the_schedule_when_no_cron_beats(): void
+    {
+        Cache::forget('smartept:scheduler_heartbeat');
+        Cache::forget('smartept:scheduler_inline_at');
+        Cache::forget('smartept:scheduler_inline_lock');
+
+        SchedulerKeepAlive::runInline();
+
+        $this->assertNotNull(Cache::get('smartept:scheduler_heartbeat'), 'schedule:run never ran');
+    }
+
+    /** A real cron is beating → inline stays out of the way. */
+    public function test_inline_run_skips_when_a_real_cron_beats(): void
+    {
+        Cache::put('smartept:scheduler_heartbeat', now()->toDateTimeString(), 3600);
+        Cache::forget('smartept:scheduler_inline_at');
+        Cache::forget('smartept:scheduler_inline_lock');
+
+        SchedulerKeepAlive::runInline();
+
+        $this->assertNull(Cache::get('smartept:scheduler_inline_at'));
+    }
 }
