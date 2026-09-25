@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\CardAccess;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -20,6 +21,12 @@ class EnsurePermission
             return response()->json([
                 'error' => ['code' => 'UNAUTHENTICATED', 'message' => 'Authentication required.'],
             ], 401);
+        }
+
+        // 25-Sep-2026: a route the role matrix governs is decided by its View/Edit tick.
+        $card = CardAccess::decide($request);
+        if ($card !== null) {
+            return $card ? $next($request) : EnsureRole::denied();
         }
 
         if (! $user->hasPermission($permission)) {

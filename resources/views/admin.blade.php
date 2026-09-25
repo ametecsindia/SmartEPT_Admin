@@ -1152,7 +1152,8 @@
           <div class="row"><input type="date" id="rp-prod-from"><input type="date" id="rp-prod-to"></div>
           <div class="row" style="margin-top:10px"><button class="btn acc" id="rp-prod">⇓ Export CSV</button></div>
         </div>
-        <div class="exp"><b>Compliance report</b>
+        <!-- 25-Sep-2026 (Ejaz): hidden until asked for; remove style="display:none" to bring it back. -->
+        <div class="exp" style="display:none"><b>Compliance report</b>
           <p>Violations by employee &amp; type, severity, detected value and the action the agent took.</p>
           <div class="row"><input type="date" id="rp-comp-from"><input type="date" id="rp-comp-to"></div>
           <div class="row" style="margin-top:10px"><button class="btn acc" id="rp-comp">⇓ Export CSV</button></div>
@@ -2278,6 +2279,7 @@ function enterApp() {
   applyPlanNav();
   applyEmployeeChrome();
   applyCardAccess();
+  applyReadOnlyViews();
   // HOST section (Tenants) — the operator's cross-tenant view, Super Admin only.
   var isHost = !!(ME && ME.role === 'SUPER_ADMIN');
   var hn = document.getElementById('nav-tenants'); if (hn) hn.style.display = isHost ? '' : 'none';
@@ -2408,6 +2410,11 @@ const CARDS_DOM = {
   'users.login_accounts':'#u-rows','devices.registered_devices':'#dev-rows',
   'policies.policy_list':'#pol-rows','policies.policy_form':'#pol-form-card','policies.policy_assign':'#as-policy',
   'rules.app_web_rules':'#rule-rows','meetings.meetings':'#mtg-rows',
+  // 25-Sep-2026: every remaining card on every screen (migration 2026_09_25_000100).
+  'webcam.webcam_detected':'Webcam presence detected','org.org_units':'#org-main-card','devices.agent_lock':'🔒 Agent exit',
+  'rules.enforcement':'#enf-card','rules.device_control':'#dev-card','biometric.gate_to_pc':'🚪 Gate-to-PC',
+  'gateexcl.gate_status':'#gx-state-card','gateexcl.exclusions':'Standing exclusions','reports.rep_monthly':'#ms-card',
+  'ops.storage_quota':'#quota-card','ops.mail_smtp':'#mail-card','ops.notifications':'#notify-card',
   'biometric.bio_setup':'#bd-prefix','biometric.bio_punch_log':'#bio-rows','biometric.bio_mismatch':'#bio-mm-rows','biometric.bio_import':'Import punches','biometric.bio_map':'Map biometric',
   'reports.rep_productivity':'#ms-rows','reports.rep_breaks':'#br-rows','reports.rep_meetings':'#mr-rows',
   'license.lic_status':'Licence status','license.lic_key':'Licence key','license.lic_offline':'Offline licence file',
@@ -2422,21 +2429,63 @@ function cardEl(v) {
   for (let i = 0; i < hs.length; i++) { if ((hs[i].textContent || '').trim().indexOf(v) === 0) return hs[i].closest('.card'); }
   return null;
 }
+function applyCardAccessCss() {
+  if (document.getElementById('card-noedit-css')) return;
+  const st = document.createElement('style'); st.id = 'card-noedit-css';
+  st.textContent = '.card-hidden{display:none !important}.card-noedit .btn.solid,.card-noedit .btn.danger,.card-noedit #enf-body button{display:none !important}.card-noedit [data-rule-status],.card-noedit #rule-rows select,.card-noedit input[type=checkbox],.card-noedit #pol-form input,.card-noedit #pol-form select,.card-noedit #pol-form textarea,.card-noedit .fgrid input,.card-noedit .fgrid select,.card-noedit .fgrid textarea,.card-noedit .fbool input{pointer-events:none;opacity:.65}';
+  document.head.appendChild(st);
+}
 function applyCardAccess() {
   if (!ME || !Array.isArray(ME.permissions)) return;
   const cardPerms = ME.permissions.filter((s) => s.indexOf('card.') === 0);
   if (!cardPerms.length) return;
-  if (!document.getElementById('card-noedit-css')) {
-    const st = document.createElement('style'); st.id = 'card-noedit-css';
-    st.textContent = '.card-noedit .btn.solid,.card-noedit .btn.danger{display:none !important}.card-noedit [data-rule-status]{pointer-events:none;opacity:.65}';
-    document.head.appendChild(st);
-  }
+  applyCardAccessCss();
   const has = new Set(cardPerms);
+  const sees = (key) => has.has('card.' + key + '.view') || has.has('card.' + key + '.edit'); // Edit implies View
   Object.keys(CARDS_DOM).forEach((key) => {
     const el = cardEl(CARDS_DOM[key]); if (!el) return;
-    if (!has.has('card.' + key + '.view')) { el.style.display = 'none'; return; }
+    // "Who is enforced, and why" travels with the Enforcement card.
+    if (key === 'rules.enforcement' && !sees(key)) { const d = document.getElementById('enf-diag-card'); if (d) d.classList.add('card-hidden'); }
+    if (!sees(key)) { el.style.display = 'none'; return; }
     if (!has.has('card.' + key + '.edit')) el.classList.add('card-noedit');
   });
+}
+// 25-Sep-2026: the role matrix is what the server enforces (App\Support\CardAccess).
+// A tab where the role holds View but no Edit on any card = see everything, change nothing.
+// Roles never set up in the matrix (no card ticks) keep the old role-based rule.
+const VIEW_WRITERS = {
+  rules: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'COMPLIANCE_OFFICER'],
+  policies: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'COMPLIANCE_OFFICER'],
+  biometric: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR_ADMIN'],
+};
+// Tabs whose toolbar holds edit-only buttons outside any card.
+const EDIT_TABS = ['attendance', 'screenshots', 'employees', 'org', 'users', 'devices', 'license', 'integrations', 'ops'];
+function hasCardPerms() { return !!(ME && (ME.permissions || []).some((p) => p.indexOf('card.') === 0)); }
+const TOOLBAR_CARD = { rules: 'rules.app_web_rules', policies: 'policies.policy_form' };
+function isReadOnlyView(v) {
+  if (!ME || ME.role === 'SUPER_ADMIN' || ME.role === 'COMPANY_ADMIN') return false;
+  if (hasCardPerms()) {
+    if (TOOLBAR_CARD[v]) return !(ME.permissions || []).includes('card.' + TOOLBAR_CARD[v] + '.edit');
+    return !(ME.permissions || []).some((p) => p.indexOf('card.' + v + '.') === 0 && /\.edit$/.test(p));
+  }
+  const r = ME.base_role || ME.role;
+  return !!(VIEW_WRITERS[v] && !VIEW_WRITERS[v].includes(r));
+}
+function applyReadOnlyViews() {
+  if (!ME) return;
+  if (!document.getElementById('ro-css')) {
+    const st = document.createElement('style'); st.id = 'ro-css';
+    // Toolbar (outside the cards) only — each card's own controls follow its own Edit tick (.card-noedit).
+    st.textContent = '.ro .filters .btn.solid,.ro .filters .btn.danger,.ro #rule-add-item,.ro #rule-add-type,.ro #rule-add-status,.ro #rule-action,.ro #rule-profile,.ro-lite .filters .btn.solid,.ro-lite .filters .btn.danger{display:none !important}';
+    document.head.appendChild(st);
+  }
+  Object.keys(VIEW_WRITERS).forEach((v) => {
+    const el = document.getElementById('v-' + v); if (!el) return;
+    el.classList.toggle('ro', isReadOnlyView(v));
+    // Roles not set up in the matrix: the old role rule makes every card on the tab read-only.
+    if (!hasCardPerms() && isReadOnlyView(v)) { applyCardAccessCss(); el.querySelectorAll('.card').forEach((c) => c.classList.add('card-noedit')); }
+  });
+  if (hasCardPerms()) EDIT_TABS.forEach((v) => { const el = document.getElementById('v-' + v); if (el) el.classList.toggle('ro-lite', isReadOnlyView(v)); });
 }
 function applyAttendanceMode() {
   const off = ME && ME.attendance_mode === 'AGENT_ONLY';
@@ -2497,6 +2546,21 @@ function applyPermissionNav() {
     // LiveView Phase 4 (14-Sep-2026): same pattern as meetings above.
     liveview: 'liveview.view',
   };
+  // 25-Sep-2026: a role set up in the matrix sees a tab when it holds View or Edit on
+  // any card of that tab — the same rule the server enforces. Meetings and LiveView
+  // have their own permissions and keep them.
+  if (hasCardPerms()) {
+    document.querySelectorAll('.nav[data-view]').forEach((el) => {
+      const v = el.getAttribute('data-view');
+      if (v === 'meetings' || v === 'liveview' || v === 'tenants') return;
+      if (!perms.some((p) => p.indexOf('card.' + v + '.') === 0)) el.style.display = 'none';
+    });
+    ['meetings', 'liveview'].forEach((view) => {
+      const el = document.querySelector('.nav[data-view="' + view + '"]');
+      if (el && !perms.includes(NAVP[view])) el.style.display = 'none';
+    });
+    return;
+  }
   Object.entries(NAVP).forEach(([view, perm]) => {
     const el = document.querySelector('.nav[data-view="' + view + '"]');
     if (el && !perms.includes(perm)) el.style.display = 'none';
@@ -2811,7 +2875,14 @@ function attachEmpSearch(input, sel, emps, allLabel) {
   input.oninput = () => {
     const q = input.value.trim().toLowerCase();
     const list = q ? emps.filter((e) => (fullName(e) + ' ' + (e.employee_code || '')).toLowerCase().includes(q)) : emps;
-    if (allLabel != null) fillSelect(sel, list, (e) => fullName(e) + ' (' + (e.employee_code || '#' + e.id) + ')', (e) => e.id, allLabel);
+    if (allLabel != null) {
+      // 25-Sep-2026: typing a name only narrowed the dropdown and left "All employees"
+      // selected, so the screen still loaded everyone. Pick the first match and reload.
+      const prev = sel.value;
+      fillSelect(sel, list, (e) => fullName(e) + ' (' + (e.employee_code || '#' + e.id) + ')', (e) => e.id, q && !list.length ? '— No matching employee —' : allLabel);
+      if (q && list.length) sel.value = String(list[0].id);
+      if (sel.value !== prev && !(q && !list.length)) sel.dispatchEvent(new Event('change')); // no match: never fall back to "all"
+    }
     else fillEmpPicker(sel, list);
   };
 }
@@ -4331,6 +4402,13 @@ function openRoleModal(role) {
   if (role && role.base_slug) baseSel.value = role.base_slug;
   $('#role-name-wrap').style.display = role && role.is_system ? 'none' : '';
   const renderMatrix = () => { $('#role-matrix').innerHTML = roleMatrixHtml(role ? (role.permission_ids || []) : baseCheckedIds(), !!(role && role.locked)); };
+  // 25-Sep-2026: Edit implies View — ticking Edit ticks View, unticking View clears Edit.
+  $('#role-matrix').onchange = (e) => {
+    const cb = e.target; const tr = cb && cb.closest('tr'); if (!tr) return;
+    const boxes = tr.querySelectorAll('input[data-perm]'); if (boxes.length !== 2) return;
+    if (cb === boxes[1] && cb.checked) boxes[0].checked = true;
+    if (cb === boxes[0] && !cb.checked) boxes[1].checked = false;
+  };
   renderMatrix();
   baseSel.onchange = role ? null : renderMatrix;   // new role: matrix follows the chosen base
   $('#role-save').classList.toggle('hide', !!(role && role.locked));
@@ -5153,7 +5231,7 @@ async function loadPolicies() {
     $('#pol-rows').innerHTML = POL_LIST.map((p) => '<tr>'
       + '<td><b>' + esc(p.name) + '</b></td><td><span class="tag t-info">v' + (p.version ?? 1) + '</span></td>'
       + '<td>' + dt(p.updated_at) + '</td>'
-      + '<td class="row" style="flex-wrap:nowrap"><button class="btn" data-pol-edit="' + p.id + '">Edit</button>'
+      + '<td class="row" style="flex-wrap:nowrap"><button class="btn" data-pol-edit="' + p.id + '">' + (isReadOnlyView('policies') ? 'View' : 'Edit') + '</button>'
       + '<button class="btn danger" data-pol-del="' + p.id + '">Delete</button></td></tr>').join('')
       || '<tr><td colspan="4" class="mut">No ' + esc(type.replace('_', '/')) + ' policies yet — create the first one on the right.</td></tr>';
   } catch (e) {
@@ -5843,7 +5921,9 @@ async function initEnforcement() {
     body.innerHTML = enfMarkup(mode);
     wireEnforcement();
   } catch (e) {
-    body.innerHTML = isDenied(e) ? deniedCard() : '<span class="mut">' + esc(e.message || e) + '</span>';
+    // A role that may view rules but not run enforcement: hide the switch, don't show a lock.
+    if (isDenied(e)) { ['#enf-card', '#dev-card'].forEach((sel) => { const el = $(sel); if (el) el.style.display = 'none'; }); return; }
+    body.innerHTML = '<span class="mut">' + esc(e.message || e) + '</span>';
   }
 }
 
@@ -6964,7 +7044,8 @@ function prPDF() {
 }
 
 function initReports() {
-  if (!$('#pr-from').value) { const d = new Date(); $('#pr-from').value = isoDate(new Date(d.getFullYear(), d.getMonth(), 1)); $('#pr-to').value = today(); }
+  // 25-Sep-2026 (Ejaz): opens on today's report; This week / This month are one click away.
+  if (!$('#pr-from').value) { $('#pr-from').value = today(); $('#pr-to').value = today(); }
   $('#pr-load').onclick = loadProductivity;
   $('#pr-rebuild').onclick = prRebuild;
   $('#pr-today').onclick = () => prSetRange(today(), today());

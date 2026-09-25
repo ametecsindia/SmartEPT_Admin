@@ -60,6 +60,8 @@ class RoleController extends Controller
             'base_slug' => ['required', Rule::in(self::BASES)],
         ]);
 
+        $this->guardGrant($request, [], $data['base_slug']);
+
         $companyId = $request->user()->company_id;
         $slug = Str::upper(Str::slug($data['name'], '_'));
         if ($slug === '' || Role::where('slug', $slug)->exists()) {
@@ -77,7 +79,12 @@ class RoleController extends Controller
         // Start from the base role's permission set — tune in the matrix after.
         $base = Role::whereNull('company_id')->where('slug', $data['base_slug'])->first();
         if ($base) {
-            $role->permissions()->sync($base->permissions()->pluck('permissions.id')->all());
+            $ids = $base->permissions()->pluck('permissions.id')->all();
+            if (! $request->user()->hasRole('SUPER_ADMIN', 'COMPANY_ADMIN')) {
+                // never more than the creator holds
+                $ids = Permission::whereIn('id', $ids)->whereIn('slug', $request->user()->permissionSlugs())->pluck('id')->all();
+            }
+            $role->permissions()->sync($ids);
         }
 
         $this->audit($request, 'CREATE', Role::class, $role->id, $data);
@@ -95,6 +102,8 @@ class RoleController extends Controller
             'name'      => ['sometimes', 'string', 'max:120'],
             'base_slug' => ['sometimes', Rule::in(self::BASES)],
         ]);
+
+        $this->guardGrant($request, [], $data['base_slug'] ?? null);
 
         $role->update($data);
         $this->audit($request, 'UPDATE', Role::class, $role->id, $data);
@@ -128,6 +137,8 @@ class RoleController extends Controller
             'permission_ids.*' => ['integer', 'exists:permissions,id'],
         ]);
 
+        $this->guardGrant($request, $data['permission_ids']);
+
         $role->permissions()->sync($data['permission_ids']);
         $this->audit($request, 'UPDATE', Role::class, $role->id, ['permissions' => $data['permission_ids']]);
 
@@ -141,5 +152,23 @@ class RoleController extends Controller
         abort_if($role->company_id !== null
             && ! $user->isSuperAdmin()
             && $role->company_id !== $user->company_id, 403, 'Outside your tenant.');
+        // 25-Sep-2026: Roles "Edit" in the matrix is not admin. A non-admin may tune
+        // only their company's custom roles, never a system role or their own.
+        if (! $user->hasRole('SUPER_ADMIN', 'COMPANY_ADMIN')) {
+            abort_if($role->is_system, 403, 'Only a Company Admin can change system roles.');
+            abort_if($role->id === $user->role_id, 403, 'You cannot change your own role.');
+        }
+    }
+
+    /** A non-admin can never grant access they do not hold themselves, nor a base role other than their own. */
+    private function guardGrant(Request $request, array $permissionIds = [], ?string $base = null): void
+    {
+        $user = $request->user();
+        if ($user->hasRole('SUPER_ADMIN', 'COMPANY_ADMIN')) {
+            return;
+        }
+        $extra = Permission::whereIn('id', $permissionIds)->pluck('slug')->diff($user->permissionSlugs());
+        abort_if($extra->isNotEmpty(), 403, 'You cannot grant access your own role does not have.');
+        abort_if($base !== null && $base !== ($user->role?->base_slug ?: $user->roleSlug()), 403, 'You can only create roles based on your own base role.');
     }
 }

@@ -39,7 +39,11 @@ class HierarchyService
 
         if ($slug === 'BRANCH_ADMIN') {
             // Branch Admin: their assigned branch only (fixes the old "sees whole company" gap).
-            $branchId = $user->branch_id;
+            // 25-Sep-2026: the Users screen never sets users.branch_id, so every
+            // console-created Branch Admin saw only themselves. Fall back to the
+            // branch on their linked employee record.
+            $branchId = $user->branch_id
+                ?: Employee::query()->where('user_id', $user->id)->value('branch_id');
 
             return $branchId
                 ? Employee::query()->where('branch_id', $branchId)->pluck('id')->all()

@@ -101,7 +101,9 @@ class WhyNoSignOut extends Command
         // PHP timeout never releases it, and `schedule:run` then skips the command without
         // printing anything at all — the failure mode that looks exactly like link 1.
         $event = collect($schedule->events())
-            ->first(fn ($e) => str_contains((string) $e->command, 'smartept:auto-logout'));
+            // 23-Sep-2026: scheduled in-process now (Schedule::call, named 'auto-logout'), so match
+            // the name too — otherwise this reported a false "MISSING".
+            ->first(fn ($e) => str_contains((string) $e->command, 'smartept:auto-logout') || $e->description === 'auto-logout');
 
         if (! $event) {
             $blocked = true;

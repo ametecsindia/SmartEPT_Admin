@@ -113,6 +113,7 @@ class PostShiftSignOutTest extends TestCase
         $this->travelTo(Carbon::parse('2026-07-08 09:00:00'));
         $e = $this->employee('E-1002');
         $e->update(['shift_id' => null]);
+        \App\Models\Shift::withoutGlobalScopes()->create(['company_id' => 1, 'name' => 'Second Shift', 'code' => 'S2', 'start_time' => '14:00:00', 'end_time' => '22:00:00']); // two shifts → no single shift to fall back to (24-Sep-2026)
 
         $session = $this->openSession($e, '2026-07-07 10:00:00');
 

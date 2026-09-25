@@ -134,9 +134,7 @@ class BiometricDeviceController extends Controller
     /** GET /api/integrations/biometric/live-sync — the company's server-side live auto-sync setting. */
     public function liveSync(Request $request): JsonResponse
     {
-        $cfg = json_decode((string) \App\Models\Setting::get(\App\Services\GateService::liveSyncKey($request->user()->company_id), ''), true) ?: [];
-
-        return response()->json(['on' => ! empty($cfg['on']), 'seconds' => (int) ($cfg['seconds'] ?? 60)]);
+        return response()->json(\App\Services\GateService::liveSyncConfig($request->user()->company_id));
     }
 
     /**

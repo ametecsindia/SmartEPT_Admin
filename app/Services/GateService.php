@@ -403,16 +403,31 @@ class GateService
         return 'bio_live_sync:company:' . $companyId;
     }
 
+    /** Out of the box: ON, every 1 second — works with nobody touching the Biometric tab (Ejaz, 24-Sep-2026). */
+    public const LIVE_SYNC_DEFAULT = ['on' => true, 'seconds' => 1];
+
+    /** The company's live auto-sync setting; the default above until an admin changes it. */
+    public static function liveSyncConfig(int $companyId): array
+    {
+        try {
+            $cfg = json_decode((string) \App\Models\Setting::get(self::liveSyncKey($companyId), ''), true);
+        } catch (\Throwable $e) {
+            $cfg = null;
+        }
+
+        return is_array($cfg) ? ['on' => ! empty($cfg['on']), 'seconds' => max(1, (int) ($cfg['seconds'] ?? 1))] : self::LIVE_SYNC_DEFAULT;
+    }
+
     /**
-     * Seconds between live pulls for a company: the Biometric tab's "Live auto-sync every N"
-     * value when it is switched on, else 60. Never below 1.
+     * Seconds between live pulls: the configured value while live auto-sync is on (by default,
+     * every 1 second), 60 if an admin explicitly pressed Stop.
      */
     public static function liveSyncSeconds(int $companyId): int
     {
         try {
-            $cfg = json_decode((string) \App\Models\Setting::get(self::liveSyncKey($companyId), ''), true) ?: [];
+            $cfg = self::liveSyncConfig($companyId);
 
-            return ! empty($cfg['on']) ? max(1, (int) ($cfg['seconds'] ?? 60)) : 60;
+            return $cfg['on'] ? $cfg['seconds'] : 60;
         } catch (\Throwable $e) {
             return 60;
         }

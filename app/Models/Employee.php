@@ -30,6 +30,30 @@ class Employee extends Model
     public function team()         { return $this->belongsTo(Team::class); }
     public function designation()  { return $this->belongsTo(Designation::class); }
     public function shift()        { return $this->belongsTo(Shift::class); }
+
+    /**
+     * 24-Sep-2026 (Ejaz: "still not signing out as per the time set post shift"). The employee
+     * he tested with had NO shift assigned, so the General Shift he edited never applied to them
+     * and auto sign-out fell back to midnight. Every shift rule (auto sign-out, sign-in window,
+     * door breaks, late login, reports) reads $employee->shift, so this is the one place to fix
+     * it: an employee with no shift uses the company's shift when the company has exactly ONE
+     * active shift. With several shifts there is no safe guess, so they stay unassigned.
+     */
+    public function getShiftAttribute()
+    {
+        $assigned = $this->getRelationValue('shift');
+        if ($assigned || ! $this->company_id) {
+            return $assigned;
+        }
+
+        // ponytail: one small query per employee object (once()), only for employees with no shift.
+        return once(function () {
+            $shifts = Shift::withoutGlobalScopes()->where('company_id', $this->company_id)
+                ->where('status', 'ACTIVE')->limit(2)->get();
+
+            return $shifts->count() === 1 ? $shifts->first() : null;
+        });
+    }
     public function manager()      { return $this->belongsTo(User::class, 'manager_user_id'); }
     public function reportingManager() { return $this->belongsTo(User::class, 'reporting_manager_user_id'); }
     public function user()         { return $this->belongsTo(User::class); }

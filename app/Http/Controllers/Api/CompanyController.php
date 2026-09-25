@@ -26,6 +26,10 @@ class CompanyController extends Controller
     public function show(Request $request, Company $company): JsonResponse
     {
         $this->authorizeCompany($request, $company);
+        // 25-Sep-2026: settings readers via a card tick never see storage credentials.
+        if (! $request->user()->hasRole('SUPER_ADMIN', 'COMPANY_ADMIN')) {
+            $company->makeHidden('storage_settings');
+        }
         return response()->json(['data' => $company->loadCount(['branches', 'departments', 'teams', 'employees'])]);
     }
 
@@ -81,6 +85,25 @@ class CompanyController extends Controller
             'break_limit_tea_min'   => ['nullable', 'integer', 'min:1', 'max:600'],
             'break_limit_other_min' => ['nullable', 'integer', 'min:1', 'max:600'],
         ]);
+
+        // 25-Sep-2026: a non-admin reaches here only through an Organisation/Biometric
+        // card's Edit tick — each card may change its own settings and nothing else.
+        if (! $request->user()->hasRole('SUPER_ADMIN', 'COMPANY_ADMIN')) {
+            $fieldCards = [
+                'attendance_mode'       => ['org.attendance_source'],
+                'biometric_gate'        => ['org.attendance_source', 'biometric.gate_to_pc'],
+                'timezone'              => ['org.company_timezone'],
+                'break_limit_lunch_min' => ['org.break_limits'],
+                'break_limit_tea_min'   => ['org.break_limits'],
+                'break_limit_other_min' => ['org.break_limits'],
+                'exclude_ip_sites'      => ['org.privacy_rawip'],
+            ];
+            $held = $request->user()->permissionSlugs();
+            foreach (array_keys($data) as $field) {
+                $cards = $fieldCards[$field] ?? [];
+                abort_unless($cards && \App\Support\CardAccess::holds($held, $cards, 'edit'), 403, "Your role cannot change {$field}.");
+            }
+        }
 
         // Section 3: record who changed a break limit and its old→new values.
         $breakKeys = ['break_limit_lunch_min', 'break_limit_tea_min', 'break_limit_other_min'];

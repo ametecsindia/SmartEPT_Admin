@@ -104,6 +104,7 @@ class M8AttendanceCompletenessTest extends TestCase
         $e1 = $this->employee('E-1001'); // GEN shift ends 18:00
         $e2 = $this->employee('E-1002');
         $e2->update(['shift_id' => null]); // no shift → close at 23:59:59
+        \App\Models\Shift::withoutGlobalScopes()->create(['company_id' => 1, 'name' => 'Second Shift', 'code' => 'S2', 'start_time' => '14:00:00', 'end_time' => '22:00:00']); // two shifts → no single shift to fall back to (24-Sep-2026)
 
         $s1 = EmployeeLoginSession::create([
             'company_id' => 1, 'employee_id' => $e1->id, 'session_type' => 'CLIENT', 'login_at' => '2026-07-06 09:00:00',

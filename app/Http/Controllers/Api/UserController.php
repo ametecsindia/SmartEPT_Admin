@@ -250,6 +250,31 @@ class UserController extends Controller
         if (! $caller->isSuperAdmin() && $target->company_id !== $caller->company_id) {
             abort(404);
         }
+        // 25-Sep-2026: Users "Edit" in the role matrix must never become a way to
+        // take over a login that has more access than the caller.
+        abort_unless(self::mayManageRole($caller, $target->role), 403, 'This login has more access than your role.');
+    }
+
+    /** Admins manage anyone; others only roles whose access is within their own. */
+    private static function mayManageRole(User $caller, ?Role $role): bool
+    {
+        if ($caller->hasRole('SUPER_ADMIN', 'COMPANY_ADMIN') || ! $role) {
+            return true;
+        }
+        if (in_array($role->slug, ['SUPER_ADMIN', 'COMPANY_ADMIN'], true)) {
+            return false;
+        }
+        if (($role->base_slug ?: $role->slug) === 'EMPLOYEE') {
+            return true; // portal logins: matrix ticks do not apply to them
+        }
+
+        // Compared on the role matrix (card.*) ticks — the access that is actually enforced.
+        $mine = preg_grep('/^card\./', $caller->permissionSlugs());
+        if (! $mine) {
+            return true; // caller's role not set up in the matrix: old behaviour
+        }
+
+        return ! array_diff(preg_grep('/^card\./', $role->permissions()->pluck('slug')->all()), $mine);
     }
 
     /**
@@ -262,7 +287,12 @@ class UserController extends Controller
             throw ValidationException::withMessages(['role' => ['Only a Super Admin may assign the SUPER_ADMIN role.']]);
         }
 
-        return Role::where('slug', $slug)->orderByRaw('company_id IS NOT NULL')->firstOrFail();
+        $role = Role::where('slug', $slug)->orderByRaw('company_id IS NOT NULL')->firstOrFail();
+        if (! self::mayManageRole($caller, $role)) {
+            throw ValidationException::withMessages(['role' => ['You cannot assign a role with more access than your own.']]);
+        }
+
+        return $role;
     }
 
     private function payload(User $user): array

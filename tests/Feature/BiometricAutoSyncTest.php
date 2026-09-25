@@ -83,10 +83,26 @@ class BiometricAutoSyncTest extends TestCase
         Http::assertSentCount(3);
     }
 
-    public function test_without_live_sync_the_server_pull_waits_the_default_60_seconds(): void
+    public function test_out_of_the_box_live_sync_is_on_every_second_with_nothing_configured(): void
     {
         $this->cloudDevice();
         Http::fake(['*' => Http::response(['Error' => false, 'PunchData' => []])]);
+        $this->assertSame(['on' => true, 'seconds' => 1], GateService::liveSyncConfig(1));
+        $gate = app(GateService::class);
+        $gate->statusFor($this->e->fresh());
+        $this->app->terminate();
+        $this->travel(2)->seconds();
+        $gate->statusFor($this->e->fresh());
+        $this->app->terminate();
+
+        Http::assertSentCount(3); // 1 + 1 re-run + 1 NEW pull — no Biometric tab, no Start button
+    }
+
+    public function test_after_an_admin_presses_stop_the_server_pull_waits_60_seconds(): void
+    {
+        $this->cloudDevice();
+        Http::fake(['*' => Http::response(['Error' => false, 'PunchData' => []])]);
+        \App\Models\Setting::put(GateService::liveSyncKey(1), json_encode(['on' => false, 'seconds' => 1]));
         $gate = app(GateService::class);
         $gate->statusFor($this->e->fresh());
         $this->app->terminate();
