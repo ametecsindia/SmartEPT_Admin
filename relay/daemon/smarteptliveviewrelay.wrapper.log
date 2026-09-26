@@ -10,3 +10,7 @@
 2026-09-19 09:28:03 - Started 6148
 2026-09-24 08:58:48 - Starting C:\laragon\bin\nodejs\node-v22\node.exe  --harmony C:\laragon\www\smartept\relay\node_modules\node-windows\lib\wrapper.js --file C:\laragon\www\smartept\relay\server.js --scriptoptions= --log "SmartEPT LiveView Relay wrapper" --grow 0.5 --wait 2 --maxrestarts 10 --abortonerror n --stopparentfirst undefined
 2026-09-24 08:58:48 - Started 5924
+2026-09-26 13:23:10 - Starting C:\laragon\bin\nodejs\node-v22\node.exe  --harmony C:\laragon\www\smartept\relay\node_modules\node-windows\lib\wrapper.js --file C:\laragon\www\smartept\relay\server.js --scriptoptions= --log "SmartEPT LiveView Relay wrapper" --grow 0.5 --wait 2 --maxrestarts 10 --abortonerror n --stopparentfirst undefined
+2026-09-26 13:23:10 - Started 6436
+2026-09-26 14:39:47 - Starting C:\laragon\bin\nodejs\node-v22\node.exe  --harmony C:\laragon\www\smartept\relay\node_modules\node-windows\lib\wrapper.js --file C:\laragon\www\smartept\relay\server.js --scriptoptions= --log "SmartEPT LiveView Relay wrapper" --grow 0.5 --wait 2 --maxrestarts 10 --abortonerror n --stopparentfirst undefined
+2026-09-26 14:39:48 - Started 5504

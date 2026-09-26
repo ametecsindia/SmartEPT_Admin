@@ -301,6 +301,15 @@
 
   /* ---------- LiveView tiles (Phase 4, 14-Sep-2026; multi-screen + fullscreen + per-tile desktop switch 14-Sep-2026) ---------- */
   .lv-tile{padding:0;overflow:hidden}
+  .lv-emp-dd{position:relative;min-width:220px}
+  .lv-emp-dd>summary{list-style:none;cursor:pointer;border:1px solid var(--border);border-radius:8px;padding:7px 28px 7px 10px;font-size:13px;color:var(--ink);background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;position:relative}
+  .lv-emp-dd>summary::-webkit-details-marker{display:none}
+  .lv-emp-dd>summary::after{content:"\25BE";position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--ink-3)}
+  .lv-emp-list{position:absolute;z-index:50;top:calc(100% + 4px);left:0;min-width:240px;max-height:320px;overflow:auto;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:4px 0}
+  .lv-emp-row{display:flex;align-items:center;gap:8px;padding:6px 12px;font-size:13px;cursor:pointer;white-space:nowrap}
+  .lv-emp-row:hover{background:var(--hairline)}
+  .lv-emp-allrow{font-weight:600;border-bottom:1px solid var(--hairline)}
+  .filters .lv-emp-list input[type=checkbox]{min-width:0;width:auto;padding:0;margin:0;flex:none}
   .lv-tile .lv-tile-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--hairline)}
   .lv-tile .lv-tile-head-left{display:flex;align-items:center;gap:6px;min-width:0;flex:1}
   .lv-tile .lv-tile-name{font-weight:700;font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
@@ -759,7 +768,11 @@
       <div class="card">
         <h3>Watch employees' screens <span class="hint">live, only while this panel is open — nothing is recorded</span></h3>
         <div class="filters" style="margin:0 0 10px">
-          <label>Employee</label><select id="lv-employee" style="min-width:220px"></select>
+          <label>Employee</label>
+          <!-- 26-Sep-2026: multi-select — tick several employees, Start / All Screens starts each of them. -->
+          <details class="lv-emp-dd" id="lv-emp-dd"><summary id="lv-emp-sum">Select employees</summary>
+            <div class="lv-emp-list"><label class="lv-emp-row lv-emp-allrow"><input type="checkbox" id="lv-emp-all"> Select all</label><div id="lv-employee"></div></div>
+          </details>
           <label>Monitor</label><select id="lv-monitor" style="min-width:0"><option value="0">Desktop 1</option></select>
           <label>Quality</label>
           <select id="lv-quality" style="min-width:0">
@@ -768,10 +781,10 @@
             <option value="high" id="lv-quality-high">High (1080p)</option>
           </select>
           <button class="btn solid" id="lv-start">Start</button>
-          <button class="btn" id="lv-start-all" title="Start every desktop this employee has, in one grid">&#9638; All Screens</button>
+          <button class="btn" id="lv-start-all" title="Start every desktop of each ticked employee">&#9638; All Screens</button>
           <button class="btn" id="lv-manage-perm" title="Choose which employees can be watched via LiveView">Manage permissions</button>
-          <button class="btn" id="lv-show-all" title="Show All — open every live screen in its own CCTV-style window" style="margin-left:auto">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>Show All
+          <button class="btn" id="lv-show-all" title="Open Live Wall — every live screen in a new window; drag tiles to rearrange" style="margin-left:auto">
+            Open Live Wall<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-left:5px"><path d="M14 3h7v7"/><path d="M10 14L21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
           </button>
         </div>
         <div class="mut" id="lv-status" style="margin-bottom:0"></div>
@@ -4660,7 +4673,7 @@ const lvTiles = new Map();
 // relay connection per screen — it just blits the frame already decoded onto each tile's own
 // canvas (lvConnect's ws.onmessage) across onto a same-origin canvas living in the pop-up, on
 // a light interval. lvWallMirrors maps session_id -> { wrap, canvas, ctx, lbl } in that window.
-let lvWallWin = null, lvWallTimer = null;
+let lvWallWin = null, lvWallTimer = null, lvWallDragEl = null;
 const lvWallMirrors = new Map();
 // Maximize / minimize (lucide-style, stroke=currentColor so it matches the button's own text color).
 const LV_ICON_EXPAND = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/></svg>';
@@ -4708,7 +4721,10 @@ function initLiveView() {
   $('#lv-start-all').onclick = lvStartAll;
   $('#lv-show-all').onclick = lvOpenWall;
   $('#lv-manage-perm').onclick = lvOpenPermissions;
-  $('#lv-employee').onchange = (e) => lvPopulateMonitors(parseInt(e.target.value, 10));
+  $('#lv-employee').onchange = lvEmpChanged;
+  $('#lv-emp-all').onchange = (e) => { $('#lv-employee').querySelectorAll('input').forEach((cb) => { cb.checked = e.target.checked; }); lvEmpChanged(); };
+  // Close the employee picker on any click outside it.
+  document.addEventListener('click', (e) => { const dd = $('#lv-emp-dd'); if (dd.open && !dd.contains(e.target)) dd.open = false; });
   $('#lvperm-x').onclick = $('#lvperm-close').onclick = () => $('#lvperm-ovl').classList.remove('open');
   // One listener for every tile: swap that tile's icon to "compress" while it's the
   // fullscreen element, and every other tile back to "expand" (covers Esc too, not just the button).
@@ -4725,20 +4741,35 @@ function initLiveView() {
 // Desktop 1 / Desktop 2 / ... — the Agent reports how many monitors it sees
 // (EmployeeDevice.monitor_count, from Electron's screen.getAllDisplays().length on
 // every heartbeat); devicesList() is the same cache the Devices panel already uses.
-function lvPopulateMonitors(empId) {
+function lvPopulateMonitors(empIds) {
   const sel = $('#lv-monitor');
   // force refresh (15-Sep-2026): DEV_CACHE is otherwise stale for the rest of the
   // admin's session once anything else has populated it — a monitor plugged in
   // after that point would never show up here without this. This is the moment
   // freshness actually matters (about to pick a monitor to start), so it's worth
   // the extra request; unlike the cached calls elsewhere, this one isn't on a poll.
+  // 26-Sep-2026: several employees can be ticked — offer the most desktops any of them has
+  // (an index a PC doesn't have falls back to its primary display on the Agent).
   devicesList(true).then((list) => {
-    const dev = list.find((d) => d.employee_id === empId);
-    const n = Math.max(1, (dev && dev.monitor_count) || 1);
+    const prev = sel.value;
+    let n = 1;
+    list.forEach((d) => { if (empIds.includes(d.employee_id)) n = Math.max(n, d.monitor_count || 1); });
     let opts = '';
     for (let i = 0; i < n; i++) opts += '<option value="' + i + '">Desktop ' + (i + 1) + '</option>';
     sel.innerHTML = opts;
+    if (prev && parseInt(prev, 10) < n) sel.value = prev;
   }).catch(() => { sel.innerHTML = '<option value="0">Desktop 1</option>'; });
+}
+// Ticked employees in the multi-select picker, as [{ id, label }].
+function lvSelectedEmps() {
+  return [...$('#lv-employee').querySelectorAll('input:checked')].map((cb) => ({ id: parseInt(cb.value, 10), label: cb.dataset.label }));
+}
+function lvEmpChanged() {
+  const sel = lvSelectedEmps();
+  const all = $('#lv-employee').querySelectorAll('input').length;
+  $('#lv-emp-all').checked = all > 0 && sel.length === all;
+  $('#lv-emp-sum').textContent = !sel.length ? 'Select employees' : sel.length === 1 ? sel[0].label : sel.length + ' employees selected';
+  lvPopulateMonitors(sel.map((e) => e.id));
 }
 function lvUpdateStatus() {
   $('#lv-status').textContent = lvTiles.size + ' live screen' + (lvTiles.size === 1 ? '' : 's') + ' open';
@@ -4749,16 +4780,18 @@ function lvUpdateStatus() {
 function lvLoadPermittedEmployees() {
   api('/liveview/permissions').then((d) => {
     const sel = $('#lv-employee');
-    const prevValue = sel.value;
+    const prevChecked = new Set(lvSelectedEmps().map((e) => e.id));
     const permitted = (d.employees || []).filter((e) => e.liveview_enabled);
     if (!permitted.length) {
       sel.innerHTML = '';
       $('#lv-status').textContent = 'No employees are permitted for LiveView yet — click "Manage permissions" to grant access.';
       return;
     }
-    sel.innerHTML = permitted.map((e) => '<option value="' + e.id + '">' + esc(fullName(e) || e.employee_code || ('#' + e.id)) + '</option>').join('');
-    if (permitted.some((e) => String(e.id) === prevValue)) sel.value = prevValue;
-    lvPopulateMonitors(parseInt(sel.value, 10));
+    sel.innerHTML = permitted.map((e) => {
+      const name = esc(fullName(e) || e.employee_code || ('#' + e.id));
+      return '<label class="lv-emp-row"><input type="checkbox" value="' + e.id + '" data-label="' + name + '"' + (prevChecked.has(e.id) ? ' checked' : '') + '> ' + name + '</label>';
+    }).join('');
+    lvEmpChanged();
   }).catch(() => {});
 }
 // Manage LiveView Permissions (21-Sep-2026): this list — not concurrent viewers — is
@@ -4790,55 +4823,43 @@ async function lvTogglePermission(cb) {
     cb.disabled = false;
   }
 }
-async function lvStart() {
-  const empSel = $('#lv-employee');
-  const empId = parseInt(empSel.value, 10);
-  if (!empId) { $('#lv-status').textContent = 'Pick an employee first.'; return; }
-  const empLabel = empSel.selectedOptions[0] ? empSel.selectedOptions[0].textContent : ('#' + empId);
-  const monitorIndex = parseInt($('#lv-monitor').value, 10);
-  const quality = $('#lv-quality').value;
-  $('#lv-status').textContent = 'Requesting session…';
-  try {
-    const res = await api('/liveview/session/start', { method: 'POST', body: JSON.stringify({
-      employee_id: empId, monitor_index: monitorIndex, quality: quality,
-    }) });
-    lvAddTile(res.session_id, empId, empLabel, monitorIndex, quality, res.relay_url, res.view_token);
-    lvUpdateStatus();
-  } catch (e) {
-    $('#lv-status').textContent = 'Start failed: ' + (e.message || 'unknown error');
-  }
+// 26-Sep-2026: Start / All Screens run for every ticked employee, one request at a time so a
+// licence/permission error stops cleanly instead of a pile of parallel failures. A screen that
+// is already showing (same employee + desktop) is skipped, never opened twice.
+async function lvStartOne(emp, monitorIndex, quality) {
+  for (const t of lvTiles.values()) if (t.empId === emp.id && t.monitorIndex === monitorIndex) return false;
+  const res = await api('/liveview/session/start', { method: 'POST', body: JSON.stringify({
+    employee_id: emp.id, monitor_index: monitorIndex, quality: quality,
+  }) });
+  lvAddTile(res.session_id, emp.id, emp.label, monitorIndex, quality, res.relay_url, res.view_token);
+  return true;
 }
-// All Screens: start every desktop the selected employee's PC has (skipping any already
-// showing in a tile), one after another so a licence limit hit stops cleanly rather than
-// firing every start request in parallel and getting a pile of LIVEVIEW_LIMIT_REACHED errors.
-async function lvStartAll() {
-  const empSel = $('#lv-employee');
-  const empId = parseInt(empSel.value, 10);
-  if (!empId) { $('#lv-status').textContent = 'Pick an employee first.'; return; }
-  const empLabel = empSel.selectedOptions[0] ? empSel.selectedOptions[0].textContent : ('#' + empId);
+async function lvStartMany(allScreens) {
+  const emps = lvSelectedEmps();
+  if (!emps.length) { $('#lv-status').textContent = 'Tick at least one employee first.'; return; }
+  $('#lv-emp-dd').open = false;
   const quality = $('#lv-quality').value;
-  const already = new Set();
-  lvTiles.forEach((t) => { if (t.empId === empId) already.add(t.monitorIndex); });
-  const list = await devicesList(true).catch(() => []); // force refresh — see lvPopulateMonitors
-  const dev = list.find((d) => d.employee_id === empId);
-  const n = Math.max(1, (dev && dev.monitor_count) || 1);
-  const toStart = [];
-  for (let i = 0; i < n; i++) if (!already.has(i)) toStart.push(i);
-  if (!toStart.length) { $('#lv-status').textContent = already.size ? 'All of this employee\'s screens are already showing.' : 'No desktops to start.'; return; }
-  $('#lv-status').textContent = 'Starting all screens…';
+  const monitorIndex = parseInt($('#lv-monitor').value, 10) || 0;
+  const list = allScreens ? await devicesList(true).catch(() => []) : []; // force refresh — see lvPopulateMonitors
+  $('#lv-status').textContent = 'Starting…';
   let started = 0, failMsg = '';
-  for (const monitorIndex of toStart) {
-    try {
-      const res = await api('/liveview/session/start', { method: 'POST', body: JSON.stringify({
-        employee_id: empId, monitor_index: monitorIndex, quality: quality,
-      }) });
-      lvAddTile(res.session_id, empId, empLabel, monitorIndex, quality, res.relay_url, res.view_token);
-      started++;
-    } catch (e) { failMsg = e.message || 'unknown error'; break; }
+  outer: for (const emp of emps) {
+    let monitors = [monitorIndex];
+    if (allScreens) {
+      const dev = list.find((d) => d.employee_id === emp.id);
+      monitors = [...Array(Math.max(1, (dev && dev.monitor_count) || 1)).keys()];
+    }
+    for (const m of monitors) {
+      try { if (await lvStartOne(emp, m, quality)) started++; }
+      catch (e) { failMsg = emp.label + ': ' + (e.message || 'unknown error'); break outer; }
+    }
   }
   lvUpdateStatus();
-  if (failMsg) $('#lv-status').textContent += ' — started ' + started + ' of ' + toStart.length + ' (' + failMsg + ').';
+  if (failMsg) $('#lv-status').textContent += ' — started ' + started + ', stopped at ' + failMsg;
+  else if (!started) $('#lv-status').textContent = 'Those screens are already showing.';
 }
+function lvStart() { return lvStartMany(false); }
+async function lvStartAll() { return lvStartMany(true); }
 function lvAddTile(sid, empId, empLabel, monitorIndex, quality, relayUrl, viewToken) {
   const el = document.createElement('div');
   el.className = 'card lv-tile';
@@ -4957,8 +4978,8 @@ async function lvStop(sid) {
 function lvOpenWall() {
   if (lvWallWin && !lvWallWin.closed) { lvWallWin.focus(); lvWallSync(); return; }
   lvWallWin = window.open('', 'smartept-liveview-wall', 'width=1280,height=800');
-  if (!lvWallWin) { $('#lv-status').textContent = 'Could not open the Show All window — check your browser\'s pop-up blocker.'; return; }
-  lvWallWin.document.title = 'SmartEPT LiveView — Show All';
+  if (!lvWallWin) { $('#lv-status').textContent = 'Could not open the Live Wall window — check your browser\'s pop-up blocker.'; return; }
+  lvWallWin.document.title = 'SmartEPT LiveView — Live Wall';
   lvWallWin.document.head.innerHTML = '<meta charset="utf-8">'
     + '<style>'
     + 'html,body{margin:0;height:100%;background:#0b0e13;overflow:hidden;font-family:system-ui,sans-serif}'
@@ -4978,6 +4999,9 @@ function lvOpenWall() {
     + '.lv-wtile .lv-wcap{right:41px}'
     + '.lv-wtile:hover .lv-wfs,.lv-wtile:hover .lv-wcap{opacity:1}'
     + '.lv-wtile .lv-wfs:hover,.lv-wtile .lv-wcap:hover{background:rgba(5,20,24,.9)}'
+    // Drag & drop (26-Sep-2026): grab any tile, drop it on another — the two swap places.
+    + '.lv-wtile{cursor:grab}.lv-wtile.lv-wdrag{opacity:.4}'
+    + '.lv-wtile.lv-wover{outline:3px dashed #2bb3c0;outline-offset:-3px}'
     + '#lv-wempty{color:#8b95a3;font-size:14px;display:flex;align-items:center;justify-content:center;height:100vh}'
     + '</style>';
   lvWallWin.document.body.innerHTML = '<div id="lv-wall"></div>';
@@ -5068,6 +5092,24 @@ function lvWallSync() {
     wrap.appendChild(lbl);
     wrap.appendChild(fsBtn);
     wrap.appendChild(capBtn);
+    // Drag & drop swap (26-Sep-2026): the two tiles trade DOM positions, so the grid (and
+    // each canvas's already-painted frame) just reflows — no re-render, no stream restart.
+    // New screens are appended at the end, so an arrangement survives screens starting/stopping.
+    wrap.draggable = true;
+    wrap.ondragstart = (e) => { lvWallDragEl = wrap; wrap.classList.add('lv-wdrag'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(sid)); };
+    wrap.ondragend = () => { wrap.classList.remove('lv-wdrag'); grid.querySelectorAll('.lv-wover').forEach((x) => x.classList.remove('lv-wover')); lvWallDragEl = null; };
+    wrap.ondragover = (e) => { if (lvWallDragEl && lvWallDragEl !== wrap) { e.preventDefault(); wrap.classList.add('lv-wover'); } };
+    wrap.ondragleave = () => wrap.classList.remove('lv-wover');
+    wrap.ondrop = (e) => {
+      e.preventDefault();
+      wrap.classList.remove('lv-wover');
+      const src = lvWallDragEl;
+      if (!src || src === wrap || src.parentNode !== grid) return;
+      const tmp = lvWallWin.document.createElement('div');
+      grid.replaceChild(tmp, src);
+      grid.replaceChild(src, wrap);
+      grid.replaceChild(wrap, tmp);
+    };
     grid.appendChild(wrap);
     lvWallMirrors.set(sid, { wrap, canvas, ctx: canvas.getContext('2d'), lbl, fsBtn, capBtn });
   });
