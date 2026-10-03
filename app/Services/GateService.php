@@ -446,6 +446,13 @@ class GateService
      */
     private function pullDoorPunchesSoon(int $companyId): void
     {
+        // 29-Sep-2026: never under `php artisan serve`. It has ONE worker, so a cloud pull run
+        // after a response (provider timeouts are 60–90s) froze every other request — console
+        // menus, dropdowns, agent chat — until it finished. Apache/IIS/FPM are unaffected;
+        // under artisan serve door punches arrive via the scheduled biometric auto-sync.
+        if (PHP_SAPI === 'cli-server') {
+            return;
+        }
         try {
             if (! \Illuminate\Support\Facades\Cache::add('gate-pull:' . $companyId, 1, self::liveSyncSeconds($companyId))) {
                 return;
@@ -493,11 +500,18 @@ class GateService
     /** OUT punch while a session is open → open (or adopt) a door break. */
     private function handleOutPunch(int $companyId, int $employeeId, Carbon $at): void
     {
+        // 28-Sep-2026 (Ejaz, "tiru" +1h31m Unaccounted while signed in all day): a screen LOCK
+        // closes the login session (logout_reason = LOCK). Lock-then-walk-out is the NORMAL way to
+        // leave a desk, but it landed here as "no session" → no door break, while the closed gate
+        // made the server refuse (423) and the agent drop every idle stretch until the IN punch.
+        // The whole absence vanished into Unaccounted. A session that ended in a LOCK within the
+        // last day is still a working day — only a real sign-out (USER / auto) closes it.
         $sessionOpen = EmployeeLoginSession::withoutGlobalScopes()
             ->where('company_id', $companyId)->where('employee_id', $employeeId)
-            ->whereNull('logout_at')->latest('login_at')->first();
+            ->where('login_at', '>=', $at->copy()->subDay())
+            ->latest('login_at')->first();
 
-        if (! $sessionOpen) {
+        if (! $sessionOpen || ($sessionOpen->logout_at && $sessionOpen->logout_reason !== 'LOCK')) {
             return; // evening walk-out after log-off = day closing, not a break
         }
 

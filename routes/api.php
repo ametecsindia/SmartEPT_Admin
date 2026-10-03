@@ -92,6 +92,8 @@ Route::prefix('enforcer')->middleware(['auth:sanctum', 'throttle:600,1'])->group
     Route::post('heartbeat', [EnforcerSyncController::class, 'heartbeat']);
     Route::get('policy', [EnforcerSyncController::class, 'policy']);
     Route::post('audit', [EnforcerSyncController::class, 'storeAudit']);
+    // 03-Oct-2026: Endpoint Security (Defender) — its own call; never alters the heartbeat above.
+    Route::post('security/sync', [\App\Http\Controllers\Api\EndpointSecuritySyncController::class, 'sync']);
 });
 
 // ---- Authenticated (any valid token) ----
@@ -235,6 +237,11 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
         // Fast LiveView-only sibling to the heartbeat above (15-Sep-2026) — see
         // LiveViewController::poll()'s docblock for why this exists separately.
         Route::get('liveview/poll', [LiveViewController::class, 'poll']);
+        // 28-Sep-2026: chat with the admin (new messages are announced on liveview/poll).
+        Route::get('chat', [\App\Http\Controllers\Api\ChatController::class, 'agentIndex']);
+        Route::post('chat', [\App\Http\Controllers\Api\ChatController::class, 'agentSend']);
+        // 29-Sep-2026: the employee closed the chat popup — the conversation ends.
+        Route::delete('chat', [\App\Http\Controllers\Api\ChatController::class, 'agentClear']);
         // Section 10: the agent's explicit sign-out (revokes this device's session).
         Route::post('session-logout', [DeviceController::class, 'sessionLogout']);
         Route::post('consent', [ConsentController::class, 'store']);
@@ -301,6 +308,7 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
         Route::get('reports/usage-summary', [UsageController::class, 'companySummary']); // 17-Jul all-employees default
         Route::get('reports/time-utilization', [UsageController::class, 'timeUtilization']); // dashboard 'where the hours went'
         Route::get('reports/productivity', [ProductivityController::class, 'report']); // 17-Jul all-employee day-wise productivity
+        Route::get('reports/productivity/detail', [ProductivityController::class, 'detail']); // 29-Sep "+" row: the day event by event
         Route::get('reports/productivity-v2', [ProductivityController::class, 'reportV2']); // Part A — transparent auditable formula (alongside classic)
         Route::post('reports/productivity/rebuild', [ProductivityController::class, 'rebuildSummaries']); // backfill missing daily summaries on demand
         Route::get('reports/employee/{employee}/app-usage', [UsageController::class, 'appReport']);
@@ -317,6 +325,13 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
     Route::get('dashboard/summary', [DashboardController::class, 'summary'])->middleware($mgrEmp);
     Route::get('dashboard/device-health', [DashboardController::class, 'deviceHealth'])->middleware($mgrEmp);
     Route::get('reports/employee/{employee}/timeline', [ReportController::class, 'timeline'])->middleware($mgr);
+    // 28-Sep-2026: admin ↔ employee chat from the employee drawer (agent side: agent/chat below).
+    // 30-Sep-2026: unread employee replies (console toast/notification + LiveView chat badges).
+    Route::get('chat-unread', [\App\Http\Controllers\Api\ChatController::class, 'adminUnread'])->middleware($mgr);
+    Route::get('chat/{employee}', [\App\Http\Controllers\Api\ChatController::class, 'adminIndex'])->middleware($mgr);
+    Route::post('chat/{employee}', [\App\Http\Controllers\Api\ChatController::class, 'adminSend'])->middleware($mgr);
+    // 29-Sep-2026: the admin closed the drawer / full-screen chat — the conversation ends.
+    Route::delete('chat/{employee}', [\App\Http\Controllers\Api\ChatController::class, 'adminClear'])->middleware($mgr);
     // Section 3 & 14: break report (permitted/actual/excess/reason) + meeting report.
     Route::get('reports/breaks', [BreakReportController::class, 'index'])->middleware($mgr);
     Route::get('reports/meetings', [MeetingController::class, 'report'])->middleware($mgr);
@@ -324,6 +339,39 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
         ->middleware('role:SUPER_ADMIN,COMPANY_ADMIN,HR_ADMIN');
     // Monthly payroll pack: per-employee counts + payable days for a month.
     Route::get('reports/monthly-summary', [MonthlyReportController::class, 'summary'])->middleware($mgr);
+
+    // 03-Oct-2026: Endpoint Security (Enforcer + Commander only). Plan gate = EnsureEndpointSecurity
+    // (Standard → 403 FEATURE_NOT_AVAILABLE); access = "Endpoint Security" cards (CardAccess);
+    // legacy roles: Super/Company Admin. 'access' is ungated — the console uses it to show the nav.
+    Route::get('endpoint-security/access', [\App\Http\Controllers\Api\EndpointSecurityController::class, 'access']);
+    Route::prefix('endpoint-security')->middleware(['role:SUPER_ADMIN,COMPANY_ADMIN', \App\Http\Middleware\EnsureEndpointSecurity::class])->group(function () {
+        $es = \App\Http\Controllers\Api\EndpointSecurityController::class;
+        $cap = fn (string $c) => \App\Http\Middleware\EnsureEndpointSecurity::class . ':' . $c;
+        Route::get('overview', [$es, 'overview']);
+        Route::get('devices/{machine}', [$es, 'show']);
+        Route::get('devices/{machine}/threats', [$es, 'threats'])->middleware($cap('threat_history'));
+        Route::get('devices/{machine}/events', [$es, 'events'])->middleware($cap('events'));
+        Route::post('devices/{machine}/actions/{action}', [$es, 'action']); // capability checked per action
+        Route::get('commands', [$es, 'commands'])->middleware($cap('command_history'));
+        Route::get('policy', [$es, 'policy']);
+        Route::put('policy', [$es, 'savePolicy'])->middleware($cap('policies'));
+        Route::get('reports/{type}', [$es, 'report'])->middleware($cap('reports'));
+    });
+
+    // 30-Sep-2026 (Ejaz): Reports → Schedule Report (automatic Productivity report emails).
+    // Governed by the "Report schedules" card (CardAccess); legacy roles: Reports & Exports access.
+    Route::get('report-schedules', [\App\Http\Controllers\Api\ReportScheduleController::class, 'index'])->middleware('permission:export.data');
+    Route::get('report-schedules/{schedule}/snapshot', [\App\Http\Controllers\Api\ReportScheduleController::class, 'snapshot'])->middleware('permission:export.data');
+    Route::get('whatsapp-config', [\App\Http\Controllers\Api\ReportScheduleController::class, 'whatsappShow'])->middleware('permission:export.data');
+    // WhatsApp connection holds a Meta access token: Super/Company Admin only (plus a matrix Edit tick).
+    Route::put('whatsapp-config', [\App\Http\Controllers\Api\ReportScheduleController::class, 'whatsappSave'])->middleware('role:SUPER_ADMIN,COMPANY_ADMIN');
+    Route::post('whatsapp-config/test', [\App\Http\Controllers\Api\ReportScheduleController::class, 'whatsappTest'])->middleware('role:SUPER_ADMIN,COMPANY_ADMIN');
+    Route::middleware('role:SUPER_ADMIN,COMPANY_ADMIN,HR_ADMIN,BRANCH_ADMIN,MANAGER')->group(function () {
+        Route::post('report-schedules', [\App\Http\Controllers\Api\ReportScheduleController::class, 'store']);
+        Route::put('report-schedules/{schedule}', [\App\Http\Controllers\Api\ReportScheduleController::class, 'update']);
+        Route::delete('report-schedules/{schedule}', [\App\Http\Controllers\Api\ReportScheduleController::class, 'destroy']);
+        Route::post('report-schedules/{schedule}/run', [\App\Http\Controllers\Api\ReportScheduleController::class, 'run']);
+    });
 
     // ---- Exports (M5 + M6) — CSV ----
     Route::middleware('permission:export.data')->group(function () {

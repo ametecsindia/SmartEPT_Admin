@@ -96,6 +96,10 @@ Schedule::call(function () {
 // concurrency slots for 24h.
 Schedule::call(fn () => Artisan::call('smartept:end-stale-liveview-sessions'))->name('end-stale-liveview-sessions')->everyMinute()->withoutOverlapping(2);
 
+// 30-Sep-2026 (Ejaz): Reports → Schedule Report — email the Productivity reports that are due.
+// Each schedule claims its day before sending, so a slow or repeated tick never sends twice.
+Schedule::call(fn () => Artisan::call('smartept:scheduled-reports'))->name('scheduled-reports')->everyMinute()->withoutOverlapping(30);
+
 // Live-board self-heal (Admin #3/#4): close any break/meeting status segment left open
 // across a day boundary (agent killed mid-break → a 16-hour "On break" ghost) so the live
 // dashboard never shows an impossible multi-hour break. The dashboard also self-heals on

@@ -188,8 +188,13 @@ class LiveViewController extends Controller
         // same employee used to starve all but the newest).
         $sessions = $deviceUuid !== '' ? LiveViewSession::connectingFor($deviceUuid) : collect();
 
+        // 28-Sep-2026: the same 3s poll announces unread admin chat messages, so the agent can
+        // pop its chat window without a second polling loop.
+        $employeeId = \App\Models\Employee::where('user_id', $request->user()->id)->value('id');
+
         return response()->json([
             'liveview_requested' => $sessions->map(fn ($s) => $s->toAgentRequest($this->tokens))->all(),
+            'chat_unread' => $employeeId ? ChatController::unreadForEmployee((int) $employeeId) : 0,
         ]);
     }
 }

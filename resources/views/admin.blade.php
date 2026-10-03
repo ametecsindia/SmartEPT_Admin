@@ -319,7 +319,13 @@
     padding:2px 6px;background:var(--card-2);flex:0 0 auto;max-width:112px}
   .lv-tile .lv-tile-actions{display:flex;gap:6px;flex-shrink:0;align-items:center}
   .lv-tile .lv-tile-actions button.btn{font-size:11.5px;padding:4px 9px}
-  .lv-tile .lv-fs-btn{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;padding:0}
+  /* 29-Sep-2026 (Ejaz): chat / screenshot / full-screen were faint white squares nobody noticed —
+     solid brand buttons with larger icons, readable on the light header and in full screen. */
+  .lv-tile .lv-fs-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;
+    background:var(--accent);border:1.5px solid var(--accent);color:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+  .lv-tile .lv-fs-btn:hover{background:var(--accent-ink);border-color:var(--accent-ink);color:#fff}
+  .lv-tile .lv-tile-actions .lv-fs-btn svg{width:18px !important;height:18px !important;flex:none}
+  .lv-tile .lv-tile-actions .x{width:32px;height:32px}
   .lv-tile .lv-tile-actions .x{background:var(--danger-w);border:1px solid var(--danger);color:var(--danger);font-size:12px;cursor:pointer;
     font-family:inherit;width:26px;height:26px;border-radius:8px;transition:background .12s,color .12s;flex-shrink:0}
   .lv-tile .lv-tile-actions .x:hover{background:var(--danger);color:#fff}
@@ -393,6 +399,60 @@
     box-shadow:-24px 0 60px rgba(5,42,51,.18);padding:22px;overflow-y:auto;transform:translateX(100%);
     transition:transform .22s cubic-bezier(.2,.8,.3,1);z-index:150;border-radius:18px 0 0 18px}
   .drawer.open{transform:none}
+  /* 28-Sep-2026: drawer = header + scrolling tab body + chat pinned to the bottom 20%. */
+  .drawer{display:flex;flex-direction:column;overflow:hidden}
+  .drawer .x{position:absolute;top:18px;right:18px}
+  .drawer #d-body{flex:1 1 auto;min-height:0;overflow-y:auto}
+  .dchat{flex:0 0 20vh;min-height:150px;display:flex;flex-direction:column;border-top:1px solid var(--border);margin:10px -22px -22px;padding:8px 14px 12px;background:var(--card-2)}
+  .lv-eye{border:none;background:none;padding:2px 4px;margin-left:4px;vertical-align:middle;color:var(--accent);cursor:pointer;border-radius:5px;line-height:0}
+  .lv-eye:hover:not(:disabled){background:var(--card-2)}
+  .lv-eye:disabled{color:var(--ink-3,#9aa7b0);opacity:.45;cursor:not-allowed}
+  /* 30-Sep-2026 (Ejaz): the eye opens wide, glances and blinks; still (and grey) when offline. */
+  .lv-eye .eye-lid{transform-box:fill-box;transform-origin:center;animation:eyeOpen .6s ease-out both,eyeBlink 4.5s 1.2s ease-in-out infinite}
+  .lv-eye .eye-iris{animation:eyeLook 4.5s 1.2s ease-in-out infinite}
+  .lv-eye:hover:not(:disabled) .eye-svg{transform:scale(1.12);transition:transform .15s}
+  .lv-eye:disabled .eye-lid,.lv-eye:disabled .eye-iris{animation:none}
+  .lv-eye:disabled .eye-svg{filter:grayscale(1)}
+  @keyframes eyeOpen{from{transform:scaleY(.08)}to{transform:scaleY(1)}}
+  @keyframes eyeBlink{0%,90%,100%{transform:scaleY(1)}94%{transform:scaleY(.08)}}
+  @keyframes eyeLook{0%,20%,100%{transform:translateX(0)}30%,42%{transform:translateX(-2px)}52%,64%{transform:translateX(2px)}74%{transform:translateX(0)}}
+  @media (prefers-reduced-motion:reduce){.lv-eye .eye-lid,.lv-eye .eye-iris{animation:none}}
+  .pr-plus{width:20px;height:20px;padding:0;border:1px solid var(--border);border-radius:5px;background:var(--card);color:var(--accent);font-weight:800;line-height:1;cursor:pointer;vertical-align:middle}
+  .pr-plus:hover{background:var(--card-2)}
+  tr.pr-detail > td{background:var(--card-2);padding:10px 12px;white-space:normal}
+  .prd-sum{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12px;margin-bottom:8px}
+  /* 29-Sep-2026: Productivity overview (totals of the rows shown) */
+  .pro-wrap{border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:14px;background:var(--card,#fff)}
+  .pro-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .pro-h b{font-size:13px}.pro-h span{font-size:11.5px;color:var(--ink-3)}
+  .pro-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px;margin-bottom:12px}
+  .pro-c{border:1px solid var(--border);border-radius:11px;padding:9px 11px;border-left:4px solid var(--c,#0E7C8F)}
+  .pro-c .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-3);font-weight:700}
+  .pro-c .v{font-size:19px;font-weight:800;margin-top:2px}.pro-c .p{font-size:11px;color:var(--ink-3)}
+  .pro-bar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--border)}
+  .pro-bar i{display:block;height:100%}
+  .pro-leg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11px;color:var(--ink-3);margin-top:6px}
+  .pro-leg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+  .prd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+  .prd-box{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 10px;max-height:320px;overflow:auto}
+  .prd-h{font-size:11px;font-weight:700;color:var(--ink-2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px}
+  table.prd-t{width:100%;font-size:11.5px}table.prd-t th,table.prd-t td{padding:3px 6px;white-space:nowrap}
+  table.prd-t tfoot td{border-top:1px solid var(--border);font-size:11.5px;white-space:normal}
+  .prd-box.wide{grid-column:span 2}
+  .dchat-h{font-size:11.5px;font-weight:700;color:var(--ink-2);margin-bottom:5px;display:flex;justify-content:space-between}
+  /* 29-Sep-2026 (Ejaz): drag the chat's title bar up/down to resize it, like a table splitter. */
+  .dchat-h{cursor:ns-resize;user-select:none;touch-action:none;position:relative;padding-top:6px}
+  .dchat-h::before{content:'';position:absolute;top:0;left:50%;width:36px;height:3px;margin-left:-18px;border-radius:2px;background:var(--border)}
+  .dchat-list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:5px;padding:2px}
+  .dchat-m{max-width:78%;padding:6px 10px;border-radius:10px;font-size:12px;line-height:1.35;white-space:pre-wrap;word-break:break-word}
+  .dchat-m.me{align-self:flex-end;background:#D7F0F4;color:var(--ink);border:1px solid #BFE3EA;border-bottom-right-radius:3px} /* 30-Sep-2026: light so ✓✓ blue reads */
+  .dchat-m.them{align-self:flex-start;background:var(--card);border:1px solid var(--border);border-bottom-left-radius:3px}
+  .dchat-m small{display:block;opacity:.7;font-size:10px;margin-top:2px}
+  .dchat-m.me small{opacity:1;color:var(--ink-3);text-align:right} /* 30-Sep-2026: ticks at full colour */
+  .dchat-f{display:flex;gap:6px;margin-top:6px}
+  .dchat-f input{flex:1;width:auto;min-width:0;padding:7px 10px}
+  .tl .ev a.shot-view{color:var(--accent);font-weight:600;cursor:pointer}
+  #shot-ovl{z-index:200}
   body.drawer-lock{overflow:hidden}
   .drawer .x{float:right;cursor:pointer;color:var(--ink-3);font-size:18px;width:30px;height:30px;text-align:center;
     line-height:30px;border-radius:8px;transition:background .12s}
@@ -469,10 +529,13 @@
     <div class="nav" data-view="liveview"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4.5" width="19" height="13" rx="2"/><path d="M8 21h8M12 17.5V21"/><circle cx="12" cy="11" r="3"/></svg></span> LiveView</div>
     <div class="nav" data-view="policies"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.5 3v5.2c0 4.8-3.2 8.2-7.5 9.8-4.3-1.6-7.5-5-7.5-9.8V6z"/><path d="M9 11.8l2.1 2.1 3.9-4.2"/></svg></span> Policies</div>
     <div class="nav" data-view="rules"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h11M4 18h7"/><circle cx="18.5" cy="16.5" r="3"/><path d="M20.6 18.6 23 21"/></svg></span> App &amp; Web Rules</div>
+    <div class="nav" data-view="endsec" style="display:none"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.5 3v5.2c0 4.8-3.2 8.2-7.5 9.8-4.3-1.6-7.5-5-7.5-9.8V6z"/><path d="M12 8v4.5M12 15.6h.01"/></svg></span> Endpoint Security</div>
     <div class="nav" data-view="biometric"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8A9 9 0 0 1 21 12c0 2.6-.4 5-1.2 7"/><path d="M3.6 8.4A9 9 0 0 0 3 12c0 2.8.6 5.2 1.6 7.2"/><path d="M12 8.4a3.6 3.6 0 0 1 3.6 3.6c0 2.3-.3 4.5-1 6.6"/><path d="M8.4 12a3.6 3.6 0 0 1 .4-1.7M8.6 15.6c.3 1.5.2 3-.2 4.6"/><path d="M12 12v2.4c0 1.7-.2 3.4-.7 5"/></svg></span> Biometric</div>
         <div class="nav" data-view="gateexcl"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V6.2a2 2 0 0 1 1.3-1.9l7-2.2a1 1 0 0 1 1.3 1v18"/><path d="M12.6 21H21V9.4a2 2 0 0 0-1.4-1.9l-7-2.2"/><path d="M8.4 12.2v1.6"/><path d="M2 21h20"/></svg></span> Gate Exclusions</div>
 <div class="navgrp">INSIGHT</div>
     <div class="nav" data-view="reports"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11.5M7.5 10l4.5 4.5L16.5 10"/><path d="M4 17v2.4A1.6 1.6 0 0 0 5.6 21h12.8a1.6 1.6 0 0 0 1.6-1.6V17"/></svg></span> Reports &amp; Exports</div>
+        <!-- 30-Sep-2026 (Ejaz): scheduled Productivity report emails, under Reports & Exports -->
+        <div class="nav" data-view="schedrep" style="padding-left:30px;font-size:12.5px"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2.5h6"/></svg></span> Schedule Report</div>
     <div class="nav" data-view="license"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="12" r="4.6"/><path d="M12.6 12H21M17.5 12v3.4M21 12v2.4"/></svg></span> Licence</div>
     <div class="nav" data-view="integrations"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg></span> API &amp; Integrations</div>
     <div class="nav" data-view="ops"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6.5 5 13L17 12h4"/></svg></span> Audit &amp; Ops</div>
@@ -1083,6 +1146,125 @@
       </div>
     </div>
 
+    <!-- 30-Sep-2026 (Ejaz): Reports → Schedule Report. The form lives inside the card so the
+         role matrix's "Report schedules" Edit tick governs its buttons (card-noedit). -->
+    @include('partials.endpoint-security') {{-- 03-Oct-2026: Endpoint Security (own file, own IIFE) --}}
+    <div class="view" id="v-schedrep">
+      <div class="card" id="sr-card">
+        <h3>Report schedules <span class="hint">the Productivity report, emailed automatically at the time you choose (company time zone)</span>
+          <button class="btn solid" id="sr-new" style="float:right">+ New schedule</button></h3>
+        <table><thead><tr><th>Name</th><th>When</th><th>Covers</th><th>Sends to</th><th>Last run</th><th>Status</th><th></th></tr></thead>
+          <tbody id="sr-rows"><tr><td colspan="7" class="mut">Loading…</td></tr></tbody></table>
+
+        <div id="sr-form" style="display:none;margin-top:18px;border-top:1px solid var(--border);padding-top:14px">
+          <h4 id="sr-form-title" style="margin:0 0 10px;font-size:14px">New schedule</h4>
+          <div class="fgrid">
+            <div><label>Name</label><input id="sr-name" maxlength="120" placeholder="e.g. Daily productivity — Operations"></div>
+            <div class="fbool" style="padding-top:26px"><input type="checkbox" id="sr-enabled" checked> Active (untick to pause)</div>
+            <div><label>How often</label><select id="sr-freq"><option value="DAILY">Daily — covers the previous day</option>
+              <option value="WEEKLY">Weekly — covers the previous 7 days</option><option value="MONTHLY">Monthly — covers the previous month</option></select></div>
+            <div><label>Send at (time)</label><input type="time" id="sr-time" value="09:00"></div>
+            <div class="full" id="sr-days-wrap"><label id="sr-days-label">Send on</label><div id="sr-days" style="display:flex;gap:6px;flex-wrap:wrap;padding-top:4px"></div></div>
+            <div id="sr-dom-wrap" style="display:none"><label>Day of the month (1–28)</label><input type="number" id="sr-dom" min="1" max="28" value="1"></div>
+          </div>
+
+          <div style="font-weight:700;margin:16px 0 4px">Covers <span class="mut" style="font-weight:400;font-size:11.5px">— whose data is in the full report, and who "every employee" means</span></div>
+          <div class="fgrid">
+            <div><label>Branch</label><select id="sr-b"></select></div>
+            <div><label>Department</label><select id="sr-d"></select></div>
+            <div><label>Team</label><select id="sr-t"></select></div>
+          </div>
+
+          <div style="font-weight:700;margin:16px 0 4px">Who receives it</div>
+          <div class="fbool"><input type="checkbox" id="sr-allown"> <span>Every active employee in <b>Covers</b> gets <b>their own</b> report automatically (their day, event by event + summary)</span></div>
+          <div class="mut" style="font-size:11.5px;margin:6px 0 8px"><b>Own report</b> = that employee's own day, event by event. <b>Full report</b> = everyone in Covers (for managers / HR).
+            Edit an email to send that person's reports somewhere else (blank = the email on their employee record).</div>
+          <div class="filters" style="border:none;box-shadow:none;padding:0;background:none;margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input id="sr-q" placeholder="Search name / code / email" autocomplete="off" style="min-width:200px">
+            <select id="sr-fd"></select>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap;margin:0"><input type="checkbox" id="sr-sel-only" style="width:auto;min-width:0;margin:0"> Selected only</label>
+            <span class="mut" style="font-size:11.5px">Set everyone shown:</span>
+            <button class="btn" type="button" data-srall="OWN">Own report</button>
+            <button class="btn" type="button" data-srall="FULL">Full report</button>
+            <button class="btn" type="button" data-srall="">None</button>
+            <span id="sr-count" class="mut" style="font-size:11.5px"></span>
+          </div>
+          <div style="max-height:340px;overflow:auto;border:1px solid var(--border);border-radius:8px">
+            <table><thead><tr><th style="width:150px">Send</th><th>Employee</th><th>Department</th><th>Email for reports</th></tr></thead>
+              <tbody id="sr-emps"></tbody></table>
+          </div>
+          <div style="margin-top:10px"><label>Additional emails <span class="mut" style="font-weight:400">(get the full report — separate with commas or new lines)</span></label>
+            <textarea id="sr-extra" rows="2" style="width:100%" placeholder="hr@company.com, director@company.com"></textarea></div>
+
+          <!-- 30-Sep-2026 (Ejaz): the report snapshot (image) on WhatsApp -->
+          <div style="font-weight:700;margin:16px 0 4px">WhatsApp</div>
+          <div class="fbool"><input type="checkbox" id="sr-wa"> <span>Also send the report <b>snapshot (image)</b> to WhatsApp</span></div>
+          <div id="sr-wa-box" style="display:none;padding:4px 0 0 26px">
+            <div class="fbool"><input type="checkbox" id="sr-wa-admins"> <span>Company Admin(s) <span id="sr-wa-adm" class="mut" style="font-weight:400"></span></span></div>
+            <label style="margin-top:8px">WhatsApp numbers <span class="mut" style="font-weight:400">(comma or new line; a 10-digit number gets +91)</span></label>
+            <textarea id="sr-wa-nums" rows="2" style="width:100%" placeholder="+91 98765 43210, 9123456789"></textarea>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
+              <button class="btn" type="button" id="sr-wa-preview">Preview image</button>
+              <span id="sr-wa-state" class="mut" style="font-size:11.5px"></span>
+            </div>
+            <img id="sr-wa-img" alt="" style="display:none;max-width:540px;width:100%;margin-top:8px;border:1px solid var(--border);border-radius:8px">
+          </div>
+
+          <div style="font-weight:700;margin:16px 0 4px">Options</div>
+          <div class="fbool"><input type="checkbox" id="sr-skip-empty" checked> Don't email anyone who has no activity in the period</div>
+          <div class="fbool"><input type="checkbox" id="sr-skip-hol" checked> Skip daily reports for company holidays</div>
+          <div class="fbool"><input type="checkbox" id="sr-excel" checked> Attach the report as Excel (same columns as Reports &amp; Exports)</div>
+          <div class="fgrid" style="margin-top:8px">
+            <div class="full"><label>Subject <span class="mut" style="font-weight:400">(optional — blank = built-in; placeholders below work here too)</span></label><input id="sr-subject" maxlength="200"></div>
+            <div class="full"><label>Message on top of every email <span class="mut" style="font-weight:400">(optional — placeholders are filled in for each person when it is sent)</span></label><textarea id="sr-msg" rows="3" maxlength="2000" style="width:100%" placeholder="Hi <Employee Full Name>,&#10;Here is your day's Productivity Report for <date>."></textarea>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px;font-size:11.5px"><span class="mut">Insert:</span>
+                <button class="btn" type="button" data-srins="<Employee Full Name>" title="The recipient's full name (Team for additional emails)">Employee full name</button>
+                <button class="btn" type="button" data-srins="<First Name>">First name</button>
+                <button class="btn" type="button" data-srins="<date>" title="The report date — or the range, for weekly/monthly">Report date</button>
+                <button class="btn" type="button" data-srins="<Company Name>">Company</button>
+                <span class="mut">— click a field (Subject or Message) first; also works typed as {name} {date} {company}</span></div></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap">
+            <button class="btn solid" id="sr-save">Save schedule</button>
+            <button class="btn" id="sr-cancel" type="button">Cancel</button>
+            <button class="btn solid" id="sr-test" type="button" title="Sends the full report and one sample employee report to your own email">Save &amp; send a test to me</button>
+            <span id="sr-msg-out" class="mut" style="font-size:12px"></span>
+          </div>
+        </div>
+      </div>
+      <!-- 30-Sep-2026 (Ejaz): WhatsApp connection (Meta WhatsApp Business Platform) — one per company -->
+      <div class="card" id="sr-wa-card">
+        <h3>WhatsApp connection <span class="hint">Meta's official WhatsApp Business Platform — used by schedules that tick "send to WhatsApp"</span>
+          <span id="wa-badge" class="tag t-off" style="float:right">Not set up</span></h3>
+        <div class="fgrid">
+          <div><label>Phone number ID</label><input id="wa-pnid" placeholder="e.g. 109876543210987" autocomplete="off"></div>
+          <div><label>Access token</label><input id="wa-token" type="password" placeholder="permanent (System User) token" autocomplete="new-password"></div>
+          <div><label>Template name</label><input id="wa-tpl" placeholder="smartept_daily_report"></div>
+          <div><label>Template language</label><input id="wa-lang" placeholder="en"></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap">
+          <button class="btn solid" id="wa-save">Save connection</button>
+          <button class="btn danger" id="wa-off" type="button">Disconnect</button>
+          <span style="width:16px"></span>
+          <input id="wa-test-to" placeholder="Test number e.g. 98765 43210" style="max-width:220px">
+          <button class="btn solid" id="wa-test" type="button">Send test snapshot</button>
+          <span id="wa-msg" class="mut" style="font-size:12px"></span>
+        </div>
+        <details style="margin-top:12px;font-size:12px"><summary style="cursor:pointer;font-weight:700">How to set it up (one time, in Meta)</summary>
+          <ol style="margin:8px 0 0 18px;line-height:1.7">
+            <li>In <b>Meta Business Suite</b> → WhatsApp Manager, add a phone number that is <b>not</b> on the WhatsApp app, and complete business verification.</li>
+            <li>Create a message template — Name <code>smartept_daily_report</code>, Category <b>Utility</b>, Language <b>English</b>, Header <b>Image</b>, Body:<br>
+              <code style="display:inline-block;margin:4px 0;padding:6px 8px;background:var(--card-2);border-radius:6px;white-space:pre-wrap">Productivity report for @{{1}}
+@{{2}}
+The full report with every employee is in your email.</code><br>Submit it and wait for <b>Approved</b> (usually minutes to a day).</li>
+            <li>Copy the <b>Phone number ID</b> (WhatsApp Manager → API setup) and create a <b>permanent access token</b> (Business Settings → System users → Generate token, with whatsapp_business_messaging).</li>
+            <li>Paste both here, Save, then <b>Send test snapshot</b> to your own number.</li>
+          </ol>
+          <div class="mut" style="margin-top:6px">Meta charges per delivered message (Utility category). The first message to a number that has never written to your business must be a template — which is what this uses.</div>
+        </details>
+      </div>
+    </div>
+
     <div class="view" id="v-reports">
       <div class="card">
         <h3>Live productivity — all employees <span class="hint">day-wise · today updates live · click a column to sort</span></h3>
@@ -1100,6 +1282,17 @@
           <button class="btn" id="pr-csv">⇓ CSV</button>
           <button class="btn" id="pr-pdf">⇓ PDF</button>
         </div>
+        <div class="org-filter" id="pr-org" style="margin-bottom:12px">
+          <span class="of-l">Filter</span>
+          <select id="prf-company" disabled></select>
+          <select id="prf-branch"><option value="">All branches</option></select>
+          <select id="prf-dept"><option value="">All departments</option></select>
+          <select id="prf-team"><option value="">All teams</option></select>
+          <select id="prf-emp"><option value="">All employees</option></select>
+          <button class="btn" id="prf-reset" type="button">Reset</button>
+          <span class="of-scope" id="prf-scope"></span>
+        </div>
+        <div id="pr-overview"></div>
         <div style="overflow-x:auto">
         <table id="pr-table"><thead><tr>
           <th>Date</th><th>Code</th><th>Employee</th><th>Dept</th><th title="Reporting Manager">Manager</th>
@@ -1107,17 +1300,17 @@
           <th title="Actual Present Hrs (Logged out - Logged in)">Actual Present</th>
           <th title="Working (hh:mm)">Working</th><th title="Idle (hh:mm)">Idle</th>
           <th title="Number of Breaks">Breaks</th><th title="Break time Availed (hh:mm)">Break Availed</th>
-          <th title="Allotted break (hh:mm)">Allotted</th><th title="Meeting Time">Meeting</th>
+          <th title="The shift's Break allowed — pro rata only on a late login / early logout (hover a cell for the working)">Allotted</th><th title="Meeting Time">Meeting Time</th>
           <th title="Break Exceed Mins (Break Time - Allotted Time)">Break Exceed</th>
           <th title="Productive Hrs (Working + Meeting)">Productive</th>
-          <th title="Non Productive Hrs (Idle + Break Exceed)">Non-Prod.</th>
+          <th title="Non Productive Hrs (Idle + Break Exceed + Away)">Non-Prod.</th>
           <th title="Net Hrs (Actual Logged Hours - Allotted Break)">Net Hrs</th>
-          <th>Time-outs</th><th>Violations</th>
+          <th>Time-outs</th>
           <th title="Productive% [ Productive Hrs / Net Hrs ]">Prod. %</th>
           <th title="Minutes past the shift start time, from the attendance sheet">Late (min)</th>
-          <th title="Actual Present − (Working + Idle + Break). Positive = signed-in time nothing was recorded for; negative = overlapping records double-counting the same minutes">Unaccounted</th>
+          <th title="Away = punched out without a break and punched back in, or signed out of the app and signed back in (non-productive)">Away</th>
           <th title="Why this row's Actual Present is not simply sign-out − sign-in">Data Issue</th>
-        </tr></thead><tbody id="pr-rows"><tr><td colspan="26" class="mut">Pick a range and press Show.</td></tr></tbody></table>
+        </tr></thead><tbody id="pr-rows"><tr><td colspan="25" class="mut">Pick a range and press Show.</td></tr></tbody></table>
         </div>
         <div class="mut" id="pr-note" style="margin-top:8px"></div>
       </div>
@@ -1895,6 +2088,14 @@
     <div class="tab" data-tab="policy" title="Why each monitored capability is on/off for this employee">Policy</div>
   </div>
   <div id="d-body"></div>
+  <div class="dchat" id="d-chat">
+    <div class="dchat-h" id="d-chat-grip" title="Drag up or down to resize the chat"><span id="d-chat-title">Chat</span><span class="mut" id="d-chat-st"></span></div>
+    <div class="dchat-list" id="d-chat-list"></div>
+    <form class="dchat-f" id="d-chat-f" autocomplete="off">
+      <input id="d-chat-in" maxlength="2000" placeholder="Type a message to this employee…">
+      <button class="btn solid" type="submit">Send</button>
+    </form>
+  </div>
 </div>
 
 <!-- HELP MODAL -->
@@ -2174,7 +2375,7 @@ document.addEventListener('mouseover', (e) => {
       && !th.closest('table').classList.contains('nosort')) th.classList.add('sortable-h');
 }, { once: false });
 // Lightweight non-blocking toast (17-Jul) — used by org/import/cleanup actions.
-function toast(msg) {
+function toast(msg, onClick, ms) { // 30-Sep-2026: optional click action + duration (chat replies)
   let el = document.getElementById('_toast');
   if (!el) {
     el = document.createElement('div');
@@ -2185,9 +2386,11 @@ function toast(msg) {
     document.body.appendChild(el);
   }
   el.textContent = msg;
+  el.onclick = onClick ? () => { el.style.opacity = '0'; onClick(); } : null;
+  el.style.cursor = onClick ? 'pointer' : '';
   requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'none'; });
   clearTimeout(el._t);
-  el._t = setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateY(8px)'; }, 3000);
+  el._t = setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateY(8px)'; }, ms || 3000);
 }
 
 async function api(path, opts = {}) {
@@ -2298,6 +2501,9 @@ function enterApp() {
   var hn = document.getElementById('nav-tenants'); if (hn) hn.style.display = isHost ? '' : 'none';
   var hg = document.getElementById('navgrp-host'); if (hg) hg.style.display = isHost ? '' : 'none';
   show('dashboard');
+  // 28-Sep-2026: bring LiveView screens (and so the open Live Wall) back on refresh even though
+  // the page lands on Dashboard — waiting for a click on LiveView left the wall empty.
+  if (hasPlanFeature('live_view') && can('liveview.start')) lvRestoreScreens();
   // Temp-password logins must set their own password before doing anything else.
   if (ME.must_change_password) openForcedPwd();
 }
@@ -2430,6 +2636,7 @@ const CARDS_DOM = {
   'ops.storage_quota':'#quota-card','ops.mail_smtp':'#mail-card','ops.notifications':'#notify-card',
   'biometric.bio_setup':'#bd-prefix','biometric.bio_punch_log':'#bio-rows','biometric.bio_mismatch':'#bio-mm-rows','biometric.bio_import':'Import punches','biometric.bio_map':'Map biometric',
   'reports.rep_productivity':'#ms-rows','reports.rep_breaks':'#br-rows','reports.rep_meetings':'#mr-rows',
+  'schedrep.report_schedules':'#sr-card', // 30-Sep-2026
   'license.lic_status':'Licence status','license.lic_key':'Licence key','license.lic_offline':'Offline licence file',
   'integrations.api_keys':'#key-add','integrations.outbound_targets':'#tgt-add','integrations.integration_guide':'Integration guide',
   'ops.cleanup_schedule':'Automatic cleanup schedule','ops.local_storage':'Local / On-premise storage','ops.cloud_storage':'Cloud Storage (Google Cloud)','ops.audit_trail':'#au-rows',
@@ -2450,6 +2657,10 @@ function applyCardAccessCss() {
 }
 function applyCardAccess() {
   if (!ME || !Array.isArray(ME.permissions)) return;
+  // 28-Sep-2026: mirror the server (CardAccess::decide — admins are never restricted). Without
+  // this, any card.* tick on the admin role hid every unticked card: blank Dashboard/Attendance/
+  // Screenshots/Employees under only their filter bars.
+  if (ME.role === 'SUPER_ADMIN' || ME.role === 'COMPANY_ADMIN') return;
   const cardPerms = ME.permissions.filter((s) => s.indexOf('card.') === 0);
   if (!cardPerms.length) return;
   applyCardAccessCss();
@@ -2523,11 +2734,14 @@ function can(perm) {
 // ME.plan_tier is null on a licence issued before this feature existed; treat
 // that as "don't restrict" so no pre-existing install loses anything.
 function hasPlanFeature(key) {
+  // 30-Sep-2026: prefer the server's own verdict (a Standard trial no longer gets everything).
+  if (ME && ME.plan_access && key in ME.plan_access) return !!ME.plan_access[key];
   return !ME || !ME.plan_tier || !!(ME.plan_features && ME.plan_features[key]);
 }
 function applyPlanNav() {
   const nav = document.querySelector('.nav[data-view="liveview"]');
   if (nav) nav.style.display = hasPlanFeature('live_view') ? '' : 'none';
+  if (window.applyEndSecNav) window.applyEndSecNav(); // 03-Oct-2026: Endpoint Security nav (server decides)
 }
 // 18-Sep-2026: ME (and its plan_tier/plan_features) is only set at login — a
 // plan change in Central updates the licence row, but an already-open Admin
@@ -2552,7 +2766,7 @@ function applyPermissionNav() {
   }
   const NAVP = {
     dashboard: 'dashboard.view', screenshots: 'screenshot.view', webcam: 'webcam.view', usage: 'activity.view',
-    attendance: 'attendance.view', violations: 'dashboard.view', reports: 'export.data',
+    attendance: 'attendance.view', violations: 'dashboard.view', reports: 'export.data', schedrep: 'export.data',
     policies: 'policy.view', ops: 'audit.view',
     // QA Phase 4 (B5): the Meetings screen is gated on meeting.view.
     meetings: 'meeting.view',
@@ -2631,7 +2845,7 @@ $('#fp-reset').onclick = async () => {
 };
 $('#signout').onclick = async () => {
   try { await api('/auth/logout', { method: 'POST' }); } catch (e) { /* token may already be dead */ }
-  TOKEN = null; ME = null; sessionStorage.removeItem('ept_token');
+  TOKEN = null; ME = null; sessionStorage.removeItem('ept_token'); sessionStorage.removeItem('ept_lv_screens');
   clearInterval(poll); $('#app').classList.add('hide'); $('#login').classList.remove('hide');
 };
 // Per-client branding: on a /<slug> URL, show the client's name on the login card.
@@ -2696,8 +2910,10 @@ const TITLES = {
   liveview: ['LiveView', 'Watch an employee\'s screen, live'],
   policies: ['Policies', 'The control room — what is tracked, for whom'],
   rules: ['App & Web Rules', 'Track, allow, block or flag apps & websites — company-wide'],
+  endsec: ['Endpoint Security', 'Microsoft Defender status, threats, scans & security compliance'],
   biometric: ['Biometric', 'Cloud punch sync, mapping & reconciliation'],
   reports: ['Reports & Exports', 'CSV exports for Excel and payroll'],
+  schedrep: ['Schedule Report', 'Email the Productivity report automatically — to each employee and to managers'],
   license: ['Licence', 'Key, plan, device seats & daily validation'],
   integrations: ['API & Integrations', 'Connect SmartEPT to SmartPRS & any external device or app'],
   gateexcl: ['Gate Exclusions', 'Who may sign in without a door punch — and until when'],
@@ -2735,6 +2951,8 @@ function show(v) {
   if (v === 'biometric') initBiometric();
   if (v === 'gateexcl') initGateExcl();
   if (v === 'reports') initReports();
+  if (v === 'schedrep') initSchedRep();
+  if (v === 'endsec') window.initEndSec();
   if (v === 'license') loadLicense();
   if (v === 'integrations') initIntegrations();
   if (v === 'ops') loadOps();
@@ -2765,6 +2983,8 @@ function refreshView() {
   else if (v === 'rules') { initRules(); initEnforcement(); }
   else if (v === 'biometric') initBiometric();
   else if (v === 'reports') initReports();
+  else if (v === 'schedrep') loadSchedRep();
+  else if (v === 'endsec') window.initEndSec();
   else if (v === 'license') loadLicense();
   else if (v === 'integrations') initIntegrations();
   else if (v === 'ops') loadOps();
@@ -3025,6 +3245,8 @@ function renderLiveRows() {
   // Stable within each group, so the server's ordering is otherwise preserved.
   const ordered = list.slice().sort((a, b) =>
     ((a.work_status === 'OFFLINE') ? 1 : 0) - ((b.work_status === 'OFFLINE') ? 1 : 0));
+  // 29-Sep-2026 (Ejaz): an eye beside each employee opens LiveView on them directly; greyed out when offline.
+  const lvOk = hasPlanFeature('live_view') && can('liveview.start');
   $('#live-rows').innerHTML = ordered.map((e) => {
     const ws = e.work_status || 'OFFLINE';
     const cls = WORK_TAG[ws] || 't-off';
@@ -3035,7 +3257,11 @@ function renderLiveRows() {
       ? ' <span class="mut" style="font-size:11px">since ' + t(e.break_started_at) + ' · ' + secH(e.elapsed) + '</span>'
       : '';
     return '<tr class="clk" data-id="' + e.employee_id + '" data-name="' + esc(e.name) + '">'
-      + '<td><span class="nm">' + esc(e.name) + '</span></td><td>' + esc(e.team || '—') + '</td>'
+      + '<td><span class="nm">' + esc(e.name) + '</span>'
+      + (!lvOk ? '' : ws === 'OFFLINE'
+        ? ' <button class="lv-eye" disabled title="Offline — LiveView needs the agent running">' + LV_ICON_EYE_CLOSED + '</button>'
+        : ' <button class="lv-eye" data-lv="' + e.employee_id + '" title="Open LiveView for ' + esc(e.name) + '">' + LV_ICON_EYE + '</button>')
+      + '</td><td>' + esc(e.team || '—') + '</td>'
       + '<td><span class="tag ' + cls + '">' + esc(lbl) + '</span>' + extra + '</td>'
       + '<td>' + secH(e.active_seconds) + '</td><td>' + secH(e.idle_seconds) + '</td>'
       // Offline: show DATE + time (they may have last been seen on an earlier day). Online: time only.
@@ -3122,9 +3348,22 @@ async function loadDashboard() {
   }
 }
 $('#live-rows').addEventListener('click', (e) => {
+  const eye = e.target.closest('.lv-eye');
+  if (eye) { if (eye.disabled) return; dashOpenLiveView(Number(eye.dataset.lv), eye.closest('tr').dataset.name); return; }
   const tr = e.target.closest('tr[data-id]');
   if (tr) openEmployee(Number(tr.dataset.id), tr.dataset.name);
 });
+// 29-Sep-2026: eye on the live table → LiveView screen with this employee's Desktop 1 started.
+// 30-Sep-2026 (Ejaz): and straight into that tile's full-screen view. The browser allows
+// full screen only shortly after the click (~5s), so a slow start falls back to a hint.
+async function dashOpenLiveView(id, name) {
+  show('liveview');
+  try { await lvStartOne({ id, label: name }, 0, $('#lv-quality').value || 'low'); lvUpdateStatus(); }
+  catch (err) { $('#lv-status').textContent = name + ': ' + (err.message || 'could not start LiveView'); return; }
+  const tile = [...lvTiles.values()].find((x) => x.empId === id && x.monitorIndex === 0);
+  if (!tile || document.fullscreenElement === tile.el || !tile.el.requestFullscreen) return;
+  tile.el.requestFullscreen().catch(() => toast('Click the full-screen button on ' + name + '\'s tile to enlarge it.'));
+}
 // EPT-23: KPI card drill-down — status cards filter the live table, count cards jump to their screen.
 $('#kpis').addEventListener('click', (ev) => {
   const k = ev.target.closest('.kpi.drill');
@@ -4666,8 +4905,32 @@ $('#dev-rows').addEventListener('click', async (e) => {
 // so N screens run independently. 21-Sep-2026: licensing is no longer a simultaneous-viewing
 // cap (any number of PERMITTED employees may be watched at once) — see lvLoadPermittedEmployees()
 // and the Manage LiveView Permissions panel (lvOpenPermissions()) for the real, licensed gate.
-let lvBound = false;
+let lvBound = false, lvRestored = false;
 const lvTiles = new Map();
+// 28-Sep-2026: a page refresh wiped every live screen (tiles live only in this page's memory).
+// Remember what is showing in this tab's sessionStorage (same place as the login token, cleared
+// on sign-out) and bring it back on reload.
+function lvSaveScreens() {
+  try {
+    sessionStorage.setItem('ept_lv_screens', JSON.stringify([...lvTiles.values()].map((t) => ({
+      sid: t.sid, empId: t.empId, empLabel: t.empLabel, monitorIndex: t.monitorIndex, quality: t.quality,
+    }))));
+  } catch (e) { /* storage blocked — refresh just won't restore */ }
+}
+async function lvRestoreScreens() {
+  if (lvRestored) return;
+  lvRestored = true;
+  let saved = [];
+  try { saved = JSON.parse(sessionStorage.getItem('ept_lv_screens') || '[]'); } catch (e) {}
+  if (!saved.length) return;
+  $('#lv-status').textContent = 'Restoring ' + saved.length + ' screen(s)…';
+  for (const s of saved) {
+    // The pre-refresh session is orphaned (its viewer is gone) — stop it, then start fresh.
+    try { await api('/liveview/session/' + s.sid + '/stop', { method: 'POST' }); } catch (e) {}
+    try { await lvStartOne({ id: s.empId, label: s.empLabel }, s.monitorIndex, s.quality); } catch (e) {}
+  }
+  lvUpdateStatus();
+}
 // Show All (15-Sep-2026): a separate pop-up window that mirrors every currently-live tile
 // into a CCTV-style wall, sized to fill whatever window it's in. It does NOT open a second
 // relay connection per screen — it just blits the frame already decoded onto each tile's own
@@ -4678,6 +4941,21 @@ const lvWallMirrors = new Map();
 // Maximize / minimize (lucide-style, stroke=currentColor so it matches the button's own text color).
 const LV_ICON_EXPAND = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/></svg>';
 const LV_ICON_COMPRESS = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/></svg>';
+// 30-Sep-2026 (Ejaz): animated wide-open eye with a winged eyeliner (opens, glances, blinks; CSS .lv-eye).
+const LV_ICON_EYE = '<svg class="eye-svg" width="27" height="18" viewBox="0 0 30 20" aria-hidden="true"><g class="eye-lid">'
+  + '<path d="M2 10.5Q15-2.5 28 10Q15 22 2 10.5Z" fill="#fff"/>'
+  + '<g class="eye-iris"><circle cx="15" cy="10" r="5.2" fill="#0E7C8F"/><circle cx="15" cy="10" r="2.6" fill="#0B1F33"/><circle cx="16.6" cy="8.4" r="1.1" fill="#fff"/></g>'
+  + '<path d="M1.6 10.6Q15-2.5 27.6 9.4" fill="none" stroke="#0B1F33" stroke-width="2.4" stroke-linecap="round"/>'
+  + '<path d="M24.6 7.4Q27.9 6.4 29.9 3.4Q29.2 7.4 27.9 9.9Z" fill="#0B1F33"/>'
+  + '<path d="M4.5 12.4Q15 19.6 25.5 12.2" fill="none" stroke="#0B1F33" stroke-width=".9" stroke-linecap="round" opacity=".6"/>'
+  + '</g></svg>';
+// 30-Sep-2026 (Ejaz): offline employees get a closed eye — lined lid with lashes, grey via .lv-eye:disabled.
+const LV_ICON_EYE_CLOSED = '<svg class="eye-svg" width="27" height="18" viewBox="0 0 30 20" aria-hidden="true">'
+  + '<path d="M1.8 8.6Q15 18 27.8 8.4" fill="none" stroke="#0B1F33" stroke-width="2.4" stroke-linecap="round"/>'
+  + '<path d="M26.4 9.4Q28.6 8 29.9 5.4Q29.8 8.6 28.2 10.6Z" fill="#0B1F33"/>'
+  + '<path d="M7 13.4L5.4 16.4M11 15.2L10.2 18.4M15 15.8V19M19 15.2L19.8 18.4M23 13.4L24.6 16.4" stroke="#0B1F33" stroke-width="1.4" stroke-linecap="round"/>'
+  + '</svg>';
+const LV_ICON_CHAT = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.6 8.6 0 0 1-3.9-.9L3 21l1.9-5.6a8.4 8.4 0 0 1-.9-3.9A8.5 8.5 0 0 1 12.5 3 8.4 8.4 0 0 1 21 11.5z"/></svg>';
 const LV_ICON_CAMERA = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
 // Instant screenshot (15-Sep-2026): grabs whatever's already painted on a live tile's own
 // <canvas> — no server round trip, no new endpoint, no persistence — and downloads it as a
@@ -4715,6 +4993,7 @@ function initLiveView() {
   $('#lv-manage-perm').style.display = can('liveview.start') ? '' : 'none';
   $('#lv-quality-high').disabled = !can('liveview.high_quality');
   lvLoadPermittedEmployees();
+  if (can('liveview.start')) lvRestoreScreens();
   if (lvBound) return;
   lvBound = true;
   $('#lv-start').onclick = lvStart;
@@ -4869,6 +5148,7 @@ function lvAddTile(sid, empId, empLabel, monitorIndex, quality, relayUrl, viewTo
     + '<span class="lv-tile-name" title="' + esc(empLabel) + ' (#' + empId + ')">' + esc(empLabel) + ' <span class="lv-tile-id">(#' + empId + ')</span></span>'
     + '<select class="lv-tile-desktop-sel"></select></div>'
     + '<div class="lv-tile-actions">'
+    + '<button class="btn lv-fs-btn" data-act="chat" title="Chat with this employee (full screen)">' + LV_ICON_CHAT + '</button>'
     + '<button class="btn lv-fs-btn" data-act="cap" title="Take screenshot">' + LV_ICON_CAMERA + '</button>'
     + '<button class="btn lv-fs-btn" data-act="fs" title="Full screen">' + LV_ICON_EXPAND + '</button>'
     + '<button class="x" data-act="stop" title="Stop">&#10005;</button>'
@@ -4890,6 +5170,8 @@ function lvAddTile(sid, empId, empLabel, monitorIndex, quality, relayUrl, viewTo
   lvFillDesktopSelect(tile, monitorIndex);
   tile.desktopSel.onchange = () => lvSwitchDesktop(tile, parseInt(tile.desktopSel.value, 10));
   el.querySelector('[data-act="stop"]').onclick = () => lvStop(tile.sid);
+  el.querySelector('[data-act="chat"]').onclick = () => lvChatFocus(tile, document);
+  el.querySelector('[data-act="chat"]').dataset.emp = empId; // 30-Sep-2026: unread badge target
   el.querySelector('[data-act="cap"]').onclick = () => lvCapture(tile.canvas, tile.empLabel + '_Desktop' + (tile.monitorIndex + 1));
   el.querySelector('[data-act="fs"]').onclick = () => {
     if (document.fullscreenElement === el) { document.exitFullscreen && document.exitFullscreen().catch(() => {}); }
@@ -4952,6 +5234,13 @@ function lvConnect(tile, relayUrl, viewToken) {
     img.onload = () => {
       if (tile.canvas.width !== img.width || tile.canvas.height !== img.height) { tile.canvas.width = img.width; tile.canvas.height = img.height; }
       tile.ctx.drawImage(img, 0, 0);
+      if (lvFocus && lvFocus.tile === tile) lvFocusPaint(img);
+      // Paint the Live Wall copy on the SAME frame (was a 150ms poll = max ~6 fps on the wall).
+      const m = lvWallMirrors.get(tile.sid);
+      if (m && lvWallWin && !lvWallWin.closed) {
+        if (m.canvas.width !== img.width || m.canvas.height !== img.height) { m.canvas.width = img.width; m.canvas.height = img.height; }
+        m.ctx.drawImage(img, 0, 0);
+      }
       URL.revokeObjectURL(url);
       tile.canvas.style.display = 'block';
       tile.frames++;
@@ -4977,14 +5266,35 @@ async function lvStop(sid) {
 // while it's open (lvWallSync is called from lvAddTile/lvStop/lvSwitchDesktop above).
 function lvOpenWall() {
   if (lvWallWin && !lvWallWin.closed) { lvWallWin.focus(); lvWallSync(); return; }
-  lvWallWin = window.open('', 'smartept-liveview-wall', 'width=1280,height=800');
-  if (!lvWallWin) { $('#lv-status').textContent = 'Could not open the Live Wall window — check your browser\'s pop-up blocker.'; return; }
+  const win = window.open('', 'smartept-liveview-wall', 'width=1280,height=800');
+  if (!win) { $('#lv-status').textContent = 'Could not open the Live Wall window — check your browser\'s pop-up blocker.'; return; }
+  lvWallSetup(win);
+}
+// 28-Sep-2026: after the admin page refreshes, the open wall window re-attaches itself.
+// The wall asks its opener every 1.5s "are you driving me?"; a freshly reloaded admin page
+// says no, so the wall hands itself over and is rebuilt here. The poller is created in the
+// WALL's own realm (win.Function) so it survives the admin page's reload.
+function lvWallAdopt(win) {
+  if (lvWallWin && !lvWallWin.closed) return;
+  lvWallSetup(win);
+}
+function lvWallAttached() { return !!(lvWallWin && !lvWallWin.closed); }
+function lvWallSetup(win) {
+  lvWallWin = win;
   lvWallWin.document.title = 'SmartEPT LiveView — Live Wall';
   lvWallWin.document.head.innerHTML = '<meta charset="utf-8">'
     + '<style>'
     + 'html,body{margin:0;height:100%;background:#0b0e13;overflow:hidden;font-family:system-ui,sans-serif}'
-    + '#lv-wall{display:grid;width:100vw;height:100vh;gap:3px;background:#000}'
-    + '.lv-wtile{position:relative;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center}'
+    // 28-Sep-2026: top bar with Refresh on the right; the wall fills the rest.
+    + '#lv-wbar{height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 10px;'
+    + 'background:#0f2a33;color:#e6e9ee;font-size:13px;font-weight:600;box-sizing:border-box}'
+    + '#lv-wrefresh{height:26px;padding:0 12px;border:1px solid #2bb3c0;border-radius:6px;display:flex;align-items:center;gap:6px;'
+    + 'color:#e6e9ee;background:transparent;font:600 12px system-ui,sans-serif;cursor:pointer}#lv-wrefresh:hover{background:#2bb3c0;color:#051418}'
+    // 28-Sep-2026: every screen gets a clear frame — padded grid, bordered rounded tile.
+    + '#lv-wall{display:grid;width:100vw;height:calc(100vh - 34px);gap:8px;padding:8px;box-sizing:border-box;background:#0b0e13}'
+    + '.lv-wtile{position:relative;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center;'
+    + 'border:2px solid #2f5260;border-radius:8px;box-shadow:0 0 0 1px #000,0 2px 10px rgba(0,0,0,.5);min-width:0;min-height:0}'
+    + '.lv-wtile:hover{border-color:#2bb3c0}'
     + '.lv-wtile canvas{max-width:100%;max-height:100%}'
     + '.lv-wtile .lv-wlbl{position:absolute;left:8px;bottom:7px;color:#e6e9ee;font-size:12px;font-weight:600;'
     + 'background:rgba(5,20,24,.6);padding:3px 9px;border-radius:6px;pointer-events:none;backdrop-filter:blur(2px)}'
@@ -4992,19 +5302,38 @@ function lvOpenWall() {
     // and requestFullscreen()/exitFullscreen() pattern the main LiveView grid's tile
     // header button already uses, just surfaced on hover here instead of always-on,
     // since a wall tile has no header bar to put a persistent button in.
-    + '.lv-wtile .lv-wfs,.lv-wtile .lv-wcap{position:absolute;top:7px;width:28px;height:28px;border:none;border-radius:6px;'
-    + 'display:flex;align-items:center;justify-content:center;color:#e6e9ee;background:rgba(5,20,24,.65);'
-    + 'cursor:pointer;opacity:0;transition:opacity .15s;backdrop-filter:blur(2px)}'
-    + '.lv-wtile .lv-wfs{right:7px}'
-    + '.lv-wtile .lv-wcap{right:41px}'
-    + '.lv-wtile:hover .lv-wfs,.lv-wtile:hover .lv-wcap{opacity:1}'
-    + '.lv-wtile .lv-wfs:hover,.lv-wtile .lv-wcap:hover{background:rgba(5,20,24,.9)}'
+    // 29-Sep-2026 (Ejaz): always visible (were hidden until hover), solid brand colour, bigger icons.
+    + '.lv-wtile .lv-wfs,.lv-wtile .lv-wcap,.lv-wtile .lv-wchat{position:absolute;top:8px;width:34px;height:34px;border:1.5px solid rgba(255,255,255,.85);border-radius:8px;'
+    + 'display:flex;align-items:center;justify-content:center;color:#fff;background:#0E7C8F;'
+    + 'cursor:pointer;opacity:1;box-shadow:0 2px 6px rgba(0,0,0,.45)}'
+    + '.lv-wtile .lv-wfs svg,.lv-wtile .lv-wcap svg,.lv-wtile .lv-wchat svg{width:18px;height:18px}'
+    + '.lv-wtile .lv-wfs{right:8px}'
+    + '.lv-wtile .lv-wcap{right:48px}.lv-wtile .lv-wchat{right:88px}'
+    + '.lv-wtile .lv-wfs:hover,.lv-wtile .lv-wcap:hover,.lv-wtile .lv-wchat:hover{background:#0A6273}'
     // Drag & drop (26-Sep-2026): grab any tile, drop it on another — the two swap places.
     + '.lv-wtile{cursor:grab}.lv-wtile.lv-wdrag{opacity:.4}'
     + '.lv-wtile.lv-wover{outline:3px dashed #2bb3c0;outline-offset:-3px}'
     + '#lv-wempty{color:#8b95a3;font-size:14px;display:flex;align-items:center;justify-content:center;height:100vh}'
     + '</style>';
-  lvWallWin.document.body.innerHTML = '<div id="lv-wall"></div>';
+  lvWallWin.document.body.innerHTML = '<div id="lv-wbar"><span>SmartEPT LiveView — Live Wall</span>'
+    + '<button id="lv-wrefresh" title="Rebuild the wall from the screens live right now">'
+    + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>Refresh</button></div>'
+    + '<div id="lv-wall"></div>';
+  // Browser F5 would blank this window (its content is written from the admin page), so
+  // Refresh = drop every mirror and rebuild from the screens live right now.
+  // Refresh = really reload: restart every live stream (fresh session per screen, same
+  // employee/desktop/quality), then rebuild the wall from the new ones.
+  lvWallWin.document.getElementById('lv-wrefresh').onclick = lvWallReload;
+  // Re-attach after the admin page reloads. The poller MUST be created inside the wall's own
+  // document (an injected <script>): a timer the admin page creates dies with the admin page's
+  // document, which is why the 28-Sep first attempt (win.setInterval from here) never fired.
+  // Verified in headless Chromium across repeated opener reloads.
+  if (!win.__lvAdopt) {
+    const sc = win.document.createElement('script');
+    sc.textContent = 'window.__lvAdopt = setInterval(function () { try { var o = window.opener;'
+      + ' if (o && !o.closed && o.lvWallAttached && !o.lvWallAttached()) o.lvWallAdopt(window); } catch (e) {} }, 1000);';
+    win.document.head.appendChild(sc);
+  }
   lvWallWin.addEventListener('resize', lvWallLayout);
   lvWallWin.addEventListener('beforeunload', () => {
     if (lvWallTimer) { clearInterval(lvWallTimer); lvWallTimer = null; }
@@ -5020,7 +5349,7 @@ function lvOpenWall() {
       m.fsBtn.title = isFs ? 'Exit full screen' : 'Full screen';
     });
   });
-  lvWallTimer = setInterval(lvWallRender, 150);
+  lvWallTimer = setInterval(lvWallRender, 1000); // catch-up only (new tiles); live frames paint in lvConnect
   lvWallSync();
 }
 // Recomputes the grid so it stays "adjusted" to whatever shape the wall window is —
@@ -5030,7 +5359,7 @@ function lvWallLayout() {
   const grid = lvWallWin.document.getElementById('lv-wall');
   const n = lvTiles.size;
   if (!grid || !n) return;
-  const w = lvWallWin.innerWidth || 1280, h = lvWallWin.innerHeight || 800;
+  const w = lvWallWin.innerWidth || 1280, h = (lvWallWin.innerHeight || 800) - 34; // minus #lv-wbar
   const cols = Math.max(1, Math.min(n, Math.ceil(Math.sqrt(n * (w / h)))));
   const rows = Math.ceil(n / cols);
   grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
@@ -5039,6 +5368,7 @@ function lvWallLayout() {
 // Adds/removes wall tiles to match lvTiles exactly, then relayouts. Safe to call any time —
 // a no-op if the wall isn't open.
 function lvWallSync() {
+  lvSaveScreens(); // every tile add/stop/desktop-switch already routes through here
   if (!lvWallWin || lvWallWin.closed) return;
   const grid = lvWallWin.document.getElementById('lv-wall');
   if (!grid) return;
@@ -5092,6 +5422,13 @@ function lvWallSync() {
     wrap.appendChild(lbl);
     wrap.appendChild(fsBtn);
     wrap.appendChild(capBtn);
+    const chatBtn = lvWallWin.document.createElement('button');
+    chatBtn.className = 'lv-wchat';
+    chatBtn.title = 'Chat with this employee (full screen)';
+    chatBtn.innerHTML = LV_ICON_CHAT;
+    chatBtn.onclick = (e) => { e.stopPropagation(); lvChatFocus(tile, lvWallWin.document); };
+    chatBtn.dataset.emp = tile.empId; // 30-Sep-2026: unread badge target
+    wrap.appendChild(chatBtn);
     // Drag & drop swap (26-Sep-2026): the two tiles trade DOM positions, so the grid (and
     // each canvas's already-painted frame) just reflows — no re-render, no stream restart.
     // New screens are appended at the end, so an arrangement survives screens starting/stopping.
@@ -5119,6 +5456,123 @@ function lvWallSync() {
 // canvas onto its mirror in the wall window. No second WebSocket/relay connection per
 // screen and no re-decoding JPEGs — just a cheap canvas-to-canvas blit of a frame that's
 // already been received and painted once.
+// ---- 28-Sep-2026: Chat focus — one employee full screen: 80% live screen, 20% chat (WhatsApp-style) ----
+// Opens in whichever window the chat icon was clicked (LiveView page or Live Wall). The live
+// frame is painted from lvConnect on every frame; the chat uses the same /api/chat endpoints as
+// the employee drawer, and the agent pops its chat window to reply.
+let lvFocus = null;
+function lvFocusPaint(img) {
+  const c = lvFocus.canvas;
+  if (c.width !== img.width || c.height !== img.height) { c.width = img.width; c.height = img.height; }
+  lvFocus.ctx.drawImage(img, 0, 0);
+}
+function lvChatFocusClose() {
+  if (!lvFocus) return;
+  const f = lvFocus; lvFocus = null;
+  clearInterval(f.timer);
+  api('/chat/' + f.tile.empId, { method: 'DELETE' }).catch(() => {}); // 29-Sep-2026: closing ends the conversation
+  try { if (f.doc.fullscreenElement === f.root) f.doc.exitFullscreen().catch(() => {}); } catch (e) {}
+  f.root.remove();
+}
+function lvChatFocus(tile, doc) {
+  lvChatFocusClose();
+  chatNotifyAsk();
+  const root = doc.createElement('div');
+  root.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;background:#05141a;font-family:system-ui,Segoe UI,sans-serif';
+  root.innerHTML =
+    '<div style="flex:0 0 80%;display:flex;flex-direction:column;min-width:0;background:#000">'
+    + '<div style="height:40px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:#0b3440;color:#e6eef0;font-size:13px;font-weight:700">'
+    + '<span data-f="title"></span><span style="font-weight:400;font-size:11px;color:#9fc3cb">Esc or ✕ to close</span></div>'
+    + '<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center"><canvas data-f="cv" style="max-width:100%;max-height:100%"></canvas></div></div>'
+    + '<div style="flex:0 0 20%;display:flex;flex-direction:column;min-width:0;background:#0b1f25;border-left:1px solid #1d3a44">'
+    + '<div style="height:40px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;background:#0f2a33;color:#e6eef0;font-size:13px;font-weight:700">'
+    + '<span data-f="who"></span><button data-f="x" title="Close" style="border:none;background:none;color:#e6eef0;font-size:18px;cursor:pointer">✕</button></div>'
+    + '<div data-f="list" style="flex:1;min-height:0;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:6px;'
+    + 'background:#0b1f25 radial-gradient(circle at 20% 20%,rgba(43,179,192,.06),transparent 60%)"></div>'
+    + '<div data-f="st" style="font-size:11px;color:#f0a7a7;padding:0 10px"></div>'
+    + '<form data-f="form" autocomplete="off" style="display:flex;gap:6px;padding:8px;background:#0f2a33">'
+    + '<input data-f="in" maxlength="2000" placeholder="Type a message" style="flex:1;min-width:0;padding:9px 12px;border-radius:18px;border:1px solid #2f5260;background:#06222A;color:#fff;font-size:13px;outline:none">'
+    + '<button type="submit" title="Send" style="width:38px;height:38px;border:none;border-radius:50%;background:#2bb3c0;color:#051418;font-weight:700;cursor:pointer">➤</button>'
+    + '</form></div>';
+  const q = (k) => root.querySelector('[data-f="' + k + '"]');
+  q('title').textContent = tile.empLabel + ' · Desktop ' + (tile.monitorIndex + 1) + ' · LIVE';
+  q('who').textContent = tile.empLabel;
+  doc.body.appendChild(root);
+  const cv = q('cv');
+  lvFocus = { tile, doc, root, canvas: cv, ctx: cv.getContext('2d'), last: 0, busy: false, timer: null };
+  const f = lvFocus;
+  // Show the frame already on screen right away (the next one follows within 1/fps).
+  if (tile.canvas && tile.canvas.width) { cv.width = tile.canvas.width; cv.height = tile.canvas.height; f.ctx.drawImage(tile.canvas, 0, 0); }
+
+  const list = q('list');
+  const render = (msgs, first) => {
+    if (first) list.innerHTML = '';
+    msgs.forEach((m) => {
+      f.last = Math.max(f.last, m.id);
+      const mine = m.sender === 'ADMIN';
+      const b = doc.createElement('div');
+      b.style.cssText = 'max-width:85%;padding:7px 10px;border-radius:10px;font-size:13px;line-height:1.35;white-space:pre-wrap;word-break:break-word;'
+        + (mine ? 'align-self:flex-end;background:#0E4F5C;color:#fff;border-bottom-right-radius:3px' // 30-Sep: darker so ✓✓ blue reads
+                : 'align-self:flex-start;background:#173f4a;color:#e6eef0;border-bottom-left-radius:3px');
+      b.textContent = m.body;
+      const s = doc.createElement('div');
+      s.style.cssText = 'font-size:10px;opacity:.7;margin-top:3px;text-align:right';
+      s.textContent = (mine ? (m.name || 'Admin') + (m.role ? ' (' + m.role + ')' : '') + ' · ' : '') + t(m.at);
+      if (mine) s.appendChild(chatTickEl(doc, m, true)); // 30-Sep-2026: ✓ / ✓✓ / blue ✓✓
+      b.appendChild(s);
+      list.appendChild(b);
+    });
+    if (first && !msgs.length) list.innerHTML = '<div style="color:#8fb0b8;font-size:12px;text-align:center;margin-top:20px">No messages yet — your message pops up on the employee\'s screen.</div>';
+    if (msgs.length || first) list.scrollTop = list.scrollHeight;
+  };
+  const load = async (first) => {
+    if (f.busy || lvFocus !== f) return;
+    f.busy = true;
+    try {
+      const d = await api('/chat/' + tile.empId + (first ? '' : '?after_id=' + f.last));
+      if (lvFocus !== f) return;
+      const msgs = d.data || [];
+      if (!first && msgs.length && f.last === 0) list.innerHTML = '';
+      render(msgs, first);
+      chatReceipts(list, d.receipts); // re-tick bubbles already on screen
+      q('st').textContent = '';
+    } catch (e) { q('st').textContent = isDenied(e) ? 'Chat is not available for your role.' : 'Offline — retrying…'; }
+    finally { f.busy = false; }
+  };
+  q('form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const inp = q('in'), body = inp.value.trim();
+    if (!body) return;
+    inp.disabled = true;
+    try {
+      await api('/chat/' + tile.empId, { method: 'POST', body: JSON.stringify({ body }) }); inp.value = '';
+      while (f.busy) await new Promise((r) => setTimeout(r, 100)); // 29-Sep-2026: see drawer chat
+      await load(false);
+    }
+    catch (e) { q('st').textContent = 'Not sent: ' + (e.message || 'error'); }
+    finally { inp.disabled = false; inp.focus(); }
+  });
+  q('x').onclick = lvChatFocusClose;
+  root.addEventListener('keydown', (e) => { if (e.key === 'Escape') lvChatFocusClose(); });
+  doc.addEventListener('fullscreenchange', function onFs() {
+    if (lvFocus === f && doc.fullscreenElement !== root) { doc.removeEventListener('fullscreenchange', onFs); lvChatFocusClose(); }
+  });
+  if (root.requestFullscreen) root.requestFullscreen().catch(() => {}); // Esc leaves full screen = closes
+  load(true);
+  f.timer = setInterval(() => { if (!doc.hidden) load(false); }, 3000); // replies + ✓✓ within ~3s; 29-Sep: not when hidden
+  setTimeout(() => q('in').focus(), 50);
+}
+async function lvWallReload() {
+  const btn = lvWallWin && lvWallWin.document.getElementById('lv-wrefresh');
+  if (btn) { btn.disabled = true; btn.lastChild.textContent = 'Reloading…'; }
+  lvWallMirrors.clear();
+  if (lvWallWin && !lvWallWin.closed) lvWallWin.document.getElementById('lv-wall').innerHTML = '';
+  for (const tile of [...lvTiles.values()]) {
+    await lvSwitchDesktop(tile, tile.monitorIndex); // stop + start the same screen
+  }
+  lvWallSync();
+  if (btn) { btn.disabled = false; btn.lastChild.textContent = 'Refresh'; }
+}
 function lvWallRender() {
   if (!lvWallWin || lvWallWin.closed) { if (lvWallTimer) { clearInterval(lvWallTimer); lvWallTimer = null; } return; }
   lvWallMirrors.forEach((m, sid) => {
@@ -5625,6 +6079,10 @@ function renderRules() {
     + '</td>'
     + '<td>' + (r.kind === 'app' ? 'Application' : 'Website') + '</td>'
     + '<td><select data-rule-status="' + i + '" class="rst rst-' + r.status + '">'
+    // 29-Sep-2026 (Ejaz: "why is Tracked in different colours?"): a row saved as Blocked /
+    // Violation / Allowed that the current plan doesn't offer had no matching option, so the
+    // dropdown fell back to "Tracked" while keeping the real status's colour. Show the real one.
+    + (rulePlanStatuses().includes(r.status) ? '' : '<option value="' + r.status + '" selected>' + (RULE_LABEL[r.status] || r.status) + ' (not in your plan)</option>')
     + rulePlanStatuses().map((sx) => '<option value="' + sx + '"' + (sx === r.status ? ' selected' : '') + '>' + RULE_LABEL[sx] + '</option>').join('')
     + '</select></td>'
     + '<td>' + ruleActionCell(r, i) + '</td>'
@@ -7003,20 +7461,80 @@ async function prRebuild() {
   } catch (e) { toast(e.message); }
   finally { btn.disabled = false; btn.textContent = label; }
 }
+// 29-Sep-2026 (Ejaz): Company › Branch › Department › Team › Employee filter for the report
+// (the server already scopes by these — ScopesVisibleEmployees), and an overview on top.
+let PR_ORG = { branch_id: '', department_id: '', team_id: '', employee_id: '' };
+function prOrgAmp() { const q = Object.entries(PR_ORG).filter(([, v]) => v).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&'); return q ? '&' + q : ''; }
+async function initPrOrgFilter() {
+  const bSel = $('#prf-branch'), dSel = $('#prf-dept'), tSel = $('#prf-team'), eSel = $('#prf-emp');
+  $('#prf-company').innerHTML = '<option>' + esc(ME.company || 'Company') + '</option>';
+  let org, emps;
+  try { [org, emps] = await Promise.all([orgLists(), employeesList()]); } catch (e) { return; }
+  const branches = org.branches || [], depts = org.departments || [], teams = org.teams || [];
+  emps = emps || [];
+  const opt = (v, l) => '<option value="' + v + '">' + esc(l) + '</option>';
+  const fill = (sel, rows, all, label) => { sel.innerHTML = opt('', all) + rows.map((r) => opt(r.id, label ? label(r) : r.name)).join(''); };
+  const paint = () => {
+    const { branch_id: b, department_id: d, team_id: t } = PR_ORG;
+    const deptOf = (id) => depts.find((x) => String(x.id) === String(id));
+    fill(dSel, depts.filter((x) => !b || String(x.branch_id) === String(b)), 'All departments'); dSel.value = d;
+    fill(tSel, teams.filter((x) => d ? String(x.department_id) === String(d) : (!b || String((deptOf(x.department_id) || {}).branch_id) === String(b))), 'All teams'); tSel.value = t;
+    fill(eSel, emps.filter((e) => t ? String(e.team_id) === String(t) : d ? String(e.department_id) === String(d) : b ? String(e.branch_id) === String(b) : true),
+      'All employees', (e) => fullName(e) + (e.employee_code ? ' (' + e.employee_code + ')' : '')); eSel.value = PR_ORG.employee_id;
+    const nm = (rows, id) => (rows.find((r) => String(r.id) === String(id)) || {}).name;
+    const emp = emps.find((e) => String(e.id) === String(PR_ORG.employee_id));
+    const parts = [nm(branches, b), nm(depts, d), nm(teams, t), emp ? fullName(emp) : null].filter(Boolean);
+    $('#prf-scope').textContent = 'Showing: ' + (parts.length ? parts.join(' › ') : 'whole company');
+  };
+  fill(bSel, branches, 'All branches'); paint();
+  const go = () => { paint(); loadProductivity(); };
+  bSel.onchange = () => { PR_ORG = { branch_id: bSel.value, department_id: '', team_id: '', employee_id: '' }; go(); };
+  dSel.onchange = () => { Object.assign(PR_ORG, { department_id: dSel.value, team_id: '', employee_id: '' }); go(); };
+  tSel.onchange = () => { Object.assign(PR_ORG, { team_id: tSel.value, employee_id: '' }); go(); };
+  eSel.onchange = () => { PR_ORG.employee_id = eSel.value; go(); };
+  $('#prf-reset').onclick = () => { PR_ORG = { branch_id: '', department_id: '', team_id: '', employee_id: '' }; bSel.value = ''; go(); };
+}
+// Overview: totals of exactly the rows in the table (same filter + date range), so it moves with them.
+function prOverview(from, to) {
+  const R = PROD_ROWS, sum = (k) => R.reduce((a, x) => a + (+x[k] || 0), 0);
+  const present = sum('present_seconds'), work = sum('work_seconds'), meet = sum('meeting_seconds'), idle = sum('idle_seconds'),
+    brk = sum('break_seconds'), away = sum('away_seconds'), g2p = sum('gate_to_pc_seconds'), exceed = sum('break_exceed_seconds'),
+    prod = sum('productive_seconds'), nonp = sum('non_productive_seconds'), net = sum('net_working_seconds');
+  const emps = new Set(R.map((x) => x.employee_id)).size;
+  const pct = (v, of) => of > 0 ? Math.round(v / of * 100) + '%' : '—';
+  const card = (l, v, p, c) => '<div class="pro-c" style="--c:' + c + '"><div class="l">' + l + '</div><div class="v">' + v + '</div><div class="p">' + (p || '&nbsp;') + '</div></div>';
+  const segs = [['Working', work, '#16A34A'], ['Meeting', meet, '#0E7C8F'], ['Idle', idle, '#D97706'], ['Break', brk, '#6366F1'], ['Away', away, '#DC2626'], ['Gate → PC', g2p, '#94A3B8']];
+  const tot = segs.reduce((a, s) => a + s[1], 0) || 1;
+  $('#pr-overview').innerHTML = R.length ? '<div class="pro-wrap"><div class="pro-h"><b>Overview — ' + (from === to ? (from === today() ? 'today' : from) : from + ' → ' + to) + '</b>'
+    + '<span>' + emps + ' employee' + (emps === 1 ? '' : 's') + ' · ' + R.length + ' day-row' + (R.length === 1 ? '' : 's') + ' · ' + esc($('#prf-scope').textContent || '') + '</span></div>'
+    + '<div class="pro-cards">'
+    + card('Total time', hms(present), 'Actual Present', '#0C3B49')
+    + card('Productive', hms(prod), pct(prod, net) + ' of Net Hrs', '#16A34A')
+    + card('Non-productive', hms(nonp), pct(nonp, present) + ' of total', '#DC2626')
+    + card('Working', hms(work), pct(work, present), '#16A34A')
+    + card('Meeting Time', hms(meet), pct(meet, present), '#0E7C8F')
+    + card('Idle', hms(idle), pct(idle, present), '#D97706')
+    + card('Away', hms(away), pct(away, present), '#DC2626')
+    + card('Break', hms(brk), (exceed ? hms(exceed) + ' over allotted' : 'within allotted'), '#6366F1')
+    + card('Net Hrs', hms(net), 'Present − allotted break', '#0C3B49')
+    + '</div><div class="pro-bar">' + segs.map((s) => s[1] ? '<i style="width:' + (s[1] / tot * 100) + '%;background:' + s[2] + '" title="' + s[0] + ' ' + hms(s[1]) + ' (' + pct(s[1], tot) + ')"></i>' : '').join('') + '</div>'
+    + '<div class="pro-leg">' + segs.map((s) => '<span><i style="background:' + s[2] + '"></i>' + s[0] + ' ' + hms(s[1]) + ' · ' + pct(s[1], tot) + '</span>').join('') + '</div></div>' : '';
+}
 function prSetRange(from, to) { $('#pr-from').value = from; $('#pr-to').value = to; loadProductivity(); }
 function isoDate(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 async function loadProductivity() {
   const from = $('#pr-from').value || today(), to = $('#pr-to').value || today();
-  $('#pr-rows').innerHTML = '<tr><td colspan="26" class="mut">Loading…</td></tr>';
+  $('#pr-rows').innerHTML = '<tr><td colspan="25" class="mut">Loading…</td></tr>';
   try {
-    const r = await api('/reports/productivity?from=' + from + '&to=' + to);
+    const r = await api('/reports/productivity?from=' + from + '&to=' + to + prOrgAmp());
     PROD_ROWS = r.data || [];
+    prOverview(from, to);
     const pct = (v) => (v == null ? '—' : Number(v).toFixed(0) + '%');
     $('#pr-rows').innerHTML = PROD_ROWS.length ? PROD_ROWS.map((x) =>
       '<tr>' +
       '<td>' + esc(x.work_date) + (x.live ? ' <span class="tag t-info" style="font-size:8px">LIVE</span>' : '') + '</td>' +
       '<td>' + esc(x.employee_code || '—') + '</td>' +
-      '<td><b>' + esc(x.name) + '</b></td>' +
+      '<td><button class="pr-plus" data-emp="' + x.employee_id + '" data-date="' + esc(x.work_date) + '" title="Show the day event by event">+</button> <b>' + esc(x.name) + '</b></td>' +
       '<td class="mut">' + esc(x.department || '—') + '</td>' +
       '<td class="mut">' + esc(x.reporting_manager || '—') + '</td>' +
       '<td>' + esc(x.gate_in || '—') + '</td>' +
@@ -7028,45 +7546,84 @@ async function loadProductivity() {
       '<td data-sort="' + x.idle_seconds + '">' + hms(x.idle_seconds) + '</td>' +
       '<td data-sort="' + x.break_count + '">' + x.break_count + '</td>' +
       '<td data-sort="' + x.break_seconds + '">' + hms(x.break_seconds) + '</td>' +
-      '<td data-sort="' + (x.allotted_break_seconds||0) + '">' + hms(x.allotted_break_seconds||0) + '</td>' +
+      '<td data-sort="' + (x.allotted_break_seconds||0) + '" title="' + esc(x.allotted_break_basis || '') + '">' + hms(x.allotted_break_seconds||0) + '</td>' +
       '<td data-sort="' + (x.meeting_seconds || 0) + '">' + (x.meeting_seconds ? hms(x.meeting_seconds) : '—') + '</td>' +
       '<td data-sort="' + (x.break_exceed_seconds||0) + '">' + (x.break_exceed_seconds ? hms(x.break_exceed_seconds) : '—') + '</td>' +
       '<td data-sort="' + (x.productive_seconds||0) + '" title="Working + Meeting"><b>' + hms(x.productive_seconds||0) + '</b></td>' +
-      '<td data-sort="' + (x.non_productive_seconds||0) + '" title="Idle + Break Exceed">' + hms(x.non_productive_seconds||0) + '</td>' +
+      '<td data-sort="' + (x.non_productive_seconds||0) + '" title="Idle + Break Exceed + Away">' + hms(x.non_productive_seconds||0) + '</td>' +
       '<td data-sort="' + (x.net_working_seconds||0) + '" title="Actual Present − Allotted break (' + hms(x.allotted_break_seconds||0) + ')"><b>' + hms(x.net_working_seconds||0) + '</b></td>' +
       '<td data-sort="' + x.timeouts + '">' + x.timeouts + '</td>' +
-      '<td data-sort="' + x.violations + '">' + (x.violations ? '<span class="tag t-danger">' + x.violations + '</span>' : '0') + '</td>' +
       '<td data-sort="' + (x.productivity==null?-1:x.productivity) + '"><b>' + pct(x.productivity) + '</b></td>' +
       '<td data-sort="' + (x.late_minutes||0) + '">' + (x.late_minutes ? '<span class="tag t-warn">' + x.late_minutes + '</span>' : '0') + '</td>' +
-      // Signed value: + is time nothing was recorded for, − is overlapping records. Anything
-      // inside a minute is per-event rounding and reads as a clean dash.
-      '<td data-sort="' + (x.unaccounted_seconds||0) + '">' + prUnacc(x.unaccounted_seconds) + '</td>' +
-      '<td class="mut" style="font-size:10px">' + esc(x.data_issue_text || '') + '</td></tr>'
-    ).join('') : '<tr><td colspan="26" class="mut">No activity in this range.</td></tr>';
-    $('#pr-note').textContent = PROD_ROWS.length + ' rows · ' + from + ' → ' + to + ' · Actual Present = Logged out − Logged in (for today, the current time is used as logout so the % is live) · Productive = Working + Meeting · Non-Productive = Idle + Break Exceed · Net Hrs = Actual Present − Allotted break · Productive % = Productive ÷ Net Hrs. Allotted break = shift allowance, pro-rated on early logout. An extract of today uses the same current-time-as-logout values. Unaccounted = Actual Present − (Working + Idle + Break): + means signed-in time nothing was recorded for, − means overlapping records counting the same minutes twice — a blank column is a day that reconciles exactly.';
+      '<td data-sort="' + (x.away_seconds||0) + '">' + (x.away_seconds > 60 ? '<span class="tag t-warn">' + hms(x.away_seconds) + '</span>' : '<span class="mut">—</span>') + '</td>' +
+      '<td class="mut" style="font-size:11px;min-width:340px;max-width:460px;white-space:normal;line-height:1.4">' + esc(x.data_issue_text || '') + '</td></tr>'
+    ).join('') : '<tr><td colspan="25" class="mut">No activity in this range.</td></tr>';
+    $('#pr-note').textContent = PROD_ROWS.length + ' rows · ' + from + ' → ' + to + ' · Actual Present = Logged out − Logged in (for today, the current time is used as logout so the % is live) · Productive = Working + Meeting · Non-Productive = Idle + Break Exceed + Away · Net Hrs = Actual Present − Allotted break · Productive % = Productive ÷ Net Hrs. Allotted break = shift allowance, pro-rated on early logout. An extract of today uses the same current-time-as-logout values. Away = punched out without a break and punched back in, or signed out of the app and signed back in (non-productive). Idle = signed in with no keyboard/mouse activity, including time the agent sent nothing for (PC off / agent closed).';
     attachTableFilter($('#pr-q'), '#pr-rows');
-  } catch (e) { $('#pr-rows').innerHTML = '<tr><td colspan="26" class="mut">' + esc(e.message) + '</td></tr>'; }
+  } catch (e) { $('#pr-rows').innerHTML = '<tr><td colspan="25" class="mut">' + esc(e.message) + '</td></tr>'; }
 }
-// Reconciliation cell: ±hh:mm, dash when the day balances to within a minute.
-function prUnacc(sec) {
-  const s = Number(sec || 0);
-  if (Math.abs(s) <= 60) return '<span class="mut">—</span>';
-  const cls = s > 0 ? 't-warn' : 't-danger';
-  return '<span class="tag ' + cls + '">' + (s > 0 ? '+' : '−') + hms(Math.abs(s)) + '</span>';
+// 29-Sep-2026 (Ejaz): "+" beside each employee — that day event by event, with exact times:
+// door IN/OUT, PC sign-ins, every Idle spell and when Active resumed, every Away and when they
+// were back at the desk (Gate → PC), breaks, and the totals the row is built from.
+// 29-Sep-2026: what each stored sign-out reason means, in plain words.
+const PR_REASON = { USER: 'Signed out in the agent / agent closed', LOCK: 'PC locked', POST_SHIFT_AUTO: 'Auto sign-out after shift end',
+  AUTO_CLOSED: 'Closed by server (agent stopped / PC off)', TIMEOUT: 'Timed out', SHUTDOWN: 'PC shut down' };
+const prDur = (s) => { s = Math.max(0, Math.round(s || 0)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+  return h ? h + 'h ' + String(m).padStart(2, '0') + 'm' : (m ? m + 'm ' + String(x).padStart(2, '0') + 's' : x + 's'); };
+function prDetailHtml(d) {
+  const T = d.totals, v = (x) => esc(x || '—');
+  const tbl = (title, head, rows, foot, wide) => '<div class="prd-box' + (wide ? ' wide' : '') + '"><div class="prd-h">' + title + '</div>'
+    + (rows.length ? '<table class="prd-t"><thead><tr>' + head.map((h) => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>'
+      + rows.map((r) => '<tr>' + r.map((c) => '<td>' + c + '</td>').join('') + '</tr>').join('') + '</tbody>'
+      + (foot ? '<tfoot><tr><td colspan="' + head.length + '">' + foot + '</td></tr></tfoot>' : '') + '</table>'
+      : '<div class="mut" style="font-size:11px;padding:4px 0">None</div>') + '</div>';
+  return '<div class="prd-sum">'
+    + '<span>Door <b>IN ' + T.door_in_count + '</b> · <b>OUT ' + T.door_out_count + '</b></span>'
+    + '<span>PC sign-ins <b>' + T.sign_in_count + '</b></span>'
+    + '<span>Idle <b>' + T.idle_count + '×</b> · <b>' + prDur(T.idle_seconds) + '</b></span>'
+    + '<span>Away <b>' + T.away_count + '×</b> · <b>' + prDur(T.away_seconds) + '</b></span>'
+    + '<span>Gate → PC <b>' + prDur(T.gate_to_pc_seconds) + '</b></span>'
+    + '<span>Breaks <b>' + T.break_count + '×</b> · <b>' + prDur(T.break_seconds) + '</b></span></div>'
+    + '<div class="prd-grid">'
+    + tbl('Door punches', ['#', 'IN', 'OUT'], d.door.map((r) => ['IN ' + r.n + ' / OUT ' + r.n, v(r.in), v(r.out)]))
+    + tbl('PC sign-ins', ['#', 'Signed in', 'Signed out', 'Sign-out reason'], d.sessions.map((r) => [r.n, v(r.sign_in), v(r.sign_out), r.sign_out ? esc(PR_REASON[r.reason] || r.reason || '—') : '<span class="mut">still signed in</span>']))
+    + tbl('Idle', ['#', 'Idle from', 'Returned to active', 'Idle time'], d.idle.map((r) => ['Idle ' + r.n, r.from, (r.no_data ? r.to + ' <span class="mut" style="font-size:10px">(no data from the agent — PC off / agent closed)</span>' : v(r.returned_to_active || (r.to + ' (PC locked / signed out)'))),
+        prDur(r.counted_seconds) + (r.in_away_seconds ? '<br><span class="mut" style="font-size:10px" title="Part of this idle spell falls inside an Away (out of the door, or walking back to the desk) and is counted there, not as Idle">+' + prDur(r.in_away_seconds) + ' counted as Away</span>' : '')]),
+      'Overall Idle time: <b>' + prDur(T.idle_seconds) + '</b>')
+    + tbl('Away — punched out without a break and punched back in, or signed out of the app and signed back in', ['#', 'How', 'Out', 'Back in', 'Back at desk', 'Out for', 'Walk back', 'Away'], d.away.map((r) => ['Away ' + r.n, esc(r.how || 'Door'), r.out, v(r.in), v(r.back_at_desk), prDur(r.door_seconds), prDur(r.gate_to_pc_seconds), '<b>' + prDur(r.away_seconds) + '</b>']),
+      'Overall Away (non-productive): <b>' + prDur(T.away_seconds) + '</b> · of which walking back in: <b>' + prDur(T.return_gate_to_pc_seconds) + '</b> · Gate → PC (first walk-in, door → sign-in): <b>' + prDur(T.first_gate_to_pc_seconds) + '</b>', true)
+    + tbl('Breaks', ['#', 'Type', 'From', 'To', 'Time'], d.breaks.map((r) => [r.n, esc(r.type), r.from, v(r.to), prDur(r.seconds)]),
+      'Overall Break: <b>' + prDur(T.break_seconds) + '</b>')
+    + '</div>';
 }
+$('#pr-rows').addEventListener('click', async (ev) => {
+  const b = ev.target.closest('.pr-plus');
+  if (!b) return;
+  const tr = b.closest('tr'), next = tr.nextElementSibling;
+  if (next && next.classList.contains('pr-detail')) { next.remove(); b.textContent = '+'; return; }
+  b.textContent = '−';
+  const d = document.createElement('tr');
+  d.className = 'pr-detail';
+  d.innerHTML = '<td colspan="25"><div class="mut" style="font-size:11px">Loading…</div></td>';
+  tr.after(d);
+  try {
+    const r = await api('/reports/productivity/detail?employee_id=' + b.dataset.emp + '&date=' + b.dataset.date);
+    d.firstChild.innerHTML = prDetailHtml(r.data);
+  } catch (e) { d.firstChild.innerHTML = '<div class="err">' + esc(e.message) + '</div>'; }
+});
 // R4 item 6: extracted reports use hh:mm, not raw seconds/minutes.
 const hhmm = (sec) => { const m = Math.max(0, Math.round((sec || 0) / 60)); return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
 function prCSV() {
   // Exact headers from the client's Productivity Excel template (RAW sheet), kept verbatim.
-  const head = ['Emp. ID','Employee','Department','Reporting Manager','Date','Logged in','Logged out','Actual Present Hrs (Logged out - Logged in)','Working (hh:mm)','Idle (hh:mm)','Number of Breaks','Break time Availed  (hh:mm)','Allotted break (hh:mm)','Meeting Time','Break Exceed Mins (Break Time - Allotted Time)','Productive Hrs (Working + Meeting)','Non Productive Hrs (Idle + Break Exceed)','Net Hrs (Actual Logged Hours-Allotted Break)','Productive% [ Productive Hrs/ Net Hrs]','Late Login (mins)','Unaccounted Mins (Present − Working − Idle − Break)','Data Issue','Gate IN','Gate to PC (mins)'];
-  const rows = PROD_ROWS.map((x) => [x.employee_code,x.name,x.department,x.reporting_manager,x.work_date,x.first_in,x.last_out,hhmm(x.present_seconds),hhmm(x.work_seconds),hhmm(x.idle_seconds),x.break_count,hhmm(x.break_seconds),hhmm(x.allotted_break_seconds),hhmm(x.meeting_seconds),hhmm(x.break_exceed_seconds),hhmm(x.productive_seconds),hhmm(x.non_productive_seconds),hhmm(x.net_working_seconds),(x.productivity==null?'':x.productivity+'%'),(x.late_minutes||0),Math.round((x.unaccounted_seconds||0)/60),(x.data_issue_text||''),(x.gate_in||''),(x.gate_to_pc_minutes||0)]);
+  const head = ['Emp. ID','Employee','Department','Reporting Manager','Date','Logged in','Logged out','Actual Present Hrs (Logged out - Logged in)','Working (hh:mm)','Idle (hh:mm)','Number of Breaks','Break time Availed  (hh:mm)','Allotted break (hh:mm)','Meeting Time','Break Exceed Mins (Break Time - Allotted Time)','Productive Hrs (Working + Meeting)','Non Productive Hrs (Idle + Break Exceed + Away)','Net Hrs (Actual Logged Hours-Allotted Break)','Productive% [ Productive Hrs/ Net Hrs]','Late Login (mins)','Data Issue','Gate IN','Gate to PC (mins)','Away (hh:mm) — punched/signed out without a break'];
+  const rows = PROD_ROWS.map((x) => [x.employee_code,x.name,x.department,x.reporting_manager,x.work_date,x.first_in,x.last_out,hhmm(x.present_seconds),hhmm(x.work_seconds),hhmm(x.idle_seconds),x.break_count,hhmm(x.break_seconds),hhmm(x.allotted_break_seconds),hhmm(x.meeting_seconds),hhmm(x.break_exceed_seconds),hhmm(x.productive_seconds),hhmm(x.non_productive_seconds),hhmm(x.net_working_seconds),(x.productivity==null?'':x.productivity+'%'),(x.late_minutes||0),(x.data_issue_text||''),(x.gate_in||''),(x.gate_to_pc_minutes||0),hhmm(x.away_seconds||0)]);
   const csv = [head, ...rows].map((r) => r.map((c) => '"' + String(c==null?'':c).replace(/"/g,'""') + '"').join(',')).join('\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
   a.download = 'SmartEPT-Productivity-Report-' + $('#pr-from').value + '_' + $('#pr-to').value + '.csv'; a.click(); URL.revokeObjectURL(a.href);
 }
 function prPDF() {
   const from = $('#pr-from').value, to = $('#pr-to').value;
-  const rowsHtml = PROD_ROWS.map((x) => '<tr><td>' + esc(x.work_date) + '</td><td>' + esc(x.employee_code||'') + '</td><td>' + esc(x.name) + '</td><td>' + esc(x.department||'') + '</td><td>' + esc(x.reporting_manager||'—') + '</td><td>' + esc(x.first_in||'—') + '</td><td>' + esc(x.last_out||'—') + '</td><td>' + hhmm(x.present_seconds) + '</td><td>' + hhmm(x.work_seconds) + '</td><td>' + hhmm(x.idle_seconds) + '</td><td>' + x.break_count + '</td><td>' + hhmm(x.break_seconds) + '</td><td>' + hhmm(x.allotted_break_seconds) + '</td><td>' + hhmm(x.meeting_seconds) + '</td><td>' + hhmm(x.break_exceed_seconds) + '</td><td>' + hhmm(x.productive_seconds) + '</td><td>' + hhmm(x.non_productive_seconds) + '</td><td>' + hhmm(x.net_working_seconds) + '</td><td>' + (x.productivity==null?'—':Number(x.productivity).toFixed(0)+'%') + '</td><td>' + (x.late_minutes||0) + '</td><td>' + (Math.abs(x.unaccounted_seconds||0) <= 60 ? '—' : (x.unaccounted_seconds > 0 ? '+' : '−') + hhmm(Math.abs(x.unaccounted_seconds))) + '</td><td>' + esc(x.data_issue_text||'') + '</td><td>' + esc(x.gate_in||'—') + '</td><td>' + (x.gate_to_pc_minutes||0) + '</td></tr>').join('');
+  const rowsHtml = PROD_ROWS.map((x) => '<tr><td>' + esc(x.work_date) + '</td><td>' + esc(x.employee_code||'') + '</td><td>' + esc(x.name) + '</td><td>' + esc(x.department||'') + '</td><td>' + esc(x.reporting_manager||'—') + '</td><td>' + esc(x.first_in||'—') + '</td><td>' + esc(x.last_out||'—') + '</td><td>' + hhmm(x.present_seconds) + '</td><td>' + hhmm(x.work_seconds) + '</td><td>' + hhmm(x.idle_seconds) + '</td><td>' + x.break_count + '</td><td>' + hhmm(x.break_seconds) + '</td><td>' + hhmm(x.allotted_break_seconds) + '</td><td>' + hhmm(x.meeting_seconds) + '</td><td>' + hhmm(x.break_exceed_seconds) + '</td><td>' + hhmm(x.productive_seconds) + '</td><td>' + hhmm(x.non_productive_seconds) + '</td><td>' + hhmm(x.net_working_seconds) + '</td><td>' + (x.productivity==null?'—':Number(x.productivity).toFixed(0)+'%') + '</td><td>' + (x.late_minutes||0) + '</td><td>' + esc(x.data_issue_text||'') + '</td><td>' + esc(x.gate_in||'—') + '</td><td>' + (x.gate_to_pc_minutes||0) + '</td><td>' + hhmm(x.away_seconds||0) + '</td></tr>').join('');
   const co = ($('#company-name') ? $('#company-name').textContent : 'Company');
   const w = window.open('', '_blank');
   w.document.write('<html><head><title>SmartEPT Productivity ' + from + ' to ' + to + '</title><style>'
@@ -7078,7 +7635,7 @@ function prPDF() {
     + '@media print{.np{display:none}}</style></head><body>'
     + '<div class="hd"><div><h1>Productivity Report</h1><div class="sub">' + esc(co) + ' · ' + from + ' → ' + to + ' · SmartEPT by Ametecs</div></div>'
     + '<button class="np" onclick="window.print()" style="padding:8px 14px;background:#0E7C8F;color:#fff;border:none;border-radius:7px;cursor:pointer">Print / Save PDF</button></div>'
-    + '<table><thead><tr><th>Date</th><th>Code</th><th>Employee</th><th>Dept</th><th>Manager</th><th>In</th><th>Out</th><th>Actual Present</th><th>Working</th><th>Idle</th><th>Breaks</th><th>Break Availed</th><th>Allotted</th><th>Meeting</th><th>Break Exceed</th><th>Productive</th><th>Non-Prod.</th><th>Net Hrs</th><th>Prod.%</th><th>Late (min)</th><th>Unaccounted</th><th>Data Issue</th><th>Gate IN</th><th>Gate→PC (mins)</th></tr></thead><tbody>'
+    + '<table><thead><tr><th>Date</th><th>Code</th><th>Employee</th><th>Dept</th><th>Manager</th><th>In</th><th>Out</th><th>Actual Present</th><th>Working</th><th>Idle</th><th>Breaks</th><th>Break Availed</th><th>Allotted</th><th>Meeting Time</th><th>Break Exceed</th><th>Productive</th><th>Non-Prod.</th><th>Net Hrs</th><th>Prod.%</th><th>Late (min)</th><th>Data Issue</th><th>Gate IN</th><th>Gate→PC (mins)</th><th>Away</th></tr></thead><tbody>'
     + (rowsHtml || '<tr><td colspan="19">No data</td></tr>') + '</tbody></table>'
     + '<p style="margin-top:14px;color:#878C99;font-size:10px">Generated ' + new Date().toLocaleString() + ' · SmartEPT — Employee Productivity Tracking & Intelligence</p>'
     + '</body></html>');
@@ -7089,6 +7646,7 @@ function initReports() {
   // 25-Sep-2026 (Ejaz): opens on today's report; This week / This month are one click away.
   if (!$('#pr-from').value) { $('#pr-from').value = today(); $('#pr-to').value = today(); }
   $('#pr-load').onclick = loadProductivity;
+  initPrOrgFilter();
   $('#pr-rebuild').onclick = prRebuild;
   $('#pr-today').onclick = () => prSetRange(today(), today());
   $('#pr-week').onclick = () => { const d = new Date(); const g = (d.getDay()+6)%7; const mon = new Date(d); mon.setDate(d.getDate()-g); prSetRange(isoDate(mon), today()); };
@@ -7096,7 +7654,7 @@ function initReports() {
   $('#pr-csv').onclick = prCSV;
   $('#pr-pdf').onclick = prPDF;
   $('#pr-xlsx').onclick = () => { const f = $('#pr-from').value || today(), t = $('#pr-to').value || today();
-    downloadCsv('/export/productivity-report?from=' + f + '&to=' + t, 'SmartEPT-Productivity-Report-' + f + '_' + t + '.xlsx'); };
+    downloadCsv('/export/productivity-report?from=' + f + '&to=' + t + prOrgAmp(), 'SmartEPT-Productivity-Report-' + f + '_' + t + '.xlsx'); };
   loadProductivity();
   // Section 3 & 14: break + meeting reports.
   if (!$('#br-from').value) { $('#br-from').value = today(); $('#br-to').value = today(); }
@@ -7223,8 +7781,10 @@ async function openEmployee(id, name) {
   document.body.classList.add('drawer-lock');
   $$('.tab').forEach((tb) => tb.classList.toggle('active', tb.dataset.tab === 'timeline'));
   loadTab('timeline');
+  chatOpen(id, name);
 }
 function closeDrawer() {
+  chatClose();
   $('#drawer').classList.remove('open');
   const bd = $('#drawer-backdrop'); if (bd) bd.classList.remove('open');
   document.body.classList.remove('drawer-lock');
@@ -7245,7 +7805,7 @@ async function loadTab(tab) {
     if (tab === 'timeline') {
       const d = await api('/reports/employee/' + DID + '/timeline');
       body.innerHTML = d.timeline.length ? '<div class="tl">' + d.timeline.map((e) =>
-        '<div class="ev"><span class="tm">' + t(e.time) + '</span>' + esc(e.label) + (e.detail ? ' <span class="mut">(' + esc(e.detail) + ')</span>' : '') + '</div>').join('') + '</div>'
+        '<div class="ev"><span class="tm">' + t(e.time) + '</span>' + esc(e.label) + tlDetail(e) + '</div>').join('') + '</div>'
         : '<div class="mut">No events today.</div>';
     } else if (tab === 'apps') {
       const d = await api('/reports/employee/' + DID + '/app-usage');
@@ -7280,6 +7840,428 @@ async function loadTab(tab) {
     }
   } catch (e) { body.innerHTML = '<div class="mut">' + (isDenied(e) ? 'Your role cannot view this tab.' : esc(e.message)) + '</div>'; }
 }
+// 28-Sep-2026: a screenshot row links to the image ("View") instead of saying INTERVAL;
+// other trigger reasons (BLOCKED_APP…) stay visible next to the link.
+function tlDetail(e) {
+  if (e.type === 'SCREENSHOT' && e.ref) {
+    const why = e.detail && e.detail !== 'INTERVAL' ? esc(e.detail) + ' · ' : '';
+    return ' <span class="mut">(' + why + '<a class="shot-view" data-shotref="' + Number(e.ref) + '" data-shottime="' + esc(e.time) + '">View</a>)</span>';
+  }
+  return e.detail ? ' <span class="mut">(' + esc(e.detail) + ')</span>' : '';
+}
+$('#d-body').addEventListener('click', async (ev) => {
+  const a = ev.target.closest('a[data-shotref]');
+  if (!a) return;
+  const meta = $('#shot-meta');
+  $('#shot-img').removeAttribute('src');
+  meta.textContent = 'Loading…';
+  $('#shot-ovl').classList.add('open');
+  try {
+    const blob = await apiBlob('/screenshots/' + a.dataset.shotref + '/file');
+    const url = URL.createObjectURL(blob);
+    $('#shot-img').onload = () => URL.revokeObjectURL(url);
+    $('#shot-img').src = url;
+    meta.textContent = ($('#d-name').textContent || '') + ' · ' + t(a.dataset.shottime);
+  } catch (e) {
+    meta.textContent = e.status === 403 ? 'Your role cannot view screenshots.' : 'Screenshot file not found.';
+  }
+});
+
+// ---- 30-Sep-2026 (Ejaz): WhatsApp-style ticks on the admin's own messages ----
+// ✓ sent (on the server) · ✓✓ grey delivered (the employee's PC picked it up) · ✓✓ blue read
+// (the chat window was on the employee's screen). Each chat GET returns `receipts`
+// {delivered_upto, read_upto}; every own message with id <= those is delivered / read.
+const CHAT_TICK_RANK = { sent: 0, dlv: 1, read: 2 };
+function chatTickSet(el, st) {
+  if (el.dataset.st && CHAT_TICK_RANK[el.dataset.st] >= CHAT_TICK_RANK[st]) return; // never go back
+  el.dataset.st = st;
+  el.textContent = st === 'sent' ? '✓' : '✓✓';
+  el.title = st === 'read' ? 'Read' : st === 'dlv' ? 'Delivered' : 'Sent';
+  el.style.color = st === 'read' ? '#34B7F1' : (el.dataset.dark ? '#9fc3cb' : '#8696A0');
+}
+function chatTickEl(doc, m, dark) {
+  const el = doc.createElement('span');
+  el.dataset.tk = m.id;
+  if (dark) el.dataset.dark = '1';
+  el.style.cssText = 'margin-left:5px;font-size:13px;font-weight:700;letter-spacing:-4px;padding-right:4px';
+  chatTickSet(el, m.read ? 'read' : m.delivered ? 'dlv' : 'sent');
+  return el;
+}
+function chatReceipts(root, rc) {
+  if (!root || !rc) return;
+  root.querySelectorAll('[data-tk]').forEach((el) => {
+    const id = +el.dataset.tk;
+    if (id <= (rc.read_upto || 0)) chatTickSet(el, 'read');
+    else if (id <= (rc.delivered_upto || 0)) chatTickSet(el, 'dlv');
+  });
+}
+
+// ---- 28-Sep-2026: drawer chat (admin ↔ employee; the agent pops a chat window) ----
+let CHAT_EMP = null, CHAT_LAST = 0, CHAT_TIMER = null, CHAT_BUSY = false;
+function chatRender(msgs, replace) {
+  const list = $('#d-chat-list');
+  if (replace) list.innerHTML = '';
+  const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 30;
+  msgs.forEach((m) => {
+    CHAT_LAST = Math.max(CHAT_LAST, m.id);
+    const d = document.createElement('div');
+    d.className = 'dchat-m ' + (m.sender === 'ADMIN' ? 'me' : 'them');
+    d.dataset.mid = m.id;
+    d.textContent = m.body;
+    const s = document.createElement('small');
+    s.textContent = (m.sender === 'ADMIN' ? (m.name || 'Admin') + (m.role ? ' (' + m.role + ')' : '') + ' · ' : '') + t(m.at);
+    if (m.sender === 'ADMIN') s.appendChild(chatTickEl(document, m, false)); // 30-Sep-2026: ✓ / ✓✓ / blue ✓✓
+    d.appendChild(s);
+    list.appendChild(d);
+  });
+  if (!list.children.length) list.innerHTML = '<div class="mut" style="font-size:11.5px">No messages yet. Anything you send pops up on the employee\'s agent.</div>';
+  if (replace || atBottom || msgs.some((m) => m.sender === 'ADMIN')) list.scrollTop = list.scrollHeight;
+}
+async function chatLoad(full) {
+  if (!CHAT_EMP || CHAT_BUSY) return;
+  const emp = CHAT_EMP;
+  CHAT_BUSY = true;
+  try {
+    const d = await api('/chat/' + emp + (full ? '' : '?after_id=' + CHAT_LAST));
+    if (emp !== CHAT_EMP) return;
+    const msgs = d.data || [];
+    if (full) { CHAT_LAST = 0; chatRender(msgs, true); }
+    else if (msgs.length) { $('#d-chat-list .mut') && ($('#d-chat-list').innerHTML = ''); chatRender(msgs, false); }
+    chatReceipts($('#d-chat-list'), d.receipts); // re-tick bubbles already on screen
+    $('#d-chat-st').textContent = '';
+  } catch (e) {
+    $('#d-chat-st').textContent = isDenied(e) ? 'Chat not available for your role' : 'offline — retrying';
+  } finally { CHAT_BUSY = false; }
+}
+function chatOpen(id, name) {
+  chatClose();
+  $('#d-chat').style.display = isEmp() ? 'none' : ''; // self-service logins chat from the agent, not here
+  if (isEmp()) return;
+  CHAT_EMP = id; CHAT_LAST = 0;
+  chatNotifyAsk();
+  $('#d-chat-title').textContent = 'Chat with ' + name;
+  $('#d-chat-list').innerHTML = '<div class="mut" style="font-size:11.5px">Loading…</div>';
+  $('#d-chat-in').value = '';
+  chatLoad(true);
+  CHAT_TIMER = setInterval(() => { if (!document.hidden) chatLoad(false); }, 3000); // replies + "Seen" within ~3s; 29-Sep: not from a background tab
+}
+// 29-Sep-2026 (Ejaz): drag the chat title bar to resize the chat (remembered per browser).
+(function () {
+  const grip = $('#d-chat-grip'), box = $('#d-chat');
+  const clamp = (h) => Math.max(120, Math.min(h, $('#drawer').clientHeight - 180));
+  try { const h = +localStorage.getItem('ept_chat_h'); if (h) box.style.flexBasis = h + 'px'; } catch (e) {}
+  grip.addEventListener('pointerdown', (ev) => {
+    const y0 = ev.clientY, h0 = box.getBoundingClientRect().height;
+    grip.setPointerCapture(ev.pointerId);
+    const move = (e) => { box.style.flexBasis = clamp(h0 + y0 - e.clientY) + 'px'; };
+    const up = () => {
+      grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up);
+      try { localStorage.setItem('ept_chat_h', parseInt(box.style.flexBasis, 10)); } catch (e) {}
+    };
+    grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up);
+  });
+})();
+// ---- 30-Sep-2026 (Ejaz): employee replied while the admin is elsewhere ----
+// Poll /chat-unread (5s; every 15s from a background tab) → toast + Windows/browser notification
+// (click opens that employee's chat) + a green count on the LiveView tile / Live Wall chat icon.
+// Opening the chat reads the thread, which clears the count on the next poll.
+let CHAT_UNREAD = {}, CHAT_SEEN_LAST = {}, CHAT_UNREAD_TICK = 0, CHAT_UNREAD_BUSY = false, CHAT_UNREAD_OFF = false;
+function chatNotifyAsk() { // called from a click, so the browser will show its permission prompt
+  try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch (e) {}
+}
+function chatBadges() {
+  const docs = [document];
+  if (typeof lvWallWin !== 'undefined' && lvWallWin && !lvWallWin.closed) docs.push(lvWallWin.document);
+  docs.forEach((doc) => doc.querySelectorAll('[data-act="chat"][data-emp],.lv-wchat[data-emp]').forEach((btn) => {
+    const n = CHAT_UNREAD[btn.dataset.emp] || 0;
+    let b = btn.querySelector('.cu-b');
+    if (!n) { if (b) b.remove(); return; }
+    if (!b) {
+      b = doc.createElement('span');
+      b.className = 'cu-b';
+      b.style.cssText = 'position:absolute;top:-7px;right:-7px;min-width:18px;height:18px;padding:0 4px;box-sizing:border-box;border-radius:9px;'
+        + 'background:#25D366;color:#fff;font:700 11px/18px system-ui,Segoe UI,sans-serif;text-align:center;box-shadow:0 0 0 2px #fff;pointer-events:none';
+      if (btn.classList.contains('lv-fs-btn')) btn.style.position = 'relative'; // wall buttons are already absolute
+      btn.appendChild(b);
+    }
+    b.textContent = n > 99 ? '99+' : n;
+    btn.title = n + ' new message' + (n > 1 ? 's' : '') + ' — click to chat';
+  }));
+}
+function chatAlert(r) {
+  const open = () => { window.focus(); openEmployee(r.employee_id, r.name); };
+  toast('💬 ' + r.name + ': ' + r.body + (r.count > 1 ? '  (' + r.count + ' new)' : ''), open, 8000);
+  try {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const n = new Notification('SmartEPT — reply from ' + r.name, { body: r.body, tag: 'ept-chat-' + r.employee_id });
+      n.onclick = () => { n.close(); open(); };
+    }
+  } catch (e) { /* notifications unavailable */ }
+}
+async function chatUnreadPoll() {
+  if (!TOKEN || !ME || isEmp() || CHAT_UNREAD_BUSY || CHAT_UNREAD_OFF) return;
+  if (document.hidden && (++CHAT_UNREAD_TICK % 3)) return; // background tab: every 15s
+  CHAT_UNREAD_BUSY = true;
+  try {
+    const d = await api('/chat-unread');
+    const next = {};
+    (d.data || []).forEach((r) => {
+      next[r.employee_id] = r.count;
+      const isOpen = CHAT_EMP == r.employee_id || (lvFocus && lvFocus.tile.empId == r.employee_id); // being read already
+      if (!isOpen && r.last_id > (CHAT_SEEN_LAST[r.employee_id] || 0)) chatAlert(r);
+      CHAT_SEEN_LAST[r.employee_id] = r.last_id;
+    });
+    CHAT_UNREAD = next;
+    chatBadges();
+  } catch (e) { if (isDenied(e)) CHAT_UNREAD_OFF = true; /* role can't chat: stop asking; offline: next tick */ }
+  finally { CHAT_UNREAD_BUSY = false; }
+}
+setInterval(chatUnreadPoll, 5000);
+function chatClose() {
+  // 29-Sep-2026 (Ejaz): closing the chat ends the conversation — delete the thread.
+  if (CHAT_EMP && !isEmp()) api('/chat/' + CHAT_EMP, { method: 'DELETE' }).catch(() => {});
+  if (CHAT_TIMER) clearInterval(CHAT_TIMER);
+  CHAT_TIMER = null; CHAT_EMP = null;
+}
+$('#d-chat-f').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const inp = $('#d-chat-in'), body = inp.value.trim();
+  if (!body || !CHAT_EMP) return;
+  inp.disabled = true;
+  try {
+    await api('/chat/' + CHAT_EMP, { method: 'POST', body: JSON.stringify({ body }) });
+    inp.value = '';
+    // 29-Sep-2026: chatLoad() returns early while a poll is in flight — wait it out, or the
+    // sent message only shows up on a later tick.
+    while (CHAT_BUSY) await new Promise((r) => setTimeout(r, 100));
+    await chatLoad(false);
+  } catch (e) {
+    $('#d-chat-st').textContent = 'Not sent: ' + (e.message || 'error');
+  } finally { inp.disabled = false; inp.focus(); }
+});
+
+// ---- 30-Sep-2026 (Ejaz): Reports → Schedule Report ----
+// Automatic Productivity report emails. Each schedule: when (daily days / weekly day / monthly
+// date + time, company clock), what it covers (branch/department/team), who gets it (every
+// employee their own report, chosen employees own/full with an editable email, extra emails).
+let SR_ROWS = [], SR_EDIT = null, SR_REC = new Map(), SR_EMPS = [], SR_ORG = null;
+const SR_DAYS = [[1, 'Mon'], [2, 'Tue'], [3, 'Wed'], [4, 'Thu'], [5, 'Fri'], [6, 'Sat'], [7, 'Sun']];
+let srBound = false;
+async function initSchedRep() {
+  if (!srBound) {
+    srBound = true;
+    $('#sr-new').onclick = () => srOpen(null);
+    $('#sr-cancel').onclick = srClose;
+    $('#sr-save').onclick = () => srSave(false);
+    $('#sr-test').onclick = () => srSave(true);
+    $('#sr-freq').onchange = srPaintDays;
+    $('#sr-q').oninput = srPaintEmps;
+    $('#sr-fd').onchange = srPaintEmps;
+    $('#sr-sel-only').onchange = srPaintEmps;
+    document.querySelectorAll('[data-srall]').forEach((b) => b.onclick = () => {
+      srShown().forEach((e) => srSet(e.id, b.dataset.srall)); srPaintEmps();
+    });
+    $('#sr-rows').addEventListener('click', srRowAction);
+    // 30-Sep-2026: WhatsApp
+    $('#sr-wa').onchange = () => { $('#sr-wa-box').style.display = $('#sr-wa').checked ? '' : 'none'; };
+    $('#sr-wa-preview').onclick = srWaPreview;
+    $('#wa-save').onclick = () => waSave(false);
+    $('#wa-off').onclick = () => { if (confirm('Disconnect WhatsApp? Schedules stop sending to WhatsApp until it is connected again.')) waSave(true); };
+    $('#wa-test').onclick = waTest;
+    // 30-Sep-2026 (Ejaz): placeholders filled at send time — insert at the cursor of the last-focused field.
+    let srField = null;
+    ['#sr-msg', '#sr-subject'].forEach((sel) => $(sel).addEventListener('focus', () => { srField = $(sel); }));
+    document.querySelectorAll('[data-srins]').forEach((btn) => btn.onclick = () => {
+      const f = srField || $('#sr-msg'), tok = btn.dataset.srins;
+      const a = f.selectionStart ?? f.value.length, z = f.selectionEnd ?? f.value.length;
+      f.value = f.value.slice(0, a) + tok + f.value.slice(z);
+      f.focus(); f.selectionStart = f.selectionEnd = a + tok.length;
+    });
+    $('#sr-emps').addEventListener('change', (ev) => {
+      const tr = ev.target.closest('tr[data-emp]'); if (!tr) return;
+      const id = +tr.dataset.emp, cur = SR_REC.get(id) || { mode: '', email: '' };
+      if (ev.target.matches('select')) cur.mode = ev.target.value;
+      if (ev.target.matches('input')) cur.email = ev.target.value.trim();
+      SR_REC.set(id, cur); srCount();
+    });
+  }
+  try { [SR_ORG, SR_EMPS] = await Promise.all([orgLists(), employeesList()]); } catch (e) { SR_ORG = SR_ORG || {}; SR_EMPS = SR_EMPS || []; }
+  const opt = (v, l) => '<option value="' + v + '">' + esc(l) + '</option>';
+  const fill = (sel, rows, all) => { sel.innerHTML = opt('', all) + (rows || []).map((r) => opt(r.id, r.name)).join(''); };
+  fill($('#sr-b'), SR_ORG.branches, 'All branches'); fill($('#sr-d'), SR_ORG.departments, 'All departments');
+  fill($('#sr-t'), SR_ORG.teams, 'All teams'); fill($('#sr-fd'), SR_ORG.departments, 'All departments');
+  loadSchedRep();
+  loadWaConfig();
+}
+// ---- 30-Sep-2026 (Ejaz): WhatsApp connection + snapshot ----
+let WA_CFG = null;
+async function loadWaConfig() {
+  const admin = ME && (ME.role === 'SUPER_ADMIN' || ME.role === 'COMPANY_ADMIN');
+  $('#sr-wa-card').style.display = admin ? '' : 'none';
+  try { WA_CFG = (await api('/whatsapp-config')).data; } catch (e) { WA_CFG = null; return; }
+  $('#wa-pnid').value = WA_CFG.phone_number_id || ''; $('#wa-tpl').value = WA_CFG.template || ''; $('#wa-lang').value = WA_CFG.language || '';
+  $('#wa-token').value = ''; $('#wa-token').placeholder = WA_CFG.has_token ? 'saved — leave blank to keep it' : 'permanent (System User) token';
+  const b = $('#wa-badge'); b.className = 'tag ' + (WA_CFG.connected ? 't-ok' : 't-off'); b.textContent = WA_CFG.connected ? 'Details saved — use Send test to confirm' : 'Not set up';
+  const adm = WA_CFG.admin_phones || [];
+  $('#sr-wa-adm').textContent = adm.length ? '— ' + adm.map((a) => a.name + (a.phone ? ' (' + a.phone + ')' : ' (no phone on their login — add it in Users)')).join(', ') : '';
+  srWaState();
+}
+function srWaState() {
+  const st = $('#sr-wa-state'); if (!st) return;
+  st.innerHTML = WA_CFG && WA_CFG.connected ? '✓ WhatsApp details saved' : '⚠ WhatsApp is not set up yet — fill in the <b>WhatsApp connection</b> card below';
+}
+async function waSave(disconnect) {
+  const m = $('#wa-msg'); m.textContent = 'Saving…';
+  try {
+    WA_CFG = (await api('/whatsapp-config', { method: 'PUT', body: JSON.stringify(disconnect ? { disconnect: true } : {
+      phone_number_id: $('#wa-pnid').value.trim(), token: $('#wa-token').value.trim(), template: $('#wa-tpl').value.trim(), language: $('#wa-lang').value.trim() }) })).data;
+    m.textContent = disconnect ? '✓ Disconnected' : '✓ Saved'; loadWaConfig();
+  } catch (e) { m.textContent = '✕ ' + e.message; }
+}
+async function waTest() {
+  const m = $('#wa-msg'), to = $('#wa-test-to').value.trim();
+  if (!to) { m.textContent = '✕ Type the number to send the test to.'; return; }
+  m.textContent = 'Sending…';
+  try { await api('/whatsapp-config/test', { method: 'POST', body: JSON.stringify({ to }) }); m.textContent = '✓ Sent — check WhatsApp on ' + to; }
+  catch (e) { m.textContent = '✕ ' + e.message; }
+}
+async function srWaPreview() {
+  const img = $('#sr-wa-img');
+  if (!SR_EDIT || !SR_EDIT.id) { $('#sr-wa-state').textContent = 'Save the schedule first, then Preview.'; return; }
+  $('#sr-wa-state').textContent = 'Building the image…';
+  try { const b = await apiBlob('/report-schedules/' + SR_EDIT.id + '/snapshot'); img.src = URL.createObjectURL(b); img.style.display = ''; srWaState(); }
+  catch (e) { $('#sr-wa-state').textContent = '✕ ' + e.message; }
+}
+async function loadSchedRep() {
+  try { SR_ROWS = (await api('/report-schedules')).data || []; }
+  catch (e) { $('#sr-rows').innerHTML = isDenied(e) ? deniedCard() : '<tr><td colspan="7">' + esc(e.message) + '</td></tr>'; return; }
+  const nm = (rows, id) => ((rows || []).find((r) => String(r.id) === String(id)) || {}).name;
+  const dayTxt = (d) => { d = (d || []).map(Number).sort(); return d.length === 7 ? 'every day' : d.join() === '1,2,3,4,5' ? 'Mon–Fri' : d.join() === '1,2,3,4,5,6' ? 'Mon–Sat' : d.map((x) => SR_DAYS[x - 1][1]).join(', '); };
+  $('#sr-rows').innerHTML = SR_ROWS.map((s) => {
+    const when = s.frequency === 'WEEKLY' ? 'Weekly · ' + SR_DAYS[((s.days || [1])[0]) - 1][1] + ' ' + s.send_time
+      : s.frequency === 'MONTHLY' ? 'Monthly · day ' + s.day_of_month + ', ' + s.send_time : 'Daily · ' + s.send_time + ' · ' + dayTxt(s.days);
+    const sc = s.scope || {}, parts = [nm((SR_ORG || {}).branches, sc.branch_id), nm((SR_ORG || {}).departments, sc.department_id), nm((SR_ORG || {}).teams, sc.team_id)].filter(Boolean);
+    const rec = s.recipients || [], own = rec.filter((r) => r.mode === 'OWN').length, full = rec.filter((r) => r.mode === 'FULL').length, ex = (s.extra_emails || []).length;
+    const wa = s.whatsapp_enabled ? 'WhatsApp: ' + [s.whatsapp_admins ? 'Company Admin' : '', (s.whatsapp_numbers || []).length ? (s.whatsapp_numbers || []).length + ' number' + ((s.whatsapp_numbers || []).length > 1 ? 's' : '') : ''].filter(Boolean).join(' + ') : '';
+    const to = [s.all_employees_own ? 'Every employee: own' : (own ? own + ' own' : ''), full ? full + ' full' : '', ex ? ex + ' extra email' + (ex > 1 ? 's' : '') : '', wa].filter(Boolean).join(' · ') || '<span class="mut">nobody yet</span>';
+    const last = s.last_run_at ? new Date(s.last_run_at).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+    return '<tr data-id="' + s.id + '"><td><b>' + esc(s.name) + '</b>' + (s.creator ? '<div class="mut" style="font-size:11px">by ' + esc(s.creator.name) + '</div>' : '') + '</td>'
+      + '<td>' + esc(when) + '</td><td>' + esc(parts.join(' › ') || 'Whole company') + '</td><td>' + to + '</td>'
+      + '<td>' + esc(last) + (s.last_status ? '<div class="mut" style="font-size:11px;max-width:260px">' + esc(s.last_status) + '</div>' : '') + '</td>'
+      + '<td><span class="tag ' + (s.enabled ? 't-ok">Active' : 't-off">Paused') + '</span></td>'
+      + '<td style="white-space:nowrap"><button class="btn" data-sr="edit">Edit</button> <button class="btn solid" data-sr="run" title="Send the report for the period ending yesterday to everyone now">Send now</button> '
+      + '<button class="btn solid" data-sr="toggle">' + (s.enabled ? 'Pause' : 'Resume') + '</button> <button class="btn danger" data-sr="del">Delete</button></td></tr>';
+  }).join('') || '<tr><td colspan="7" class="mut">No schedules yet. Click <b>+ New schedule</b> to email the Productivity report automatically.</td></tr>';
+}
+function srPayload(s) {
+  return { name: s.name, enabled: !!s.enabled, frequency: s.frequency, send_time: s.send_time, days: s.days || [], day_of_month: s.day_of_month || 1,
+    scope: s.scope || {}, all_employees_own: !!s.all_employees_own, recipients: s.recipients || [], extra_emails: s.extra_emails || [],
+    skip_empty: !!s.skip_empty, skip_holidays: !!s.skip_holidays, attach_excel: !!s.attach_excel, subject: s.subject || null, message: s.message || null,
+    whatsapp_enabled: !!s.whatsapp_enabled, whatsapp_admins: !!s.whatsapp_admins, whatsapp_numbers: s.whatsapp_numbers || [] };
+}
+async function srRowAction(ev) {
+  const b = ev.target.closest('[data-sr]'); if (!b) return;
+  const s = SR_ROWS.find((x) => String(x.id) === b.closest('tr').dataset.id); if (!s) return;
+  const act = b.dataset.sr;
+  if (act === 'edit') return srOpen(s);
+  try {
+    if (act === 'del') { if (!confirm('Delete the schedule "' + s.name + '"? No more emails will be sent for it.')) return; await api('/report-schedules/' + s.id, { method: 'DELETE' }); toast('Schedule deleted'); }
+    if (act === 'toggle') { await api('/report-schedules/' + s.id, { method: 'PUT', body: JSON.stringify(Object.assign(srPayload(s), { enabled: !s.enabled })) }); toast(s.enabled ? 'Paused' : 'Resumed'); }
+    if (act === 'run') {
+      if (!confirm('Send "' + s.name + '" to all its recipients now (report for the period ending yesterday)?')) return;
+      b.disabled = true; b.textContent = 'Sending…';
+      const r = await api('/report-schedules/' + s.id + '/run', { method: 'POST' });
+      toast('✓ ' + r.data.text, null, 8000);
+    }
+  } catch (e) { toast('✕ ' + e.message, null, 8000); }
+  loadSchedRep();
+}
+function srPaintDays() {
+  const f = $('#sr-freq').value, cur = SR_EDIT && SR_EDIT._days ? SR_EDIT._days : [];
+  $('#sr-dom-wrap').style.display = f === 'MONTHLY' ? '' : 'none';
+  $('#sr-days-wrap').style.display = f === 'MONTHLY' ? 'none' : '';
+  $('#sr-days-label').textContent = f === 'WEEKLY' ? 'Send on (one day)' : 'Send on these days';
+  const type = f === 'WEEKLY' ? 'radio' : 'checkbox';
+  $('#sr-days').innerHTML = SR_DAYS.map(([n, l]) => '<label class="fbool" style="padding:4px 10px;border:1px solid var(--border);border-radius:16px">'
+    + '<input type="' + type + '" name="sr-day" value="' + n + '"' + (cur.includes(n) ? ' checked' : '') + '> ' + l + '</label>').join('');
+}
+function srSet(id, mode) { const cur = SR_REC.get(id) || { mode: '', email: '' }; cur.mode = mode; SR_REC.set(id, cur); }
+function srShown() {
+  const q = ($('#sr-q').value || '').toLowerCase(), d = $('#sr-fd').value, only = $('#sr-sel-only').checked;
+  return SR_EMPS.filter((e) => (!d || String(e.department_id) === d)
+    && (!only || (SR_REC.get(e.id) || {}).mode)
+    && (!q || (fullName(e) + ' ' + (e.employee_code || '') + ' ' + (e.email || '')).toLowerCase().includes(q)));
+}
+function srCount() {
+  let own = 0, full = 0; SR_REC.forEach((r) => { if (r.mode === 'OWN') own++; if (r.mode === 'FULL') full++; });
+  $('#sr-count').textContent = own + ' own · ' + full + ' full selected';
+}
+function srPaintEmps() {
+  const dn = (id) => (((SR_ORG || {}).departments || []).find((x) => String(x.id) === String(id)) || {}).name || '—';
+  const rows = srShown();
+  $('#sr-emps').innerHTML = rows.map((e) => {
+    const r = SR_REC.get(e.id) || { mode: '', email: '' };
+    return '<tr data-emp="' + e.id + '"><td><select style="min-width:0;width:140px">'
+      + '<option value="">—</option><option value="OWN"' + (r.mode === 'OWN' ? ' selected' : '') + '>Own report</option>'
+      + '<option value="FULL"' + (r.mode === 'FULL' ? ' selected' : '') + '>Full report</option></select></td>'
+      + '<td>' + esc(fullName(e)) + (e.employee_code ? ' <span class="mut">(' + esc(e.employee_code) + ')</span>' : '') + '</td><td>' + esc(dn(e.department_id)) + '</td>'
+      + '<td><input type="email" value="' + esc(r.email || '') + '" placeholder="' + esc(e.email || 'no email on record — type one') + '" style="width:100%;min-width:200px"></td></tr>';
+  }).join('') || '<tr><td colspan="4" class="mut">No employees match.</td></tr>';
+  srCount();
+}
+function srOpen(s) {
+  SR_EDIT = s ? Object.assign({}, s) : { enabled: true, frequency: 'DAILY', send_time: '09:00', days: [1, 2, 3, 4, 5, 6, 7], day_of_month: 1, scope: {},
+    all_employees_own: false, recipients: [], extra_emails: [], skip_empty: true, skip_holidays: true, attach_excel: true };
+  SR_EDIT._days = (SR_EDIT.days || []).map(Number);
+  SR_REC = new Map((SR_EDIT.recipients || []).map((r) => [+r.employee_id, { mode: r.mode, email: r.email || '' }]));
+  $('#sr-form-title').textContent = s ? 'Edit schedule — ' + s.name : 'New schedule';
+  $('#sr-name').value = SR_EDIT.name || ''; $('#sr-enabled').checked = !!SR_EDIT.enabled;
+  $('#sr-freq').value = SR_EDIT.frequency; $('#sr-time').value = SR_EDIT.send_time; $('#sr-dom').value = SR_EDIT.day_of_month || 1;
+  const sc = SR_EDIT.scope || {}; $('#sr-b').value = sc.branch_id || ''; $('#sr-d').value = sc.department_id || ''; $('#sr-t').value = sc.team_id || '';
+  $('#sr-allown').checked = !!SR_EDIT.all_employees_own; $('#sr-extra').value = (SR_EDIT.extra_emails || []).join(', ');
+  $('#sr-skip-empty').checked = !!SR_EDIT.skip_empty; $('#sr-skip-hol').checked = !!SR_EDIT.skip_holidays; $('#sr-excel').checked = !!SR_EDIT.attach_excel;
+  $('#sr-subject').value = SR_EDIT.subject || ''; $('#sr-msg').value = SR_EDIT.message || '';
+  $('#sr-wa').checked = !!SR_EDIT.whatsapp_enabled; $('#sr-wa-admins').checked = !!SR_EDIT.whatsapp_admins;
+  $('#sr-wa-nums').value = (SR_EDIT.whatsapp_numbers || []).map((n) => '+' + n).join(', ');
+  $('#sr-wa-box').style.display = SR_EDIT.whatsapp_enabled ? '' : 'none'; $('#sr-wa-img').style.display = 'none'; srWaState();
+  $('#sr-q').value = ''; $('#sr-sel-only').checked = !!s; $('#sr-msg-out').textContent = '';
+  srPaintDays(); srPaintEmps();
+  $('#sr-form').style.display = ''; $('#sr-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function srClose() { $('#sr-form').style.display = 'none'; SR_EDIT = null; }
+async function srSave(andTest) {
+  const out = $('#sr-msg-out');
+  const days = [...document.querySelectorAll('#sr-days input:checked')].map((i) => +i.value);
+  const recipients = []; SR_REC.forEach((r, id) => { if (r.mode) recipients.push({ employee_id: id, email: r.email || null, mode: r.mode }); });
+  const extra = ($('#sr-extra').value || '').split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
+  const bad = extra.find((x) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
+  if (bad) { out.textContent = '✕ Not an email address: ' + bad; return; }
+  const body = {
+    name: $('#sr-name').value.trim(), enabled: $('#sr-enabled').checked, frequency: $('#sr-freq').value, send_time: $('#sr-time').value,
+    days, day_of_month: +$('#sr-dom').value || 1,
+    scope: { branch_id: +$('#sr-b').value || null, department_id: +$('#sr-d').value || null, team_id: +$('#sr-t').value || null },
+    all_employees_own: $('#sr-allown').checked, recipients, extra_emails: extra,
+    skip_empty: $('#sr-skip-empty').checked, skip_holidays: $('#sr-skip-hol').checked, attach_excel: $('#sr-excel').checked,
+    subject: $('#sr-subject').value.trim() || null, message: $('#sr-msg').value.trim() || null,
+    whatsapp_enabled: $('#sr-wa').checked, whatsapp_admins: $('#sr-wa-admins').checked,
+    whatsapp_numbers: ($('#sr-wa-nums').value || '').split(/[,;\n]+/).map((x) => x.trim()).filter(Boolean),
+  };
+  if (body.whatsapp_enabled && !body.whatsapp_admins && !body.whatsapp_numbers.length) { out.textContent = '✕ Add a WhatsApp number or tick Company Admin(s).'; return; }
+  if (!body.name) { out.textContent = '✕ Give the schedule a name.'; return; }
+  if (!body.send_time) { out.textContent = '✕ Pick the time to send.'; return; }
+  if (!body.all_employees_own && !recipients.length && !extra.length && !body.whatsapp_enabled) { out.textContent = '✕ Choose who receives it (employees, every employee, or additional emails).'; return; }
+  out.textContent = andTest ? 'Saving and sending the test…' : 'Saving…';
+  try {
+    const r = await api('/report-schedules' + (SR_EDIT && SR_EDIT.id ? '/' + SR_EDIT.id : ''), { method: SR_EDIT && SR_EDIT.id ? 'PUT' : 'POST', body: JSON.stringify(body) });
+    SR_EDIT = Object.assign(r.data, { _days: (r.data.days || []).map(Number) });
+    if (andTest) {
+      const t = await api('/report-schedules/' + r.data.id + '/run?test=1', { method: 'POST' });
+      out.textContent = '✓ Saved. ' + t.data.text;
+    } else { out.textContent = ''; srClose(); toast('✓ Schedule saved'); }
+    loadSchedRep();
+  } catch (e) { out.textContent = '✕ ' + e.message; }
+}
+
 function tableFrom(rows, keys, heads, secs) {
   if (!rows || !rows.length) return '<div class="mut">No data.</div>';
   return '<table><thead><tr>' + heads.map((h) => '<th>' + esc(h) + '</th>').join('') + '</tr></thead><tbody>'
@@ -8105,6 +9087,8 @@ const NT_CO = [
     when: (p) => 'More than <input type="number" min="1" data-f="minutes" value="' + p.minutes + '" style="width:60px"> min late — sent at ' + NT_HOURS('hour', p.hour) },
   { k: 'gate_long_break', name: 'Long out-of-office break', what: 'The biometric door shows an employee stayed out too long.',
     when: (p) => 'Break longer than <input type="number" min="0.1" max="24" step="0.1" data-f="hours" value="' + p.hours + '" style="width:60px"> hours' },
+  { k: 'security_alert', name: 'Endpoint security', what: 'A PC lost antivirus / real-time protection / firewall, has outdated signatures, or Defender found a threat. Sent once when a problem starts (Enforcer & Commander).',
+    when: () => 'When a security problem first appears' },
   { k: 'USER_CREDENTIALS', name: 'New sign-in details', what: 'Temporary password sent to a person when an admin creates their login or resets their password.',
     when: () => 'When an admin creates / resets a login', fixedTo: 'The person the login is for', copy: true },
 ];

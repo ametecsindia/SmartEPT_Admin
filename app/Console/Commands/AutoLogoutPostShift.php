@@ -269,5 +269,8 @@ class AutoLogoutPostShift extends Command
                 'current_status'  => 'OFFLINE',
             ]);
         }
+
+        // 29-Sep-2026: chat is session-only — auto sign-out ends the thread too.
+        \App\Models\EmployeeChatMessage::clearFor($employee->id);
     }
 }

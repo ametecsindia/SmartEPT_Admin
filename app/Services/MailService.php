@@ -106,6 +106,7 @@ class MailService
         'violation_spike'  => ['on' => false, 'roles' => ['COMPANY_ADMIN'], 'extra' => '', 'threshold' => 20, 'subject' => '', 'body' => ''],
         'late_login'       => ['on' => false, 'roles' => ['COMPANY_ADMIN', 'HR_ADMIN'], 'extra' => '', 'minutes' => 15, 'hour' => 11, 'subject' => '', 'body' => ''],
         'gate_long_break'  => ['on' => false, 'roles' => ['COMPANY_ADMIN', 'HR_ADMIN'], 'extra' => '', 'hours' => 3, 'subject' => '', 'body' => ''],
+        'security_alert'   => ['on' => false, 'roles' => ['COMPANY_ADMIN'], 'extra' => '', 'subject' => '', 'body' => ''], // 03-Oct-2026: Endpoint Security
         'USER_CREDENTIALS' => ['on' => true, 'extra' => '', 'subject' => '', 'body' => ''],
     ];
 
@@ -130,6 +131,9 @@ class MailService
         'gate_long_break' => ['vars' => ['employee', 'employee_code', 'hours', 'from', 'to'],
             'subject' => 'SmartEPT: long out-of-office break — {employee}',
             'body' => "{employee} ({employee_code}) was out of office for {hours} hours today ({from}–{to}, recorded by the biometric door).\n\nBeyond 3 hours the day normally counts as a half-day — the attendance sheet applies this automatically tonight; use Attendance → regularize if there is a genuine reason (client visit, medical).\n\n— SmartEPT"],
+        'security_alert' => ['vars' => ['device', 'issues'],
+            'subject' => 'SmartEPT security alert: {device}',
+            'body' => "Endpoint Security found a problem on {device}:\n\n{issues}\n\nOpen the console → Endpoint Security for details and actions. Protection is provided by Microsoft Defender (or the antivirus installed on the PC); SmartEPT monitors it.\n\n— SmartEPT"],
         'USER_CREDENTIALS' => ['vars' => ['name', 'email', 'temp_password'],
             'subject' => 'Your SmartEPT sign-in',
             'body' => "Hello {name},\n\nA SmartEPT account is ready for you.\n\nSign-in email: {email}\nTemporary password: {temp_password}\n\nThis password is temporary — you will be asked to change it after your first sign-in.\n\n— SmartEPT"],
@@ -272,6 +276,44 @@ class MailService
             'kind'       => $kind,
             'status'     => $status,
             'error'      => $error,
+        ]);
+
+        return $status;
+    }
+
+    /**
+     * 30-Sep-2026: HTML mail with attachments (Reports → Schedule Report). Same mailer resolution
+     * and mail_logs record as send(); $attachments = [[bytes, filename, mime], ...].
+     */
+    public static function sendHtml(string $to, string $subject, string $html, array $attachments = [], ?string $kind = null, ?int $companyId = null): string
+    {
+        $status = 'sent';
+        $error  = null;
+        if (trim($to) === '' || ! filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            $status = 'skipped';
+            $error  = 'No valid email address';
+        } else {
+            try {
+                [$mailer, $fromAddress, $fromName] = self::resolveMailer($companyId);
+                $pending = $mailer ? Mail::mailer($mailer) : Mail::mailer();
+                $pending->html($html, function ($message) use ($to, $subject, $fromAddress, $fromName, $attachments) {
+                    $message->to($to)->subject($subject);
+                    if ($fromAddress) {
+                        $message->from($fromAddress, $fromName ?: config('mail.from.name'));
+                    }
+                    foreach ($attachments as [$bytes, $name, $mime]) {
+                        $message->attachData($bytes, $name, ['mime' => $mime]);
+                    }
+                });
+            } catch (\Throwable $e) {
+                $status = 'failed';
+                $error  = mb_substr($e->getMessage(), 0, 1000);
+            }
+        }
+
+        MailLog::create([
+            'company_id' => $companyId, 'to' => $to, 'subject' => $subject,
+            'kind' => $kind, 'status' => $status, 'error' => $error,
         ]);
 
         return $status;

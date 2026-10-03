@@ -53,6 +53,12 @@ class CardAccess
         ['api/reports/breaks', ['reports.rep_breaks']],
         ['api/reports/meetings', ['reports.rep_meetings']],
         ['api/reports/monthly-summary', ['reports.rep_monthly']],
+        ['api/report-schedules*', ['schedrep.report_schedules']], // 30-Sep-2026: Schedule Report
+        // 03-Oct-2026: Endpoint Security (the plan gate is separate — EnsureEndpointSecurity).
+        ['api/endpoint-security/policy', ['endsec.security_policy']],
+        ['api/endpoint-security/*', ['endsec.security_overview']],
+        ['api/whatsapp-config', ['schedrep.report_schedules'], 'view-only'], // PUT = token: Super/Company Admin only
+        ['api/whatsapp-config/test', ['schedrep.report_schedules'], 'view-only'],
         // Employees (list/detail stay shared look-ups)
         ['api/employees/archives*', ['employees.employee_archive']],
         ['api/employees/export', ['employees.employee_directory']],

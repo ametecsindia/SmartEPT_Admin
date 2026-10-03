@@ -200,17 +200,18 @@ class InstallationLicense extends Model
      * Does the plan behind this licence include $key (e.g. 'enforcement',
      * 'live_view')? Read by EnsureFeature and the enforcer sync data-level gate.
      *
-     * Preserves two pre-existing behaviours exactly — these are not new
-     * commercial rules (18-Sep-2026 brief): the 7-day/no-key evaluation window
-     * (not yet configured() at all) and a Cloud trial licence (kind='trial')
-     * both keep full, Commander-equivalent feature access, same as before this
-     * gate existed. A licence issued before 'tier' existed (bundle has no
-     * 'features' key at all) also passes — never retroactively restrict an
-     * old licence just because this column is new.
+     * The 7-day/no-key evaluation window (not yet configured() at all) keeps full
+     * feature access. A licence issued before 'tier' existed (bundle has no
+     * 'features' key at all) also passes — never retroactively restrict an old
+     * licence just because this column is new.
+     *
+     * 30-Sep-2026 (Ejaz): a Cloud TRIAL is Standard — it gets exactly the features
+     * its licence carries (it used to get everything). Enforcer/Commander on a trial
+     * is a Super Admin grant in Central, which puts those features on the licence.
      */
     public function hasFeature(string $key): bool
     {
-        if (! $this->configured() || ($this->bundle['kind'] ?? null) === 'trial') {
+        if (! $this->configured()) {
             return true;
         }
 

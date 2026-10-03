@@ -135,7 +135,9 @@ class ActivityController extends Controller
         }
 
         EmployeeDevice::where('device_uuid', $data['device_uuid'])
-            ->update(['last_sync_at' => $now, 'current_status' => 'ONLINE']);
+            // 28-Sep-2026: no longer writes current_status — forcing ONLINE here overwrote the
+            // heartbeat's IDLE every sync, and the Live Dashboard now reads Active/Idle from it.
+            ->update(['last_sync_at' => $now]);
 
         return response()->json(['ok' => true, 'stored' => count($rows)], 202);
     }

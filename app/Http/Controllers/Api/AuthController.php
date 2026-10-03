@@ -258,6 +258,9 @@ class AuthController extends Controller
             'must_change_password' => (bool) $user->must_change_password,
             'plan_tier'            => $licence->tier(),
             'plan_features'        => $licence->bundle['features'] ?? [],
+            // 30-Sep-2026: what the server's feature gate actually allows (EnsureFeature /
+            // hasFeature), so the console shows exactly the screens the plan permits.
+            'plan_access'          => ['enforcement' => $licence->hasFeature('enforcement'), 'live_view' => $licence->hasFeature('live_view')],
         ];
     }
 

@@ -98,14 +98,17 @@ class DashboardController extends Controller
             $breakStart = null;
             if ($status === 'OFFLINE') {
                 $work = 'OFFLINE';                        // offline never counts as active/idle/break/meeting
-            } elseif ($seg) {
-                $work = $seg['state'] === 'LOGGED_IN' ? 'ACTIVE' : $seg['state'];
-                if (in_array($work, ['TEA_BREAK', 'LUNCH_BREAK', 'OTHER_BREAK', 'MEETING'], true)) {
-                    $breakStart = $seg['started_at'];
-                }
+            } elseif ($seg && in_array($seg['state'], ['TEA_BREAK', 'LUNCH_BREAK', 'OTHER_BREAK', 'MEETING'], true)) {
+                // Breaks and meetings are explicit, one-off transitions — the timeline is right.
+                $work = $seg['state'];
+                $breakStart = $seg['started_at'];
             } else {
-                // No timeline segment yet (rollout / never-transitioned) — fall back to the
-                // device's coarse status so nobody vanishes from the board.
+                // 28-Sep-2026: Active vs Idle comes from the device heartbeat, NOT the timeline.
+                // The timeline's ACTIVE/IDLE segments are built from COMPLETED activity stretches
+                // the agent flushes once a minute and syncs up to 15s later — so it trails the
+                // agent by ~1–2 min, and a retried (older) batch can flip it back to IDLE. The
+                // heartbeat carries the agent's own current state every 30s, which is exactly
+                // what the agent window shows. Timeline ACTIVE/IDLE is still used for reports.
                 $work = match ($status) {
                     'IDLE', 'AWAY' => 'IDLE',
                     default        => 'ACTIVE',

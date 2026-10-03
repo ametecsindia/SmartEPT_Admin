@@ -27,9 +27,9 @@ class ReportController extends Controller
         $this->assertEmployeeVisible($request, $employee->id);
         $date = $request->query('date', now()->toDateString());
         $entries = [];
-        $add = function ($time, $type, $label, $detail = null) use (&$entries) {
+        $add = function ($time, $type, $label, $detail = null, $ref = null) use (&$entries) {
             if ($time) {
-                $entries[] = ['time' => (string) $time, 'type' => $type, 'label' => $label, 'detail' => $detail];
+                $entries[] = ['time' => (string) $time, 'type' => $type, 'label' => $label, 'detail' => $detail, 'ref' => $ref];
             }
         };
 
@@ -49,7 +49,7 @@ class ReportController extends Controller
             $add($p->started_at, 'PRESENCE', str_replace('_', ' ', $p->event_type));
         }
         foreach (EmployeeScreenshotLog::where('employee_id', $employee->id)->whereDate('captured_at', $date)->get() as $sh) {
-            $add($sh->captured_at, 'SCREENSHOT', 'Screenshot captured', $sh->trigger_reason);
+            $add($sh->captured_at, 'SCREENSHOT', 'Screenshot captured', $sh->trigger_reason, $sh->id); // ref → drawer "View"
         }
         foreach (EmployeeComplianceEvent::where('employee_id', $employee->id)->whereDate('started_at', $date)->get() as $c) {
             $add($c->started_at, 'VIOLATION', str_replace('_', ' ', $c->event_type), $c->detected_value);

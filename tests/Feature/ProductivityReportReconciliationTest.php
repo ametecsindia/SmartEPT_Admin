@@ -148,7 +148,7 @@ class ProductivityReportReconciliationTest extends TestCase
         $this->assertSame(self::DAY, $row['work_date'], 'work_date must be a plain Y-m-d, never carry a time');
     }
 
-    /** Unaccounted time must be reported, not silently folded into Productive %. */
+    /** 29-Sep-2026 (Ejaz): signed in with no agent data is Idle — and still named in Data Issue. */
     public function test_a_gap_in_tracking_is_reported_not_hidden(): void
     {
         $this->travelTo(Carbon::parse('2026-07-08 10:00:00'));
@@ -163,9 +163,10 @@ class ProductivityReportReconciliationTest extends TestCase
         $row = $this->row();
 
         $this->assertSame(9 * 3600, $row['present_seconds'], 'the signed-in span is unchanged');
-        $this->assertSame(90 * 60, $row['unaccounted_seconds']);
-        $this->assertSame('UNACCOUNTED_TIME', $row['data_issue']);
-        $this->assertStringContainsString('not recorded as working, idle or break', $row['data_issue_text']);
+        $this->assertSame(0, $row['unaccounted_seconds']);
+        $this->assertSame(1800 + 90 * 60, $row['idle_seconds'], 'the 90 min the agent sent nothing for is Idle');
+        $this->assertSame('NO_AGENT_DATA', $row['data_issue']);
+        $this->assertStringContainsString('counted as Idle', $row['data_issue_text']);
     }
 
     /**
@@ -240,7 +241,8 @@ class ProductivityReportReconciliationTest extends TestCase
 
         $this->assertSame(2, (int) $sheet->getCell('K2')->getValue(), 'Number of Breaks');
         $this->assertSame(12, (int) $sheet->getCell('T2')->getValue(), 'Late Login (mins)');
-        $this->assertSame(0, (int) $sheet->getCell('U2')->getValue(), 'Unaccounted mins — the day balances');
+        $this->assertSame('Data Issue', $sheet->getCell('U1')->getValue(), 'no Unaccounted column any more');
+        $this->assertStringStartsWith('Away', $sheet->getCell('X1')->getValue());
         $this->assertSame('Late Login (mins)', $sheet->getCell('T1')->getValue());
 
         @unlink($path);

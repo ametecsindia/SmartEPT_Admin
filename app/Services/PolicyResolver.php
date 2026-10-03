@@ -174,6 +174,16 @@ class PolicyResolver
     {
         $map = ['application' => 'APPLICATION', 'website' => 'WEBSITE'];
 
+        // 29-Sep-2026 (Ejaz: false "PROTECTION NOT ENFORCEABLE: steam"): on a plan without
+        // enforcement the console hides the Protections column, so a file/image/camera tick
+        // saved earlier (or by a default profile) could never be seen or removed — yet it was
+        // still sent to every agent. Protections are an enforcement feature: not sent without it.
+        try {
+            $withProtections = \App\Models\InstallationLicense::governing(Company::find($companyId))->hasFeature('enforcement');
+        } catch (\Throwable $e) {
+            $withProtections = true; // licence unreadable: keep today's behaviour
+        }
+
         foreach ($map as $key => $type) {
             if (! isset($policies[$key]) || ! is_array($policies[$key])) {
                 continue;
@@ -193,7 +203,7 @@ class PolicyResolver
                     'item', 'label', 'status', 'action', 'suggested_action',
                     'catalog_app_id', 'identifiers', 'protections', 'confirmed_at',
                 ])
-                ->map(static function (PolicyRule $r): array {
+                ->map(static function (PolicyRule $r) use ($withProtections): array {
                     return [
                         'item'             => $r->item,
                         'label'            => $r->label,
@@ -211,7 +221,7 @@ class PolicyResolver
                         // which JSON keys count; absent keys are simply not in
                         // it. An agent that does not know the field ignores it
                         // and behaves exactly as it did before.
-                        'protections'      => $r->protectionList(),
+                        'protections'      => $withProtections ? $r->protectionList() : [],
                         'confirmed'        => $r->confirmed_at !== null,
                     ];
                 })

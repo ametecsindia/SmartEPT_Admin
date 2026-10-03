@@ -51,6 +51,32 @@ class ProductivityController extends Controller
     }
 
     /**
+     * GET /api/reports/productivity/detail?employee_id=&date= — 29-Sep-2026 (Ejaz): the "+"
+     * row. Every door IN/OUT, PC sign-in, Idle spell (and when Active resumed), Away (and when
+     * they were back at the desk) and Break for one employee on one day, with totals.
+     */
+    public function detail(Request $request): JsonResponse
+    {
+        $data = $request->validate(['employee_id' => ['required', 'integer'], 'date' => ['required', 'date_format:Y-m-d']]);
+        $this->assertEmployeeVisible($request, (int) $data['employee_id']);
+        $emp = Employee::where('company_id', $request->user()->company_id)->findOrFail($data['employee_id']);
+
+        return response()->json(['data' => \App\Services\DayTimeline::build($emp, $data['date'])]);
+    }
+
+    /**
+     * 29-Sep-2026: Away corrections for a row — only for days that have a door punch-out with
+     * no Break (cheap otherwise): Gate → PC after each return, and the Idle seconds that sit
+     * inside Away / Gate → PC windows (already counted there, so not Idle as well).
+     */
+    private function awayAdjust(Employee $emp, string $date, array $doorAway): array
+    {
+        return empty($doorAway[$emp->id . '|' . $date]['cnt'])
+            ? ['return_gate_to_pc' => 0, 'idle_overlap' => 0]
+            : \App\Services\DayTimeline::adjustments($emp, $date);
+    }
+
+    /**
      * Build the day-wise productivity rows for a range. Shared by the JSON report() and the
      * Excel export so the on-screen numbers and the .xlsx are guaranteed identical.
      * Returns [fromDate, toDate, rows[]].
@@ -74,7 +100,7 @@ class ProductivityController extends Controller
             // 26-Aug-2026: crosses_midnight + post_shift_auto_logout_minutes are needed by row()
             // to bound a day that has no recorded sign-out (see the shift-end cap below).
             ->with(['department:id,name', 'team:id,name', 'reportingManager:id,name',
-                'shift:id,start_time,end_time,break_minutes_allowed,crosses_midnight,post_shift_auto_logout_minutes'])
+                'shift:id,name,start_time,end_time,break_minutes_allowed,crosses_midnight,post_shift_auto_logout_minutes'])
             ->get()->keyBy('id');
 
         // Break counts + timeouts, grouped employee|date, for the whole range.
@@ -92,6 +118,22 @@ class ProductivityController extends Controller
             ->selectRaw('employee_id, DATE(login_at) d, COUNT(*) cnt')
             ->groupBy('employee_id', DB::raw('DATE(login_at)'))->get()
             ->keyBy(fn ($r) => $r->employee_id . '|' . $r->d);
+
+        // 28-Sep-2026 (Ejaz): a door punch-out with NO Break started is not a break — it is
+        // Away, and Away is Non-Productive. These rows sit inside the break totals above, so
+        // they are summed here and moved out of Break into Away by row().
+        $doorAway = [];
+        EmployeeBreakLog::where('company_id', $companyId)->unannounced()
+            ->whereBetween('start_at', [$from, $to])
+            ->when($empId, fn ($q) => $q->where('employee_id', $empId))
+            ->get(['employee_id', 'start_at', 'end_at', 'duration_seconds'])
+            ->each(function ($b) use (&$doorAway) {
+                $k = $b->employee_id . '|' . $b->start_at->toDateString();
+                $secs = $b->end_at ? (int) $b->duration_seconds : max(0, (int) now()->diffInSeconds($b->start_at, true));
+                $doorAway[$k]['secs'] = ($doorAway[$k]['secs'] ?? 0) + $secs;
+                $doorAway[$k]['open'] = ($doorAway[$k]['open'] ?? 0) + ($b->end_at ? 0 : $secs);
+                $doorAway[$k]['cnt'] = ($doorAway[$k]['cnt'] ?? 0) + 1;
+            });
 
         // Section 14: Meeting time is PRODUCTIVE (never a break). Aggregate meeting
         // session seconds per employee|date so it can be added to productive time.
@@ -147,6 +189,9 @@ class ProductivityController extends Controller
             $d = Carbon::parse($s->work_date)->toDateString();
             $bk = $breaks[$s->employee_id . '|' . $d] ?? null;
             $rows[] = $this->row($emp, $d, [
+                // Completed day: the summary's break_seconds only holds CLOSED breaks.
+                'door_away' => ($doorAway[$s->employee_id . '|' . $d]['secs'] ?? 0) - ($doorAway[$s->employee_id . '|' . $d]['open'] ?? 0),
+                'door_away_count' => $doorAway[$s->employee_id . '|' . $d]['cnt'] ?? 0,
                 'first_in' => $s->first_login_at, 'last_out' => $s->last_logout_at,
                 'present' => $s->present_seconds, 'work' => $s->active_seconds,
                 'idle' => $s->idle_seconds, 'break_secs' => $s->break_seconds,
@@ -157,6 +202,7 @@ class ProductivityController extends Controller
                 'score' => (float) $s->productivity_score, 'live' => false,
                 'gate_in' => $gateIns[$s->employee_id . '|' . $d]->t ?? null,
                 'pc_in' => $pcIns[$s->employee_id . '|' . $d]->t ?? null,
+                'away_adjust' => $this->awayAdjust($emp, $d, $doorAway),
             ]);
         }
 
@@ -178,6 +224,15 @@ class ProductivityController extends Controller
                 ->when($empId, fn ($q) => $q->where('employee_id', $empId))
                 ->selectRaw('employee_id, COUNT(*) c')->groupBy('employee_id')->get()->keyBy('employee_id');
 
+            // 28-Sep-2026: a break still OPEN has duration_seconds = NULL, so SUM() booked 0 and
+            // the minutes someone is on break right now showed up as "Unaccounted". Count them.
+            $openBreaks = EmployeeBreakLog::where('company_id', $companyId)
+                ->whereDate('start_at', $today)->whereNull('end_at')
+                ->when($empId, fn ($q) => $q->where('employee_id', $empId))
+                ->get(['employee_id', 'start_at'])
+                ->groupBy('employee_id')
+                ->map(fn ($g) => $g->sum(fn ($b) => max(0, (int) now()->diffInSeconds(Carbon::parse($b->start_at), true))));
+
             foreach ($employees as $emp) {
                 $a = $att[$emp->id] ?? null;
                 $ac = $act[$emp->id] ?? null;
@@ -198,9 +253,11 @@ class ProductivityController extends Controller
                 // keep a null logout and fall back to tracked present inside row().
                 $liveLogout = ($a && $a->check_in_at && ! $a->check_out_at) ? now() : $a?->check_out_at;
                 $rows[] = $this->row($emp, $today, [
+                    'door_away' => $doorAway[$emp->id . '|' . $today]['secs'] ?? 0,
+                    'door_away_count' => $doorAway[$emp->id . '|' . $today]['cnt'] ?? 0,
                     'first_in' => $a?->check_in_at, 'last_out' => $liveLogout,
                     'present' => $present, 'work' => $work, 'idle' => $idle,
-                    'break_secs' => (int) ($bk?->secs ?? 0), 'break_count' => (int) ($bk?->cnt ?? 0),
+                    'break_secs' => (int) ($bk?->secs ?? 0) + (int) ($openBreaks[$emp->id] ?? 0), 'break_count' => (int) ($bk?->cnt ?? 0),
                     'timeouts' => ($timeouts[$emp->id . '|' . $today]->cnt ?? 0),
                     'non_productive' => 0, 'violations' => (int) ($viol[$emp->id]->c ?? 0),
                     'meeting' => (int) ($meetings[$emp->id . '|' . $today]->secs ?? 0),
@@ -208,6 +265,7 @@ class ProductivityController extends Controller
                     'score' => $present > 0 ? round($work / max($present, 1) * 100, 1) : 0, 'live' => true,
                     'gate_in' => $gateIns[$emp->id . '|' . $today]->t ?? null,
                     'pc_in' => $pcIns[$emp->id . '|' . $today]->t ?? null,
+                    'away_adjust' => $this->awayAdjust($emp, $today, $doorAway),
                 ]);
             }
         }
@@ -235,6 +293,28 @@ class ProductivityController extends Controller
             'report' => 'productivity', 'format' => 'xlsx', 'from' => $fromStr, 'to' => $toStr, 'rows' => count($rows),
         ]);
 
+        $ss = $this->spreadsheet($rows);
+
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($ss);
+        $fname = 'SmartEPT-Productivity-Report-' . $fromStr . '_' . $toStr . '.xlsx';
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $fname, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+    }
+
+    /**
+     * 30-Sep-2026: the report rows for a (possibly synthetic) request — Reports → Schedule Report
+     * builds the emailed report from exactly the same code as the screen and the .xlsx.
+     */
+    public function rowsFor(Request $request): array
+    {
+        return $this->buildReport($request);
+    }
+
+    /** The .xlsx workbook for a set of report rows (the export and the scheduled emails share it). */
+    public function spreadsheet(array $rows): \PhpOffice\PhpSpreadsheet\Spreadsheet
+    {
         // EXACT headers from the client's Productivity Excel template (RAW sheet) — kept verbatim,
         // including the source sheet's double-spaces, so the export lines up 1:1 with their sheet.
         $headers = [
@@ -242,16 +322,17 @@ class ProductivityController extends Controller
             'Logged in', 'Logged out', 'Actual Present Hrs (Logged out - Logged in)',
             'Working (hh:mm)', 'Idle (hh:mm)', 'Number of Breaks', 'Break time Availed  (hh:mm)',
             'Allotted break (hh:mm)', 'Meeting Time', 'Break Exceed Mins (Break Time - Allotted Time)',
-            'Productive Hrs (Working + Meeting)', 'Non Productive Hrs (Idle + Break Exceed)',
+            'Productive Hrs (Working + Meeting)', 'Non Productive Hrs (Idle + Break Exceed + Away)',
             'Net Hrs (Actual Logged Hours-Allotted Break)', 'Productive% [ Productive Hrs/ Net Hrs]',
-            // Columns T–V are OURS, not the client template's, so A–S still line up 1:1 with
-            // their sheet. T added 26-Aug (Ejaz): minutes past the shift start, straight from
-            // the attendance sheet. U is the reconciliation cell — signed-in span minus
-            // everything recorded inside it, so a missing (+) or double-counted (−) minute is
-            // visible instead of quietly moving Productive %. V names why a row was repaired.
-            'Late Login (mins)', 'Unaccounted Mins (Present − Working − Idle − Break)', 'Data Issue',
-            // W–X added 23-Sep-2026 (Ejaz): the door punch and the gate-to-desk time.
+            // Columns T onward are OURS, not the client template's, so A–S still line up 1:1 with
+            // their sheet. T added 26-Aug (Ejaz): minutes past the shift start. U names why a row
+            // was repaired. (29-Sep-2026: the Unaccounted column is gone — every window is now
+            // Working, Idle, Break or Away.)
+            'Late Login (mins)', 'Data Issue',
+            // V–W added 23-Sep-2026 (Ejaz): the door punch and the gate-to-desk time.
             'Gate IN', 'Gate to PC (mins)',
+            // X: punched / signed out without a break and back in later — non-productive.
+            'Away (hh:mm) — punched/signed out without a break',
         ];
 
         $ss = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
@@ -310,15 +391,14 @@ class ProductivityController extends Controller
             }
             $sheet->setCellValue('T' . $r, (int) ($x['late_minutes'] ?? 0));       // Late Login (mins)
             $this->fmt($sheet, 20, $r, '0');
-            $sheet->setCellValue('U' . $r, (int) round(($x['unaccounted_seconds'] ?? 0) / 60)); // Unaccounted (signed)
-            $this->fmt($sheet, 21, $r, '0;-0');
-            if (! empty($x['data_issue_text'])) {                                   // Data Issue (ours, col V)
-                $sheet->setCellValueExplicit('V' . $r, (string) $x['data_issue_text'],
+            if (! empty($x['data_issue_text'])) {                                   // Data Issue (ours, col U)
+                $sheet->setCellValueExplicit('U' . $r, (string) $x['data_issue_text'],
                     \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
             }
-            $this->putTime($sheet, 23, $r, $x['gate_in'] ?? null, $CLK);                  // Gate IN (W)
-            $sheet->setCellValue('X' . $r, (int) ($x['gate_to_pc_minutes'] ?? 0));       // Gate to PC mins (X)
-            $this->fmt($sheet, 24, $r, '0');
+            $this->putTime($sheet, 22, $r, $x['gate_in'] ?? null, $CLK);                  // Gate IN (V)
+            $sheet->setCellValue('W' . $r, (int) ($x['gate_to_pc_minutes'] ?? 0));       // Gate to PC mins (W)
+            $this->fmt($sheet, 23, $r, '0');
+            $this->putDur($sheet, 24, $r, $x['away_seconds'] ?? 0, $DUR);                // Away (X)
             $r++;
         }
 
@@ -327,12 +407,7 @@ class ProductivityController extends Controller
         }
         $sheet->freezePane('A2');
 
-        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($ss);
-        $fname = 'SmartEPT-Productivity-Report-' . $fromStr . '_' . $toStr . '.xlsx';
-
-        return response()->streamDownload(function () use ($writer) {
-            $writer->save('php://output');
-        }, $fname, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+        return $ss;
     }
 
     /** 1-based column index → column letter (A, B, …, S). */
@@ -710,7 +785,7 @@ class ProductivityController extends Controller
      *   Actual Present Hrs = Logged out − Logged in   (fallback: tracked present when no logout)
      *   Break Exceed       = MAX(0, Break Availed − Allotted break)
      *   Productive Hrs     = Working + Meeting
-     *   Non-Productive Hrs = Idle + Break Exceed
+     *   Non-Productive Hrs = Idle + Break Exceed + Away (door punch-out with no Break, or PC locked / out with nothing recorded)
      *   Net Hrs            = Actual Present − Allotted break
      *   Productive %       = Productive Hrs ÷ Net Hrs        (blank when Net ≤ 0)
      * Allotted break stays the shift allowance pro-rated to present (Ejaz, 11-Aug decision).
@@ -722,9 +797,13 @@ class ProductivityController extends Controller
         $lastOut = $m['last_out'];
 
         $work = (int) $m['work'];
-        $idle = (int) $m['idle'];
+        // 29-Sep-2026: Idle that sits inside an Away / return Gate → PC window is counted there.
+        $adj = $m['away_adjust'] ?? ['return_gate_to_pc' => 0, 'idle_overlap' => 0];
+        $idle = max(0, (int) $m['idle'] - (int) $adj['idle_overlap']);
         $meeting = (int) ($m['meeting'] ?? 0);
-        $breakSecs = (int) $m['break_secs'];
+        $breakSecs = (int) $m['break_secs'];          // ALL break rows, incl. door punch-outs with no Break
+        $doorAway = min($breakSecs, (int) ($m['door_away'] ?? 0));
+        $declaredBreak = $breakSecs - $doorAway;       // breaks the employee actually started
 
         // 23-Sep-2026 (Ejaz): Gate → PC — door IN to first agent sign-in. The day is measured from
         // the EARLIER of the door and the sign-in, so not one second between them is lost, and that
@@ -733,6 +812,9 @@ class ProductivityController extends Controller
         $pcIn = $m['pc_in'] ?? null;
         $gateToPc = ($gateIn && $pcIn && Carbon::parse($gateIn)->lessThan(Carbon::parse($pcIn)))
             ? (int) Carbon::parse($pcIn)->diffInSeconds(Carbon::parse($gateIn), true) : 0;
+        // 29-Sep-2026 (Ejaz): the walk back in after an Away (door IN → first keyboard/mouse at the
+        // PC) is part of that Away — non-productive — not Gate → PC (which stays the day's first walk-in).
+        $returnWalk = (int) $adj['return_gate_to_pc'];
         $dayStart = ($gateIn && (! $firstIn || Carbon::parse($gateIn)->lessThan(Carbon::parse($firstIn)))) ? $gateIn : $firstIn;
 
         // Actual Present = logout − login (login = the day start above); when logout is missing
@@ -750,7 +832,7 @@ class ProductivityController extends Controller
         // The employee cannot have been present for less time than the day tracked, so floor
         // Actual Present at the tracked span (active + idle + break). Rows with a sound logout
         // are untouched, because for them logout − login is always the larger number.
-        $trackedFloor = max($trackedPresent, $work + $idle + $breakSecs + $gateToPc);
+        $trackedFloor = max($trackedPresent, $work + $idle + $breakSecs + $gateToPc + $returnWalk);
         $actualPresent = max($clockPresent, $trackedFloor);
         // Flagged so the console/export can show WHICH rows were repaired — a clamped row is
         // evidence of a missing sign-out that the post-shift auto-logout should have caught.
@@ -766,7 +848,7 @@ class ProductivityController extends Controller
         $shiftEndCap = $lastOut ? null : $this->shiftEndSeconds($emp, $date, $dayStart);
         $cappedAtShiftEnd = false;
         if ($shiftEndCap !== null && $shiftEndCap < $actualPresent) {
-            $actualPresent = max($work + $breakSecs + $gateToPc, $shiftEndCap);
+            $actualPresent = max($work + $breakSecs + $gateToPc + $returnWalk, $shiftEndCap);
             $cappedAtShiftEnd = $actualPresent < $trackedFloor;
         }
 
@@ -776,17 +858,47 @@ class ProductivityController extends Controller
         // negative delta means the buckets OVERLAP and are double-counting the same wall
         // clock. Either way it is now a number on the row instead of a silent distortion
         // of Productive %.
-        $accountedFor = $work + $idle + $breakSecs + $gateToPc;
+        $accountedFor = $work + $idle + $breakSecs + $gateToPc + $returnWalk;
         $unaccountedSeconds = $actualPresent - $accountedFor;
 
-        $allotted = ScoringService::allottedBreakSeconds($emp->shift, $actualPresent);
-        $breakExceed = max(0, $breakSecs - $allotted);
+        // 29-Sep-2026 (Ejaz): the full "Break allowed" of the shift, pro rata only when the employee
+        // was present for less than the shift (late in / early out). Today's live row is not an
+        // early logout yet: the rest of the shift still to come counts as present for this.
+        $allotBasis = $actualPresent;
+        if ($m['live'] && $emp->shift?->end_time) {
+            $end = Carbon::parse($date . ' ' . $emp->shift->end_time);
+            if ($emp->shift->start_time && ($emp->shift->crosses_midnight || $end->lessThanOrEqualTo(Carbon::parse($date . ' ' . $emp->shift->start_time)))) {
+                $end->addDay();
+            }
+            $allotBasis += max(0, (int) now()->diffInSeconds($end, false));
+        }
+        $allotted = ScoringService::allottedBreakSeconds($emp->shift, $allotBasis);
+        $breakExceed = max(0, $declaredBreak - $allotted);
         $productive = $work + $meeting;
         $nonProductive = $idle + $breakExceed;
         $netHrs = max(0, $actualPresent - $allotted);
         // Hard cap at 100%: Productive Hrs can still nudge past Net Hrs when the allotted break
         // is pro-rated away, and a >100% cell reads as a broken report to the client.
         $productivity = $netHrs > 0 ? min(100.0, round($productive / $netHrs * 100, 1)) : null; // null => N/A (shown as —)
+
+        // 29-Sep-2026 (Ejaz): every window of the day with no working / idle / break record is
+        // classified — nothing is left "Unaccounted":
+        //  - NOT signed in (signed out of the app → signed back in), or out of the door with no
+        //    break → Away (non-productive);
+        //  - signed in but the agent sent nothing (PC off / agent closed) → Idle.
+        $gaps = [];
+        $awaySeconds = 0;
+        if ($unaccountedSeconds > 60 && $dayStart) {  // ponytail: gap-away first, door breaks added below
+            $winStart = Carbon::parse($dayStart);
+            ['gaps' => $gaps, 'away' => $awaySeconds, 'idle' => $gapIdle] = $this->unaccountedGaps($emp, $winStart,
+                $winStart->copy()->addSeconds($actualPresent), (bool) $m['live'], $gateIn, $pcIn, $adj['walks'] ?? []);
+            $awaySeconds = min($awaySeconds, $unaccountedSeconds); // never flip a real gap into "overlap"
+            $unaccountedSeconds -= $awaySeconds;
+            $gapIdle = min($gapIdle, $unaccountedSeconds);
+            $unaccountedSeconds -= $gapIdle;
+            $idle += $gapIdle;
+            $nonProductive += $awaySeconds + $gapIdle;
+        }
 
         $issue = $this->describeIssue(
             hasSignOut: (bool) $lastOut,
@@ -795,9 +907,19 @@ class ProductivityController extends Controller
             unaccountedSeconds: $unaccountedSeconds,
             actualPresent: $actualPresent,
         );
+        // Door punch-outs with no Break: out of Break, into Away (Non-Productive).
+        $awaySeconds += $doorAway + $returnWalk;
+        $nonProductive += $doorAway + $returnWalk;
+        if ($gaps) {   // signed in, nothing from the agent — counted as Idle, but worth a look
+            $note = implode('; ', array_map(fn ($g) => $g['from'] . '–' . $g['to']
+                . ' (' . sprintf('%d:%02d', intdiv($g['seconds'], 3600), intdiv($g['seconds'] % 3600, 60)) . ') '
+                . $g['cause'], $gaps));
+            $issue = $issue['code'] === null ? ['code' => 'NO_AGENT_DATA', 'text' => $note] : ['code' => $issue['code'], 'text' => $issue['text'] . ' — ' . $note];
+        }
 
         return [
             'work_date' => $date,
+            'employee_id' => $emp->id, // 29-Sep-2026: for the "+" detail row
             'employee_code' => $emp->employee_code,
             'name' => trim($emp->first_name . ' ' . $emp->last_name),
             'department' => $emp->department?->name,
@@ -820,11 +942,19 @@ class ProductivityController extends Controller
             'late_minutes' => (int) ($m['late_min'] ?? 0),
             'data_issue' => $issue['code'],
             'data_issue_text' => $issue['text'],
+            'unaccounted_gaps' => $gaps,
+            'away_seconds' => $awaySeconds,
             'work_seconds' => $work,
             'idle_seconds' => $idle,
-            'break_seconds' => $breakSecs,
-            'break_count' => (int) $m['break_count'],
+            'break_seconds' => $declaredBreak,
+            'break_count' => max(0, (int) $m['break_count'] - (int) ($m['door_away_count'] ?? 0)),
             'allotted_break_seconds' => $allotted,
+            'allotted_break_basis' => ($emp->shift?->name ?? 'No shift') . ': Break allowed '
+                . (int) round(($emp->shift?->break_minutes_allowed !== null ? $emp->shift->break_minutes_allowed * 60 : ScoringService::shiftExpectedSeconds($emp->shift) / 9) / 60) . ' min'
+                . ($allotted < ScoringService::allottedBreakSeconds($emp->shift, PHP_INT_MAX >> 8)
+                    ? ' × ' . sprintf('%dh%02dm', intdiv($allotBasis, 3600), intdiv($allotBasis % 3600, 60)) . ' present ÷ '
+                      . sprintf('%dh%02dm', intdiv(ScoringService::shiftExpectedSeconds($emp->shift), 3600), intdiv(ScoringService::shiftExpectedSeconds($emp->shift) % 3600, 60)) . ' shift (pro rata)'
+                    : ' (full shift)'),
             'break_exceed_seconds' => $breakExceed,
             // Section 14: Meeting time is productive, kept separate from breaks.
             'meeting_seconds' => $meeting,
@@ -866,6 +996,116 @@ class ProductivityController extends Controller
         }
 
         return (int) $end->diffInSeconds($in, true);
+    }
+
+    /**
+     * The clock windows inside [$winStart, $winEnd] covered by NO activity stretch, break or
+     * walk (gate→PC, walk back in after an Away), split into:
+     *  - away: not signed in (sign-out → next sign-in) or out of the door → Away;
+     *  - idle: the rest — signed in, but the agent sent nothing (PC off / agent closed) → Idle.
+     * 'gaps' lists the idle ones (≥ 2 min, biggest 4, in time order) for the Data Issue note.
+     */
+    private function unaccountedGaps(Employee $emp, Carbon $winStart, Carbon $winEnd, bool $live, $gateIn, $pcIn, array $walks = []): array
+    {
+        $look = $winStart->copy()->subDay();   // stretches that began before the window but run into it
+        $spans = [];
+        EmployeeActivityEvent::where('employee_id', $emp->id)
+            ->whereBetween('started_at', [$look, $winEnd])
+            ->get(['started_at', 'ended_at', 'duration_seconds'])
+            ->each(function ($e) use (&$spans) {
+                $s = Carbon::parse($e->started_at);
+                $spans[] = [$s, $e->ended_at ? Carbon::parse($e->ended_at) : $s->copy()->addSeconds((int) $e->duration_seconds)];
+            });
+        EmployeeBreakLog::where('employee_id', $emp->id)
+            ->whereBetween('start_at', [$look, $winEnd])
+            ->get(['start_at', 'end_at', 'duration_seconds'])
+            ->each(function ($b) use (&$spans, $live) {
+                $s = Carbon::parse($b->start_at);
+                $spans[] = [$s, $b->end_at ? Carbon::parse($b->end_at)
+                    : ($live ? now() : $s->copy()->addSeconds((int) $b->duration_seconds))];
+            });
+        if ($gateIn && $pcIn) {
+            $spans[] = [Carbon::parse($gateIn), Carbon::parse($pcIn)];
+        }
+        array_push($spans, ...$walks);
+
+        $holes = \App\Services\DayTimeline::holes($spans, $winStart, $winEnd);
+        if (! $holes) {
+            return ['gaps' => [], 'away' => 0, 'idle' => 0];
+        }
+
+        // Away windows: signed out of the app (any sign-out, PC lock included → next sign-in) and
+        // out of the door (OUT/BREAK_OUT punch → next IN/BREAK_IN). While the gate is closed the
+        // server refuses the agent's idle stretches (423), so this is the only record of that time.
+        $away = [];
+        $sessList = EmployeeLoginSession::where('employee_id', $emp->id)
+            ->whereBetween('login_at', [$look, $winEnd])->orderBy('login_at')
+            ->get(['login_at', 'logout_at', 'logout_reason'])->values();
+        foreach ($sessList as $i => $s) {
+            if ($s->logout_at) {
+                $next = $sessList[$i + 1] ?? null;
+                $away[] = [Carbon::parse($s->logout_at), $next ? Carbon::parse($next->login_at) : $winEnd->copy()];
+            }
+        }
+        $out = null;
+        foreach (\App\Models\BiometricLog::withoutGlobalScopes()->where('employee_id', $emp->id)
+            ->whereBetween('punched_at', [$look, $winEnd])->orderBy('punched_at')
+            ->get(['punch_type', 'punched_at']) as $p) {
+            $t = Carbon::parse($p->punched_at);
+            if (in_array($p->punch_type, ['OUT', 'BREAK_OUT'], true)) {
+                $out ??= $t;
+            } elseif ($out) {
+                $away[] = [$out, $t];
+                $out = null;
+            }
+        }
+        if ($out) {
+            $away[] = [$out, $winEnd->copy()];
+        }
+        $overlap = function (Carbon $a, Carbon $b) use ($away): int {
+            // Union of away windows inside [a, b] (windows may overlap: lock + door together).
+            $parts = [];
+            foreach ($away as [$s, $e]) {
+                $s = $s->greaterThan($a) ? $s : $a;
+                $e = $e->lessThan($b) ? $e : $b;
+                if ($e->greaterThan($s)) {
+                    $parts[] = [$s->getTimestamp(), $e->getTimestamp()];
+                }
+            }
+            sort($parts);
+            $sum = 0; $cur = null;
+            foreach ($parts as [$s, $e]) {
+                if ($cur && $s <= $cur[1]) { $cur[1] = max($cur[1], $e); continue; }
+                if ($cur) { $sum += $cur[1] - $cur[0]; }
+                $cur = [$s, $e];
+            }
+            return $sum + ($cur ? $cur[1] - $cur[0] : 0);
+        };
+        $awayTotal = 0; $idleTotal = 0; $idleHoles = [];
+        foreach ($holes as [$from, $to]) {
+            $len = (int) $to->diffInSeconds($from, true);
+            $a = $overlap($from, $to);
+            $awayTotal += $a;
+            $idleTotal += $len - $a;
+            if ($len - $a >= 120) {
+                $idleHoles[] = [$from, $to, $len - $a];
+            }
+        }
+
+        usort($idleHoles, fn ($a, $b) => $b[2] <=> $a[2]);
+        $idleHoles = array_slice($idleHoles, 0, 4);
+        usort($idleHoles, fn ($a, $b) => $a[0] <=> $b[0]);
+
+        $gaps = array_map(function ($h) use ($live, $winEnd) {
+            [$from, $to, $secs] = $h;
+            $cause = $live && $to->greaterThanOrEqualTo($winEnd->copy()->subSeconds(5))
+                ? 'nothing received from the agent since ' . $from->format('H:i') . ' — counted as Idle (agent closed / PC off, or data still pending on the agent)'
+                : 'signed in, no activity from the agent (PC off / agent closed) — counted as Idle';
+
+            return ['from' => $from->format('H:i'), 'to' => $to->format('H:i'), 'seconds' => $secs, 'cause' => $cause];
+        }, $idleHoles);
+
+        return ['gaps' => $gaps, 'away' => $awayTotal, 'idle' => $idleTotal];
     }
 
     /**

@@ -84,12 +84,41 @@ class DeviceController extends Controller
         $existing = EmployeeDevice::withoutGlobalScopes()
             ->where('device_uuid', $data['device_uuid'])->first();
 
-        // R2-3: a device an admin unbound may not silently re-register.
-        if ($existing && $existing->unbound_at) {
+        // 28-Sep-2026: "device was unbound … approve a re-bind" while the PC was NOT on the
+        // Devices screen, so there was nothing to approve. The lookup above is unscoped but
+        // the Devices screen is company-scoped AND narrowed to the viewer's visible employees,
+        // so the blocking row was invisible whenever it (a) belonged to ANOTHER company, or
+        // (b) still pointed at an employee outside the viewer's scope — a relieved/deleted
+        // previous user of a shared PC, or someone in another branch.
+        $crossTenant = $existing && $existing->company_id !== $employee->company_id;
+
+        // (a) Another company's unbind is that company's decision about ITS seat (already
+        // released at unbind time). It cannot bind this company, whose admin can never see or
+        // re-bind that row. For this company the PC is simply a new device: it claims a seat
+        // below and the row is re-pointed and un-blocked by the updateOrCreate.
+        //
+        // (b) Same company: the block stands (R2-3), but the row is re-pointed to the employee
+        // now at this PC, so it appears on the Devices screen for exactly the admins who manage
+        // that employee, under their name, with "Approve re-bind". Audited with the previous
+        // owner, so nothing is lost.
+        if ($existing && $existing->unbound_at && ! $crossTenant) {
+            $previousEmployeeId = $existing->employee_id;
+            $existing->forceFill(array_filter([
+                'employee_id'   => $employee->id,
+                'computer_name' => $data['computer_name'] ?? null,
+            ], fn ($v) => $v !== null))->save();
+
+            $this->audit($request, 'LOGIN_DENIED_DEVICE_UNBOUND', EmployeeDevice::class, $existing->id, [
+                'device_uuid'           => $data['device_uuid'],
+                'previous_employee_id'  => $previousEmployeeId,
+                'attempted_employee_id' => $employee->id,
+            ]);
+
             return response()->json([
                 'error' => [
                     'code' => 'DEVICE_UNBOUND',
-                    'message' => 'This device was unbound by an administrator. Ask them to approve a re-bind on the Devices screen.',
+                    'message' => 'This device (' . ($existing->computer_name ?: 'this PC')
+                        . ') was unbound by an administrator. Ask them to approve a re-bind on the Devices screen.',
                 ],
             ], 409);
         }
@@ -112,7 +141,8 @@ class DeviceController extends Controller
             ], 403);
         }
 
-        $isNewDevice = $existing === null;
+        // A PC arriving from another company is new to THIS company's licence: claim a seat here.
+        $isNewDevice = $existing === null || $crossTenant;
 
         // Section 10: server-enforced single active session per employee. Serialise
         // concurrent logins for this employee with a short lock so two PCs racing to
@@ -191,8 +221,14 @@ class DeviceController extends Controller
             // so this is reachable on purpose as well as by accident. Reset to inherit.
             $crossTenantReset = ($existing && $existing->company_id !== $employee->company_id)
                 ? ['gate_mode' => null, 'gate_mode_from' => null, 'gate_mode_until' => null,
-                    'gate_mode_reason' => null, 'gate_mode_by_user_id' => null, 'tracking_mode' => null]
+                    'gate_mode_reason' => null, 'gate_mode_by_user_id' => null, 'tracking_mode' => null,
+                    'unbound_at' => null] // the other company's unbind does not follow the PC
                 : [];
+
+            // The previous company still holds a seat for a PC it no longer has — release it.
+            if ($crossTenant && ! $existing->unbound_at) {
+                app(\App\Services\LicenseClient::class)->deactivateDevice($existing->device_uuid, $existing->company_id);
+            }
 
             // Unscoped for the same reason as the lookup above: the row may currently
             // belong to another company; updateOrCreate must SEE it to update, not insert.
@@ -221,6 +257,9 @@ class DeviceController extends Controller
             )->plainTextToken;
 
             $device->forceFill(['device_token_hash' => hash('sha256', $token)])->save();
+
+            // 29-Sep-2026: a new sign-in starts a new chat — nothing from an earlier session.
+            \App\Models\EmployeeChatMessage::clearFor($employee->id);
 
             // Section 10: this device is now THE session — retire every OTHER of the
             // employee's sessions (revoke their agent tokens so a resuming stale PC gets
@@ -385,9 +424,27 @@ class DeviceController extends Controller
             }
         }
 
+        // 28-Sep-2026 (Ejaz): back from a door punch-out that had no Break → the agent shows,
+        // once per break id, how much Non-Productive (Away) time was recorded.
+        $awayNotice = null;
+        if ($device->employee) {
+            $b = \App\Models\EmployeeBreakLog::withoutGlobalScopes()->unannounced()
+                ->where('employee_id', $device->employee->id)->whereNotNull('end_at')
+                ->where('end_at', '>=', $this->localNow($device->company_id)->subHours(4))
+                ->latest('end_at')->first();
+            if ($b) {
+                $awayNotice = ['id' => $b->id, 'minutes' => max(1, (int) round(((int) $b->duration_seconds) / 60)),
+                    'from' => $b->start_at->format('H:i'), 'to' => $b->end_at->format('H:i'),
+                    // 29-Sep-2026: exact instants, so the agent can show "back at desk" and the
+                    // gate → PC walk from the first keyboard/mouse input after the IN punch.
+                    'out_at' => $b->start_at->toIso8601String(), 'in_at' => $b->end_at->toIso8601String()];
+            }
+        }
+
         return response()->json([
             'ok' => true,
             'server_time' => now()->toIso8601String(),
+            'away_notice' => $awayNotice,
             'clock_skew_seconds' => $skew,
             'gate' => $gate,                 // nested {enabled,state,arrived,...} (unchanged)
             'gate_status' => $gateStatus,    // QA Phase 2 (A3): {gate_required, open, message, reason}
@@ -531,6 +588,9 @@ class DeviceController extends Controller
         if ($device) {
             $device->update(['session_status' => 'LOGGED_OUT', 'current_status' => 'OFFLINE']);
         }
+        // 29-Sep-2026: chat is session-only — the thread ends with the session.
+        $employeeId = \App\Models\Employee::where('user_id', $request->user()->id)->value('id');
+        if ($employeeId) \App\Models\EmployeeChatMessage::clearFor((int) $employeeId);
         $request->user()->currentAccessToken()?->delete();
 
         return response()->json(['ok' => true]);
