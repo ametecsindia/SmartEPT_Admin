@@ -88,6 +88,30 @@ class EnforcementMachine extends Model implements AuthenticatableContract
             && $this->enforcement_health === 'PROTECTED';
     }
 
+    /**
+     * 05-Oct-2026: the agent device that is on this PC NOW.
+     *
+     * The service only ever knew the device id it was enrolled with, and re-enrolment kept
+     * the old one (the handoff carries no device id). After a reinstall the agent registers
+     * as a new device, so everything the service reported — USB, software, downloads — was
+     * filed under the old device and never appeared in that PC's audit log. The agent row
+     * with this PC's name and the newest heartbeat is the live one.
+     */
+    public static function liveDeviceUuid(int $companyId, ?string $hostname, ?string $claimed): ?string
+    {
+        if (! $hostname) {
+            return $claimed;
+        }
+        $live = EmployeeDevice::withoutGlobalScopes()->where('company_id', $companyId)->where('computer_name', $hostname)
+            ->whereNotNull('last_heartbeat_at')->orderByDesc('last_heartbeat_at')->first(['device_uuid', 'last_heartbeat_at']);
+        if (! $live || $live->device_uuid === $claimed) {
+            return $claimed ?: $live?->device_uuid;
+        }
+        $mine = $claimed ? EmployeeDevice::withoutGlobalScopes()->where('device_uuid', $claimed)->value('last_heartbeat_at') : null;
+
+        return ! $mine || $live->last_heartbeat_at->gt($mine) ? $live->device_uuid : $claimed;
+    }
+
     public function device()
     {
         return $this->belongsTo(EmployeeDevice::class, 'device_uuid', 'device_uuid');

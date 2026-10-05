@@ -202,8 +202,12 @@ if not exist "relay\dist\smartept-relay-win.exe" (
   sc.exe stop "SmartEPT LiveView Relay" >nul 2>nul
   sc.exe delete "SmartEPT LiveView Relay" >nul 2>nul
   schtasks /Delete /F /TN "SmartEPT LiveView Relay" >nul 2>nul
-  schtasks /Create /F /TN "SmartEPT LiveView Relay" /SC ONSTART /RU SYSTEM /RL HIGHEST /TR "\"%WINDIR%\System32\wscript.exe\" \"%CD%\relay\daemon\relay-watchdog.vbs\"" >nul 2>nul
-  set "SVC_RC=%errorlevel%"
+  REM 05-Oct-2026: the task runs the relay exe DIRECTLY (no VBScript in between - that launcher
+  REM silently failed under SYSTEM, so the relay never started at boot). Windows itself restarts
+  REM it every minute if it stops, with no run-time limit. Also removes the dead node-windows service.
+  sc.exe delete smarteptliveviewrelay.exe >nul 2>nul
+  powershell -NoProfile -ExecutionPolicy Bypass -Command "$e='%CD%\relay\dist\smartept-relay-win.exe'; Unregister-ScheduledTask -TaskName 'SmartEPT LiveView Relay' -Confirm:$false -ErrorAction SilentlyContinue; $a=New-ScheduledTaskAction -Execute $e -WorkingDirectory (Split-Path $e); $t=New-ScheduledTaskTrigger -AtStartup; $s=New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable; Register-ScheduledTask -TaskName 'SmartEPT LiveView Relay' -Action $a -Trigger $t -Settings $s -User 'SYSTEM' -RunLevel Highest -Force -ErrorAction Stop | Out-Null" >nul 2>nul >nul 2>nul
+  set "SVC_RC=!errorlevel!"
   if not "%SVC_RC%"=="0" (
     echo    [WARN] Could not install the relay startup task - are you in an ADMINISTRATOR prompt?
     echo           Re-run INSTALL.bat as administrator, or from an admin prompt run:

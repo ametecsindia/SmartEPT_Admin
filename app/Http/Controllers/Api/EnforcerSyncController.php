@@ -76,7 +76,8 @@ class EnforcerSyncController extends Controller
             'signed_in_employee_id'  => array_key_exists('employee_id', $data)
                 ? ($data['employee_id'] ?: null)
                 : $machine->signed_in_employee_id,
-            'device_uuid'            => $data['device_uuid'] ?: $machine->device_uuid,
+            // 05-Oct-2026: the agent device on this PC now, not the one it enrolled with.
+            'device_uuid'            => EnforcementMachine::liveDeviceUuid((int) $machine->company_id, $machine->hostname, ($data['device_uuid'] ?? null) ?: $machine->device_uuid),
             'last_seen_at'           => now(),
         ])->save();
 
@@ -137,6 +138,21 @@ class EnforcerSyncController extends Controller
             }
         }
 
+        // 05-Oct-2026: Device control (USB / camera) is a machine-wide hardware block that the
+        // admin switches on by itself in "Device control". It used to ride on the application
+        // Enforcement switch, so with Enforcement OFF — or nobody signed in, or an employee with
+        // no app rules — the PC got the kill switch and USB drives kept working while the console
+        // showed "Block USB" ticked. When the answer would be OFF but a device block is ticked,
+        // the PC now gets a DEVICE-ONLY policy: the device blocks and nothing else (no app, site
+        // or protection rule), under its own version so it can never be mistaken for a full one.
+        $deviceOnly = false;
+        if ($mode === EnforcementState::OFF && $this->deviceControlsOn((int) $machine->company_id)) {
+            $mode = EnforcementState::ENFORCE;
+            $latest = self::DEVICE_ONLY_VERSION + $latest;
+            $deviceOnly = true;
+        }
+        \Illuminate\Support\Facades\Cache::put('enforcer:device_only:' . $machine->id, $deviceOnly, now()->addHours(12));
+
         // A revoked machine is told to stop enforcing, but NOT via the kill
         // switch: revoking a credential must not be a quiet way to disarm a PC.
         // It simply stops receiving policy.
@@ -152,6 +168,8 @@ class EnforcerSyncController extends Controller
                 // For the console, so "why is that PC not blocking" is a glance
                 // rather than an investigation.
                 'employee_id'           => $signedIn?->id,
+                // 05-Oct-2026 (additive): only device blocks apply; the endpoint first clears anything else it holds.
+                'device_only'           => $deviceOnly,
             ],
         ]);
     }
@@ -174,6 +192,18 @@ class EnforcerSyncController extends Controller
         // reported thirty seconds ago — an endpoint told OFF and then handed an AUDIT spec is
         // exactly the disagreement that leaves a PC applying a policy nobody thinks it has.
         $mode = $state->effectiveMode();
+        // 05-Oct-2026: the heartbeat decided this PC gets device blocks only (see heartbeat()).
+        if (\Illuminate\Support\Facades\Cache::get('enforcer:device_only:' . $machine->id)) {
+            $d = $this->deviceControls($companyId);
+
+            return response()->json(['ok' => true, 'data' => $d['usb'] || $d['camera'] ? [[
+                'version' => self::DEVICE_ONLY_VERSION + app(PolicyResolver::class)->latestPolicyVersionFor($companyId),
+                'mode' => EnforcementState::ENFORCE, 'scope' => 'MACHINE', 'tenant_id' => (string) $companyId,
+                'clearance' => $this->clearance($state), 'rules' => [], 'sites' => [], 'protections' => [],
+                'web_protections' => null, 'media_control' => null,
+                'block_removable_storage' => $d['usb'], 'block_camera_device' => $d['camera'],
+            ]] : []]);
+        }
         if ($mode === EnforcementState::OFF) {
             // Not the same as "remove everything" — the heartbeat's kill switch
             // says that. This says there is nothing to apply.
@@ -354,6 +384,22 @@ class EnforcerSyncController extends Controller
     // ---- helpers ----------------------------------------------------------
 
     /** The authenticated machine, or 403. */
+    /** Device-only policy versions live far above any real one, so the two never collide. */
+    public const DEVICE_ONLY_VERSION = 1000000000;
+
+    /** @return array{usb: bool, camera: bool} the company's Device control switches. */
+    private function deviceControls(int $companyId): array
+    {
+        $c = \App\Models\Company::withoutGlobalScopes()->whereKey($companyId)->first(['block_removable_storage', 'block_camera_device']);
+
+        return ['usb' => (bool) ($c->block_removable_storage ?? false), 'camera' => (bool) ($c->block_camera_device ?? false)];
+    }
+
+    private function deviceControlsOn(int $companyId): bool
+    {
+        return in_array(true, $this->deviceControls($companyId), true);
+    }
+
     private function machine(Request $request): EnforcementMachine
     {
         $machine = $request->user();

@@ -51,7 +51,27 @@ _to_delete/
 # Local development / generated output
 
 /Claude outputs/
-/relay/
+/_cloudsync/
+/database/*.sqlite
+/database/*.sqlite.*
+
+# LiveView relay (05-Oct-2026): the SOURCE is tracked (server.js, package.json,
+# .env.example, daemon/relay-watchdog.vbs); secrets, builds and runtime files never are.
+/relay/node_modules/
+/relay/dist/
+/relay/relay-secret.txt
+/relay/relay-status.txt
+/relay/relay-tls-*.txt
+/relay/daemon/*.log
+/relay/daemon/*.exe
+/relay/daemon/*.exe.config
+/relay/daemon/*.xml
+/relay/pkg
+/relay/Error!
+/relay/smartept-relay@*
+
+# Generated reports (PC Audit "Run audit for all PCs" CSVs)
+/storage/app/pc-audit/
 
 # Local Windows shortcuts
 

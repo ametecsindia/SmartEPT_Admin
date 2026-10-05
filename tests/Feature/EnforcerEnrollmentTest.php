@@ -431,4 +431,48 @@ class EnforcerEnrollmentTest extends TestCase
             (int) EnforcementMachine::withoutGlobalScopes()->firstOrFail()->company_id
         );
     }
+
+    /**
+     * 05-Oct-2026 (Ejaz): "Block USB" ticked but USB still worked. Device control is its own
+     * switch: with application Enforcement OFF (or nobody signed in) the PC must still get the
+     * USB block — and nothing else, under a version that can never equal a full policy's.
+     */
+    public function test_usb_block_applies_even_with_enforcement_off(): void
+    {
+        $this->admin();
+        $token = $this->enrol($this->mintSecret())->assertCreated()->json('device_token');
+        $company = $this->companyId();
+        \App\Models\EnforcementState::forCompany($company)->forceFill(['mode' => \App\Models\EnforcementState::OFF])->save();
+
+        $hb = fn () => $this->withToken($token)->postJson('/api/enforcer/heartbeat', ['employee_id' => 0])->assertOk()->json('enforcement');
+        $this->assertTrue($hb()['kill_switch'], 'nothing ticked: OFF must still mean OFF');
+
+        \App\Models\Company::withoutGlobalScopes()->whereKey($company)->update(['block_removable_storage' => true]);
+        $e = $hb();
+        $this->assertFalse($e['kill_switch']);
+        $this->assertTrue($e['device_only']);
+        $this->assertSame('ENFORCE', $e['mode']);
+        $this->assertGreaterThan(\App\Http\Controllers\Api\EnforcerSyncController::DEVICE_ONLY_VERSION, $e['latest_policy_version']);
+
+        $specs = $this->withToken($token)->getJson('/api/enforcer/policy?device_uuid=MACHINE-A')->assertOk()->json('data');
+        $this->assertCount(1, $specs);
+        $this->assertSame($e['latest_policy_version'], $specs[0]['version'], 'spec and heartbeat must agree or the PC resyncs for ever');
+        $this->assertTrue($specs[0]['block_removable_storage']);
+        $this->assertSame([], $specs[0]['rules']);
+        $this->assertSame([], $specs[0]['sites']);
+    }
+
+    /** 05-Oct-2026: a reinstalled PC's service reports under the agent device on that PC now. */
+    public function test_the_service_follows_the_agent_device_on_its_pc(): void
+    {
+        $this->admin();
+        $company = $this->companyId();
+        $emp = \App\Models\Employee::withoutGlobalScopes()->where('company_id', $company)->firstOrFail();
+        $mk = fn ($uuid, $at) => \App\Models\EmployeeDevice::withoutGlobalScopes()->create(['company_id' => $company, 'employee_id' => $emp->id,
+            'device_uuid' => $uuid, 'computer_name' => 'FLOOR-PC-01', 'last_heartbeat_at' => $at]);
+        $mk('OLD-AGENT', now()->subDays(3));
+        $mk('NEW-AGENT', now());
+
+        $this->enrol($this->mintSecret())->assertCreated()->assertJsonPath('device_uuid', 'NEW-AGENT');
+    }
 }

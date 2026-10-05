@@ -94,6 +94,8 @@ Route::prefix('enforcer')->middleware(['auth:sanctum', 'throttle:600,1'])->group
     Route::post('audit', [EnforcerSyncController::class, 'storeAudit']);
     // 03-Oct-2026: Endpoint Security (Defender) — its own call; never alters the heartbeat above.
     Route::post('security/sync', [\App\Http\Controllers\Api\EndpointSecuritySyncController::class, 'sync']);
+    // 04-Oct-2026: PC Audit Log — software, USB/devices, downloads, files to USB, network shares.
+    Route::post('pc-audit/sync', [\App\Http\Controllers\Api\PcAuditController::class, 'serviceSync']);
 });
 
 // ---- Authenticated (any valid token) ----
@@ -282,6 +284,8 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
             Route::post('app-usage', [UsageController::class, 'appUsage']);
             Route::post('website-usage', [UsageController::class, 'websiteUsage']);
             Route::post('compliance-event', [ComplianceController::class, 'store']);
+            // 04-Oct-2026: PC Audit Log — what was clicked (Enforcer + Commander; 403 otherwise).
+            Route::post('pc-audit/clicks', [\App\Http\Controllers\Api\PcAuditController::class, 'agentClicks']);
         });
     });
 
@@ -353,9 +357,24 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
         Route::get('devices/{machine}/events', [$es, 'events'])->middleware($cap('events'));
         Route::post('devices/{machine}/actions/{action}', [$es, 'action']); // capability checked per action
         Route::get('commands', [$es, 'commands'])->middleware($cap('command_history'));
+        // 04-Oct-2026: the result of one scan / signature update ("View report").
+        Route::get('commands/{command}/report', [$es, 'commandReport']);
         Route::get('policy', [$es, 'policy']);
         Route::put('policy', [$es, 'savePolicy'])->middleware($cap('policies'));
+        // 04-Oct-2026: Company Compliance Report (all PCs, a period) — the console builds the PDF.
+        Route::get('compliance-report', [$es, 'complianceReport'])->middleware($cap('reports'));
         Route::get('reports/{type}', [$es, 'report'])->middleware($cap('reports'));
+    });
+
+    // 04-Oct-2026: PC Audit Log (Enforcer + Commander) — per-PC logs + background all-PC report.
+    Route::prefix('pc-audit')->middleware(['role:SUPER_ADMIN,COMPANY_ADMIN', \App\Http\Middleware\EnsureEndpointSecurity::class . ':pc_audit'])->group(function () {
+        $pa = \App\Http\Controllers\Api\PcAuditController::class;
+        Route::get('devices', [$pa, 'devices']);
+        Route::get('devices/{uuid}', [$pa, 'show']);
+        Route::get('devices/{uuid}/csv', [$pa, 'csv']);
+        Route::get('reports', [$pa, 'reports']);
+        Route::post('reports', [$pa, 'startReport']);
+        Route::get('reports/{report}/download', [$pa, 'download']);
     });
 
     // 30-Sep-2026 (Ejaz): Reports → Schedule Report (automatic Productivity report emails).

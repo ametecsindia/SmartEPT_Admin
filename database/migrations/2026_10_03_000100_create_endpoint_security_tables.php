@@ -65,7 +65,7 @@ return new class extends Migration
         if (! Schema::hasTable('endpoint_security_threats')) {
             Schema::create('endpoint_security_threats', function (Blueprint $t) {
                 $t->id();
-                $t->unsignedBigInteger('company_id')->index();
+                $t->unsignedBigInteger('company_id');
                 $t->unsignedBigInteger('enforcement_machine_id');
                 $t->string('threat_id', 40);
                 $t->string('threat_name', 255)->nullable();
@@ -77,7 +77,6 @@ return new class extends Migration
                 $t->timestamp('status_changed_at')->nullable();
                 $t->json('resources')->nullable(); // already redacted on the endpoint
                 $t->timestamps();
-                $t->unique(['enforcement_machine_id', 'threat_id']);
             });
         }
 
@@ -93,8 +92,6 @@ return new class extends Migration
                 $t->string('detail', 120)->nullable();
                 $t->timestamp('occurred_at')->nullable();
                 $t->timestamps();
-                $t->unique(['enforcement_machine_id', 'record_id']);
-                $t->index(['enforcement_machine_id', 'occurred_at']);
             });
         }
 
@@ -117,7 +114,6 @@ return new class extends Migration
                 $t->string('error_code', 50)->nullable();
                 $t->string('error_message', 255)->nullable();
                 $t->timestamps();
-                $t->index(['enforcement_machine_id', 'status']);
             });
         }
 
@@ -129,6 +125,22 @@ return new class extends Migration
                 $t->unsignedBigInteger('updated_by')->nullable();
                 $t->timestamps();
             });
+        }
+
+        // Composite indexes get SHORT explicit names: Laravel's generated ones are 62–65
+        // characters and MySQL's limit is 64 (error 1059, 03-Oct-2026). Added outside
+        // Schema::create and guarded, so a database where an earlier run stopped half-way
+        // (tables created, index missing) is completed by simply running migrate again.
+        foreach ([
+            ['endpoint_security_threats', 'endpoint_security_threats_company_id_index', ['company_id'], 'index'],
+            ['endpoint_security_threats', 'es_threats_machine_threat_uq', ['enforcement_machine_id', 'threat_id'], 'unique'],
+            ['endpoint_security_events', 'es_events_machine_record_uq', ['enforcement_machine_id', 'record_id'], 'unique'],
+            ['endpoint_security_events', 'es_events_machine_time_idx', ['enforcement_machine_id', 'occurred_at'], 'index'],
+            ['endpoint_security_commands', 'es_commands_machine_status_idx', ['enforcement_machine_id', 'status'], 'index'],
+        ] as [$table, $name, $cols, $kind]) {
+            if (! Schema::hasIndex($table, $name)) {
+                Schema::table($table, fn (Blueprint $t) => $t->{$kind}($cols, $name));
+            }
         }
 
         // Role matrix cards (Organisation → Roles). Super/Company Admin get both; every

@@ -55,6 +55,7 @@ class EndpointSecuritySyncController extends Controller
             'capabilities' => ['nullable', 'array', 'max:20'],
             'capabilities.*' => ['string', 'max:40'],
             'version' => ['nullable', 'string', 'max:32'],
+            'hostname' => ['nullable', 'string', 'max:63'],
             'health' => ['nullable', 'array'],
             'threats' => ['nullable', 'array', 'max:500'],
             'events' => ['nullable', 'array', 'max:500'],
@@ -68,6 +69,10 @@ class EndpointSecuritySyncController extends Controller
             $status->device_uuid = $machine->device_uuid;
             $status->capability = in_array('endpoint_security_v1', (array) ($data['capabilities'] ?? []), true) ? 'endpoint_security_v1' : $status->capability;
             $status->agent_version = $data['version'] ?? $status->agent_version;
+            // The PC's CURRENT name, straight from the service (enrolment-time names go stale).
+            if (preg_match('/^[A-Za-z0-9._-]{1,63}$/', (string) ($data['hostname'] ?? ''))) {
+                $status->hostname = $data['hostname'];
+            }
             $status->received_at = now();
 
             $oneShot = [];
@@ -102,7 +107,7 @@ class EndpointSecuritySyncController extends Controller
                 $status->compliance = $state;
                 $status->compliance_issues = $issues;
                 $status->score = $score;
-                $label = $machine->hostname ?: ($machine->device_uuid ?: 'PC #' . $machine->id);
+                $label = $status->hostname ?: ($machine->hostname ?: ($machine->device_uuid ?: 'PC #' . $machine->id));
                 SecurityCompliance::applyAlerts($status, $issues, array_values(array_unique($oneShot)), $label);
             }
             $status->save();
@@ -127,7 +132,7 @@ class EndpointSecuritySyncController extends Controller
         $bool = fn ($v) => is_bool($v) ? $v : null;
         $time = function ($v) {
             try {
-                return is_string($v) && $v !== '' ? Carbon::parse($v) : null;
+                return is_string($v) && $v !== '' ? Carbon::parse($v)->setTimezone(config('app.timezone')) : null;
             } catch (\Throwable $e) {
                 return null;
             }
@@ -162,6 +167,21 @@ class EndpointSecuritySyncController extends Controller
             'errors' => array_values(array_filter(array_map(fn ($e) => preg_match('/^[A-Z_]{3,50}$/', (string) $e) ? $e : null, (array) ($h['errors'] ?? [])))),
             'checked_at' => $time($h['checkedAt'] ?? null) ?? now(),
         ]);
+        // 04-Oct-2026: bank checklist posture. Only known keys, short plain strings; an older
+        // service that sends none keeps whatever was last reported.
+        if (isset($h['posture']) && is_array($h['posture'])) {
+            $p = [];
+            foreach (['osName', 'osBuild', 'osRelease', 'osUbr', 'lastPatch', 'lastPatchId', 'bitlocker', 'lockSecs', 'macrosBlocked'] as $k) {
+                if (isset($h['posture'][$k]) && is_scalar($h['posture'][$k]) && (string) $h['posture'][$k] !== '') {
+                    $p[$k] = mb_substr((string) $h['posture'][$k], 0, 80);
+                }
+            }
+            if (isset($h['posture']['admins'])) {
+                $p['admins'] = array_slice(array_map(fn ($a) => mb_substr((string) $a, 0, 80),
+                    array_filter((array) $h['posture']['admins'], 'is_scalar')), 0, 30);
+            }
+            $s->posture = $p;
+        }
         if (array_key_exists('threatCount', $h) && is_int($h['threatCount'])) {
             $s->threat_count = $h['threatCount'];
         }
@@ -296,7 +316,10 @@ class EndpointSecuritySyncController extends Controller
     private function time($v): ?Carbon
     {
         try {
-            return is_string($v) && $v !== '' && ! str_starts_with($v, '0001-') ? Carbon::parse($v) : null;
+            // The endpoint sends UTC ("...Z"). The database stores the app's local clock (the
+            // company time zone, ApplyCompanyTimezone), so convert — otherwise every time
+            // showed 5h30 early in India (seen 03-Oct-2026: detected 17:04 shown as 11:34).
+            return is_string($v) && $v !== '' && ! str_starts_with($v, '0001-') ? Carbon::parse($v)->setTimezone(config('app.timezone')) : null;
         } catch (\Throwable $e) {
             return null;
         }

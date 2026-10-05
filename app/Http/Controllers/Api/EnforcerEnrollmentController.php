@@ -85,7 +85,7 @@ class EnforcerEnrollmentController extends Controller
                 'hostname'          => $data['hostname'] ?? $machine->hostname,
                 'os_version'        => $data['os_version'] ?? $machine->os_version,
                 'edition'           => $data['edition'] ?? $machine->edition,
-                'device_uuid'       => $data['device_uuid'] ?? $machine->device_uuid,
+                'device_uuid'       => $data['device_uuid'] ?? EnforcementMachine::liveDeviceUuid((int) $token->company_id, $data['hostname'] ?? $machine->hostname, $machine->device_uuid),
                 'enforcement_level' => $data['enforcement_level'] ?? EnforcementMachine::LEVEL_NONE,
                 // A machine that has just enrolled has not proven it can
                 // enforce anything yet, whatever it claims it is capable of.

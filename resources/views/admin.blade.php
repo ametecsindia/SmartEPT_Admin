@@ -18,24 +18,25 @@
   :root{
     --canvas:#F1EFEA;--card:#FFFFFF;--card-2:#FAF9F5;--border:#E5E1D8;--hairline:#EDEAE2;
     --ink:#0F1E26;--ink-2:#4A5A66;--ink-3:#8494A0;
-    --accent:#0E7C8F;--accent-2:#22B8CF;--accent-3:#31D2E8;--accent-weak:#E1F3F6;--accent-ink:#0A6273;
+    --accent:#006699;--accent-2:#1A8CC4;--accent-3:#4FB3E0;--accent-weak:#E0F0F8;--accent-ink:#00527A;
     --ok:#0A9464;--ok-w:#E3F6EE;--warn:#B7791F;--warn-w:#FBF3E2;--danger:#D22A4C;--danger-w:#FBE9ED;
     --info:#0B72C9;--info-w:#E6F1FB;--idle:#6D28D9;--idle-w:#F0EAFC;
-    --navy:#052A33;--navy-2:#0B4A56;
+    /* 05-Oct-2026: brand blue #006699, as on smartept.com */
+    --navy:#003352;--navy-2:#00507A;
     --font-head:'Plus Jakarta Sans','Inter','Segoe UI',sans-serif;
     --shadow-1:0 1px 2px rgba(16,42,51,.05),0 6px 18px rgba(16,42,51,.07);
     --shadow-2:0 6px 16px rgba(16,42,51,.09),0 22px 48px rgba(16,42,51,.13);
-    --ring:0 0 0 3px rgba(34,184,207,.22);
+    --ring:0 0 0 3px rgba(26,140,196,.22);
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{scrollbar-color:#C6D2DA transparent;scrollbar-width:thin;overflow-x:clip}
   body{font-family:'Inter','Segoe UI',system-ui,Arial,sans-serif;background-color:var(--canvas);
     background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)' opacity='0.35'/%3E%3C/svg%3E"),
-    radial-gradient(900px 320px at 85% -80px, rgba(34,184,207,.09), transparent 60%);
+    radial-gradient(900px 320px at 85% -80px, rgba(26,140,196,.09), transparent 60%);
     background-blend-mode:soft-light,normal;background-attachment:fixed,fixed;
     color:var(--ink);font-size:13.5px;-webkit-font-smoothing:antialiased;overflow-x:clip}
-  ::selection{background:rgba(34,184,207,.25)}
+  ::selection{background:rgba(26,140,196,.25)}
   ::-webkit-scrollbar{width:9px;height:9px}
   ::-webkit-scrollbar-thumb{background:#C6D2DA;border-radius:8px;border:2px solid var(--canvas)}
   ::-webkit-scrollbar-thumb:hover{background:#AEBEC9}
@@ -46,11 +47,11 @@
 
   /* ---------- Login ---------- */
   .login{min-height:100vh;display:flex;align-items:center;justify-content:center;
-    background:linear-gradient(150deg,var(--navy) 0%,#083A44 55%,var(--navy-2) 100%);position:relative;overflow:hidden}
+    background:linear-gradient(150deg,var(--navy) 0%,#00446B 55%,var(--navy-2) 100%);position:relative;overflow:hidden}
   .login::before{content:'';position:absolute;width:640px;height:640px;border-radius:50%;
-    background:radial-gradient(circle,rgba(34,184,207,.20),transparent 65%);top:-260px;right:-160px}
+    background:radial-gradient(circle,rgba(26,140,196,.20),transparent 65%);top:-260px;right:-160px}
   .login::after{content:'';position:absolute;width:520px;height:520px;border-radius:50%;
-    background:radial-gradient(circle,rgba(14,124,143,.25),transparent 65%);bottom:-240px;left:-140px}
+    background:radial-gradient(circle,rgba(0,102,153,.25),transparent 65%);bottom:-240px;left:-140px}
   .login .box{background:var(--card);border:none;border-radius:20px;padding:34px 32px;width:384px;
     box-shadow:0 30px 90px rgba(0,0,0,.45);position:relative;z-index:2}
   .login .box::before{content:'';display:block;position:absolute;top:0;left:24px;right:24px;height:4px;
@@ -58,7 +59,7 @@
   .lock{display:flex;align-items:center;gap:11px;margin-bottom:22px}
   .mark{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent-2));
     display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px;flex:none;
-    box-shadow:0 6px 16px rgba(14,124,143,.35);font-family:var(--font-head)}
+    box-shadow:0 6px 16px rgba(0,102,153,.35);font-family:var(--font-head)}
   .lock h1{font-size:19px;font-weight:800}
   .lock small{display:block;color:var(--ink-3);font-size:9px;font-weight:700;letter-spacing:2px}
   label{display:block;font-size:11px;color:var(--ink-2);font-weight:700;margin:13px 0 5px}
@@ -68,13 +69,13 @@
   input[type=checkbox],input[type=radio]{width:auto;accent-color:var(--accent);transform:scale(1.15);cursor:pointer;box-shadow:none}
   button.primary{width:100%;margin-top:20px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;
     border:none;border-radius:10px;padding:12px;font-weight:700;font-size:13.5px;cursor:pointer;font-family:inherit;
-    box-shadow:0 8px 20px rgba(14,124,143,.35);transition:transform .12s, box-shadow .12s}
-  button.primary:hover{transform:translateY(-1px);box-shadow:0 12px 26px rgba(14,124,143,.45)}
+    box-shadow:0 8px 20px rgba(0,102,153,.35);transition:transform .12s, box-shadow .12s}
+  button.primary:hover{transform:translateY(-1px);box-shadow:0 12px 26px rgba(0,102,153,.45)}
   .err{color:var(--danger);font-size:12px;margin-top:12px;min-height:15px}
 
   /* ---------- Shell ---------- */
   .shell{display:flex;min-height:100vh}
-  .side{width:232px;background:linear-gradient(178deg,var(--navy) 0%,#07333D 60%,#083A44 100%);
+  .side{width:232px;background:linear-gradient(178deg,var(--navy) 0%,#003B5E 60%,#00446B 100%);
     border-right:none;position:fixed;height:100vh;padding:18px 13px 14px;display:flex;flex-direction:column;gap:2px;
     overflow:hidden;z-index:6}
   .navwrap{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:2px;
@@ -85,17 +86,17 @@
   .side::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border:none}
   .side .lock{padding:4px 8px 16px;margin:0;border-bottom:1px solid rgba(255,255,255,.09);flex:0 0 auto}
   .side .lock h1{color:#fff}
-  .side .lock small{color:#7FA8AF}
-  .navgrp{font-size:9.5px;letter-spacing:2.2px;color:#5E858C;font-weight:800;margin:16px 12px 6px;font-family:var(--font-head)}
-  .nav{display:flex;align-items:center;gap:11px;padding:9.5px 12px;border-radius:10px;color:#A9CBD1;font-size:13.5px;
+  .side .lock small{color:#7FA6C0}
+  .navgrp{font-size:9.5px;letter-spacing:2.2px;color:#5E87A6;font-weight:800;margin:16px 12px 6px;font-family:var(--font-head)}
+  .nav{display:flex;align-items:center;gap:11px;padding:9.5px 12px;border-radius:10px;color:#A9C8DC;font-size:13.5px;
     font-weight:600;letter-spacing:.1px;cursor:pointer;transition:background .12s,color .12s}
   .nav:hover{background:rgba(255,255,255,.07);color:#fff}
-  .nav.active{background:linear-gradient(135deg,var(--accent),#1899AE);color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+  .nav.active{background:linear-gradient(135deg,var(--accent),#0A80B8);color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.25)}
   .nav .ic{width:18px;height:18px;display:flex;align-items:center;justify-content:center;opacity:.9;flex:none}
   .nav .ic svg{width:16.5px;height:16.5px;display:block}
   .nav.active .ic{opacity:1}
-  .side .foot{flex:0 0 auto;font-size:11px;color:#7FA8AF;padding:12px 8px 2px;border-top:1px solid rgba(255,255,255,.09);line-height:1.7}
-  .side .foot a{color:#A9CBD1!important}
+  .side .foot{flex:0 0 auto;font-size:11px;color:#7FA6C0;padding:12px 8px 2px;border-top:1px solid rgba(255,255,255,.09);line-height:1.7}
+  .side .foot a{color:#A9C8DC!important}
   .side .foot a:hover{color:#fff!important}
   .main{margin-left:232px;flex:1;padding:0 28px 44px;min-width:0;display:flex;flex-direction:column;min-height:100vh}
   .page-copy{margin-top:auto;padding-top:18px;border-top:1px solid var(--border);text-align:center;font-size:10.5px;color:var(--ink-3);line-height:1.5}
@@ -233,12 +234,12 @@
   .clk:hover td{background:var(--accent-weak)!important}
   .btn{background:var(--card);border:1.5px solid var(--border);border-radius:9px;padding:7px 13px;font-size:12px;
     font-weight:700;color:var(--ink-2);cursor:pointer;font-family:inherit;transition:all .13s}
-  .btn:hover{border-color:var(--accent);color:var(--accent);box-shadow:0 2px 8px rgba(14,124,143,.12)}
+  .btn:hover{border-color:var(--accent);color:var(--accent);box-shadow:0 2px 8px rgba(0,102,153,.12)}
   .btn.acc{background:var(--accent-weak);color:var(--accent-ink);border-color:transparent}
   .btn.acc:hover{background:#D2ECF1}
   .btn.solid{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;border-color:transparent;
-    box-shadow:0 4px 12px rgba(14,124,143,.28)}
-  .btn.solid:hover{color:#fff;transform:translateY(-1px);box-shadow:0 7px 16px rgba(14,124,143,.38)}
+    box-shadow:0 4px 12px rgba(0,102,153,.28)}
+  .btn.solid:hover{color:#fff;transform:translateY(-1px);box-shadow:0 7px 16px rgba(0,102,153,.38)}
   .btn.danger{background:var(--danger-w);color:var(--danger);border-color:transparent}
   .btn.danger:hover{background:#F7D6DE;color:var(--danger);border-color:transparent}
   .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -426,7 +427,7 @@
   .pro-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}
   .pro-h b{font-size:13px}.pro-h span{font-size:11.5px;color:var(--ink-3)}
   .pro-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px;margin-bottom:12px}
-  .pro-c{border:1px solid var(--border);border-radius:11px;padding:9px 11px;border-left:4px solid var(--c,#0E7C8F)}
+  .pro-c{border:1px solid var(--border);border-radius:11px;padding:9px 11px;border-left:4px solid var(--c,#006699)}
   .pro-c .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-3);font-weight:700}
   .pro-c .v{font-size:19px;font-weight:800;margin-top:2px}.pro-c .p{font-size:11px;color:var(--ink-3)}
   .pro-bar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--border)}
@@ -462,7 +463,7 @@
     cursor:pointer;color:var(--ink-2);font-weight:700;transition:all .12s}
   .tab:hover{border-color:var(--accent-2);color:var(--accent-ink)}
   .tab.active{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;border-color:transparent;
-    box-shadow:0 3px 10px rgba(14,124,143,.3)}
+    box-shadow:0 3px 10px rgba(0,102,153,.3)}
   .tl{border-left:2px solid var(--accent-weak);margin-left:6px;padding-left:15px}
   .tl .ev{position:relative;padding:7px 0;font-size:12px}
   .tl .ev::before{content:'';position:absolute;left:-20px;top:11px;width:8px;height:8px;border-radius:50%;
@@ -483,12 +484,12 @@
 <div class="login" id="login">
   <div class="box">
     <div class="lock" style="justify-content:center"><img id="brand-logo" src="/img/smartept-logo-h-light.png" alt="SmartEPT by Ametecs" style="width:210px;max-width:90%;height:auto;display:block"></div>
-    <div id="tenant-brand" style="display:none;text-align:center;margin:6px 0 12px;font-weight:700;color:#0E7C8F"></div>
+    <div id="tenant-brand" style="display:none;text-align:center;margin:6px 0 12px;font-weight:700;color:#006699"></div>
     <label>Work email</label><input id="email" type="email" value="admin@ametecs.io">
     <label>Password</label><input id="password" type="password" value="password">
     <button class="primary" id="btn-login">Sign in</button>
     <div class="err" id="login-err"></div>
-    <a href="#" id="fp-link" style="display:block;text-align:center;margin-top:10px;font-size:12.5px;color:#0E7C8F;font-weight:700;text-decoration:none">Forgot password?</a>
+    <a href="#" id="fp-link" style="display:block;text-align:center;margin-top:10px;font-size:12.5px;color:#006699;font-weight:700;text-decoration:none">Forgot password?</a>
     <div id="fp-box" style="display:none;margin-top:10px;border-top:1px solid #E5EAEC;padding-top:10px">
       <div id="fp-step1">
         <p style="font-size:12px;color:#5A6B70;margin:0 0 8px">We'll email a 6-digit code to the address above.</p>
@@ -530,6 +531,7 @@
     <div class="nav" data-view="policies"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.5 3v5.2c0 4.8-3.2 8.2-7.5 9.8-4.3-1.6-7.5-5-7.5-9.8V6z"/><path d="M9 11.8l2.1 2.1 3.9-4.2"/></svg></span> Policies</div>
     <div class="nav" data-view="rules"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h11M4 18h7"/><circle cx="18.5" cy="16.5" r="3"/><path d="M20.6 18.6 23 21"/></svg></span> App &amp; Web Rules</div>
     <div class="nav" data-view="endsec" style="display:none"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.5 3v5.2c0 4.8-3.2 8.2-7.5 9.8-4.3-1.6-7.5-5-7.5-9.8V6z"/><path d="M12 8v4.5M12 15.6h.01"/></svg></span> Endpoint Security</div>
+    <div class="nav" data-view="pcaudit" style="display:none"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4M7 8h6M7 11h10"/></svg></span> PC Audit Log</div>
     <div class="nav" data-view="biometric"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8A9 9 0 0 1 21 12c0 2.6-.4 5-1.2 7"/><path d="M3.6 8.4A9 9 0 0 0 3 12c0 2.8.6 5.2 1.6 7.2"/><path d="M12 8.4a3.6 3.6 0 0 1 3.6 3.6c0 2.3-.3 4.5-1 6.6"/><path d="M8.4 12a3.6 3.6 0 0 1 .4-1.7M8.6 15.6c.3 1.5.2 3-.2 4.6"/><path d="M12 12v2.4c0 1.7-.2 3.4-.7 5"/></svg></span> Biometric</div>
         <div class="nav" data-view="gateexcl"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V6.2a2 2 0 0 1 1.3-1.9l7-2.2a1 1 0 0 1 1.3 1v18"/><path d="M12.6 21H21V9.4a2 2 0 0 0-1.4-1.9l-7-2.2"/><path d="M8.4 12.2v1.6"/><path d="M2 21h20"/></svg></span> Gate Exclusions</div>
 <div class="navgrp">INSIGHT</div>
@@ -1149,6 +1151,7 @@
     <!-- 30-Sep-2026 (Ejaz): Reports → Schedule Report. The form lives inside the card so the
          role matrix's "Report schedules" Edit tick governs its buttons (card-noedit). -->
     @include('partials.endpoint-security') {{-- 03-Oct-2026: Endpoint Security (own file, own IIFE) --}}
+    @include('partials.pc-audit') {{-- 04-Oct-2026: PC Audit Log (own file, own IIFE) --}}
     <div class="view" id="v-schedrep">
       <div class="card" id="sr-card">
         <h3>Report schedules <span class="hint">the Productivity report, emailed automatically at the time you choose (company time zone)</span>
@@ -2742,6 +2745,7 @@ function applyPlanNav() {
   const nav = document.querySelector('.nav[data-view="liveview"]');
   if (nav) nav.style.display = hasPlanFeature('live_view') ? '' : 'none';
   if (window.applyEndSecNav) window.applyEndSecNav(); // 03-Oct-2026: Endpoint Security nav (server decides)
+  if (window.applyPcAuditNav) window.applyPcAuditNav(); // 04-Oct-2026: PC Audit Log nav (server decides)
 }
 // 18-Sep-2026: ME (and its plan_tier/plan_features) is only set at login — a
 // plan change in Central updates the licence row, but an already-open Admin
@@ -2911,6 +2915,7 @@ const TITLES = {
   policies: ['Policies', 'The control room — what is tracked, for whom'],
   rules: ['App & Web Rules', 'Track, allow, block or flag apps & websites — company-wide'],
   endsec: ['Endpoint Security', 'Microsoft Defender status, threats, scans & security compliance'],
+  pcaudit: ['PC Audit Log', 'Sites, applications, clicks, software changes, USB devices, downloads & file sharing — per PC or all PCs'],
   biometric: ['Biometric', 'Cloud punch sync, mapping & reconciliation'],
   reports: ['Reports & Exports', 'CSV exports for Excel and payroll'],
   schedrep: ['Schedule Report', 'Email the Productivity report automatically — to each employee and to managers'],
@@ -2953,6 +2958,7 @@ function show(v) {
   if (v === 'reports') initReports();
   if (v === 'schedrep') initSchedRep();
   if (v === 'endsec') window.initEndSec();
+  if (v === 'pcaudit') window.initPcAudit();
   if (v === 'license') loadLicense();
   if (v === 'integrations') initIntegrations();
   if (v === 'ops') loadOps();
@@ -2985,6 +2991,7 @@ function refreshView() {
   else if (v === 'reports') initReports();
   else if (v === 'schedrep') loadSchedRep();
   else if (v === 'endsec') window.initEndSec();
+  else if (v === 'pcaudit') window.initPcAudit();
   else if (v === 'license') loadLicense();
   else if (v === 'integrations') initIntegrations();
   else if (v === 'ops') loadOps();
@@ -3302,7 +3309,9 @@ async function loadDashboard() {
         + '<div class="kside"><div class="l">' + esc(l) + '</div>' + subLine + '</div>'
         + '<div class="kmain"><span class="go">' + go + '</span><div class="v">' + (v ?? 0) + '</div></div></div>';
     }).join('');
-    const wf = [['Active', c.active, '#16A34A'], ['Idle', c.idle, '#D97706'], ['On break', c.break_total, '#EA580C'], ['Meeting', c.meeting, '#B45309'], ['Offline', c.offline_count, '#94A3B8']];
+    // 05-Oct-2026: the donut uses the SAME colours as the status tiles above it (.k-ok / .k-idle / .k-break / .k-away / .k-off).
+    const cv = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+    const wf = [['Active', c.active, cv('--ok')], ['Idle', c.idle, cv('--idle')], ['On break', c.break_total, cv('--info')], ['Meeting', c.meeting, cv('--warn')], ['Offline', c.offline_count, cv('--ink-3')]];
     const wfTotal = c.total_employees || wf.reduce((a, [, v]) => a + (v || 0), 0);
     $('#wf-donut').innerHTML = svgDonut(wf.map(([label, value, color]) => ({ label, value: value || 0, color })), wfTotal);
     $('#wf-leg').innerHTML = wf.map(([l, v, col]) => '<div class="r"><span class="dot" style="background:' + col + '"></span><span class="nm">' + l + '</span><span class="ct">' + (v || 0) + '</span><span class="pc">' + (wfTotal ? Math.round((v || 0) / wfTotal * 100) : 0) + '%</span></div>').join('');
@@ -4944,7 +4953,7 @@ const LV_ICON_COMPRESS = '<svg width="13" height="13" viewBox="0 0 24 24" fill="
 // 30-Sep-2026 (Ejaz): animated wide-open eye with a winged eyeliner (opens, glances, blinks; CSS .lv-eye).
 const LV_ICON_EYE = '<svg class="eye-svg" width="27" height="18" viewBox="0 0 30 20" aria-hidden="true"><g class="eye-lid">'
   + '<path d="M2 10.5Q15-2.5 28 10Q15 22 2 10.5Z" fill="#fff"/>'
-  + '<g class="eye-iris"><circle cx="15" cy="10" r="5.2" fill="#0E7C8F"/><circle cx="15" cy="10" r="2.6" fill="#0B1F33"/><circle cx="16.6" cy="8.4" r="1.1" fill="#fff"/></g>'
+  + '<g class="eye-iris"><circle cx="15" cy="10" r="5.2" fill="#006699"/><circle cx="15" cy="10" r="2.6" fill="#0B1F33"/><circle cx="16.6" cy="8.4" r="1.1" fill="#fff"/></g>'
   + '<path d="M1.6 10.6Q15-2.5 27.6 9.4" fill="none" stroke="#0B1F33" stroke-width="2.4" stroke-linecap="round"/>'
   + '<path d="M24.6 7.4Q27.9 6.4 29.9 3.4Q29.2 7.4 27.9 9.9Z" fill="#0B1F33"/>'
   + '<path d="M4.5 12.4Q15 19.6 25.5 12.2" fill="none" stroke="#0B1F33" stroke-width=".9" stroke-linecap="round" opacity=".6"/>'
@@ -5304,12 +5313,12 @@ function lvWallSetup(win) {
     // since a wall tile has no header bar to put a persistent button in.
     // 29-Sep-2026 (Ejaz): always visible (were hidden until hover), solid brand colour, bigger icons.
     + '.lv-wtile .lv-wfs,.lv-wtile .lv-wcap,.lv-wtile .lv-wchat{position:absolute;top:8px;width:34px;height:34px;border:1.5px solid rgba(255,255,255,.85);border-radius:8px;'
-    + 'display:flex;align-items:center;justify-content:center;color:#fff;background:#0E7C8F;'
+    + 'display:flex;align-items:center;justify-content:center;color:#fff;background:#006699;'
     + 'cursor:pointer;opacity:1;box-shadow:0 2px 6px rgba(0,0,0,.45)}'
     + '.lv-wtile .lv-wfs svg,.lv-wtile .lv-wcap svg,.lv-wtile .lv-wchat svg{width:18px;height:18px}'
     + '.lv-wtile .lv-wfs{right:8px}'
     + '.lv-wtile .lv-wcap{right:48px}.lv-wtile .lv-wchat{right:88px}'
-    + '.lv-wtile .lv-wfs:hover,.lv-wtile .lv-wcap:hover,.lv-wtile .lv-wchat:hover{background:#0A6273}'
+    + '.lv-wtile .lv-wfs:hover,.lv-wtile .lv-wcap:hover,.lv-wtile .lv-wchat:hover{background:#00527A}'
     // Drag & drop (26-Sep-2026): grab any tile, drop it on another — the two swap places.
     + '.lv-wtile{cursor:grab}.lv-wtile.lv-wdrag{opacity:.4}'
     + '.lv-wtile.lv-wover{outline:3px dashed #2bb3c0;outline-offset:-3px}'
@@ -7241,7 +7250,7 @@ async function pollJoinable() {
 }
 function showJoinPopup(m) {
   const w = document.createElement('div');
-  w.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:99998;background:var(--card,#fff);color:var(--ink,#1f2a2e);border:1px solid var(--line,#dde6e8);border-left:4px solid var(--accent,#0E7C8F);border-radius:10px;box-shadow:0 8px 30px rgba(20,50,60,.18);padding:14px 16px;max-width:330px;font-size:13px';
+  w.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:99998;background:var(--card,#fff);color:var(--ink,#1f2a2e);border:1px solid var(--line,#dde6e8);border-left:4px solid var(--accent,#006699);border-radius:10px;box-shadow:0 8px 30px rgba(20,50,60,.18);padding:14px 16px;max-width:330px;font-size:13px';
   w.innerHTML = '<div style="font-weight:700;margin-bottom:3px">Meeting in progress</div>'
     + '<div style="margin-bottom:9px">' + esc(m.title) + (m.is_organizer ? ' <span class="tag t-info">You organise this</span>' : ' <span class="tag t-ok">You are invited</span>') + '</div>'
     + '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-jp-x>Dismiss</button><button class="btn acc" data-jp-go>Join / Open</button></div>';
@@ -7503,7 +7512,7 @@ function prOverview(from, to) {
   const emps = new Set(R.map((x) => x.employee_id)).size;
   const pct = (v, of) => of > 0 ? Math.round(v / of * 100) + '%' : '—';
   const card = (l, v, p, c) => '<div class="pro-c" style="--c:' + c + '"><div class="l">' + l + '</div><div class="v">' + v + '</div><div class="p">' + (p || '&nbsp;') + '</div></div>';
-  const segs = [['Working', work, '#16A34A'], ['Meeting', meet, '#0E7C8F'], ['Idle', idle, '#D97706'], ['Break', brk, '#6366F1'], ['Away', away, '#DC2626'], ['Gate → PC', g2p, '#94A3B8']];
+  const segs = [['Working', work, '#16A34A'], ['Meeting', meet, '#006699'], ['Idle', idle, '#D97706'], ['Break', brk, '#6366F1'], ['Away', away, '#DC2626'], ['Gate → PC', g2p, '#94A3B8']];
   const tot = segs.reduce((a, s) => a + s[1], 0) || 1;
   $('#pr-overview').innerHTML = R.length ? '<div class="pro-wrap"><div class="pro-h"><b>Overview — ' + (from === to ? (from === today() ? 'today' : from) : from + ' → ' + to) + '</b>'
     + '<span>' + emps + ' employee' + (emps === 1 ? '' : 's') + ' · ' + R.length + ' day-row' + (R.length === 1 ? '' : 's') + ' · ' + esc($('#prf-scope').textContent || '') + '</span></div>'
@@ -7512,7 +7521,7 @@ function prOverview(from, to) {
     + card('Productive', hms(prod), pct(prod, net) + ' of Net Hrs', '#16A34A')
     + card('Non-productive', hms(nonp), pct(nonp, present) + ' of total', '#DC2626')
     + card('Working', hms(work), pct(work, present), '#16A34A')
-    + card('Meeting Time', hms(meet), pct(meet, present), '#0E7C8F')
+    + card('Meeting Time', hms(meet), pct(meet, present), '#006699')
     + card('Idle', hms(idle), pct(idle, present), '#D97706')
     + card('Away', hms(away), pct(away, present), '#DC2626')
     + card('Break', hms(brk), (exceed ? hms(exceed) + ' over allotted' : 'within allotted'), '#6366F1')
@@ -7628,13 +7637,13 @@ function prPDF() {
   const w = window.open('', '_blank');
   w.document.write('<html><head><title>SmartEPT Productivity ' + from + ' to ' + to + '</title><style>'
     + 'body{font-family:Inter,Segoe UI,sans-serif;color:#15171C;padding:22px;font-size:11px}'
-    + 'h1{color:#0E7C8F;font-size:18px;margin:0}.sub{color:#878C99;font-size:11px;margin:2px 0 14px}'
-    + 'table{width:100%;border-collapse:collapse}th{background:#E3F4F7;color:#0B6373;text-align:left;padding:6px;font-size:9px;text-transform:uppercase}'
+    + 'h1{color:#006699;font-size:18px;margin:0}.sub{color:#878C99;font-size:11px;margin:2px 0 14px}'
+    + 'table{width:100%;border-collapse:collapse}th{background:#E0F0F8;color:#00527A;text-align:left;padding:6px;font-size:9px;text-transform:uppercase}'
     + 'td{padding:5px 6px;border-bottom:1px solid #EEF2F6}tr:nth-child(even) td{background:#FAFBFC}'
-    + '.hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #0E7C8F;padding-bottom:10px;margin-bottom:14px}'
+    + '.hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #006699;padding-bottom:10px;margin-bottom:14px}'
     + '@media print{.np{display:none}}</style></head><body>'
     + '<div class="hd"><div><h1>Productivity Report</h1><div class="sub">' + esc(co) + ' · ' + from + ' → ' + to + ' · SmartEPT by Ametecs</div></div>'
-    + '<button class="np" onclick="window.print()" style="padding:8px 14px;background:#0E7C8F;color:#fff;border:none;border-radius:7px;cursor:pointer">Print / Save PDF</button></div>'
+    + '<button class="np" onclick="window.print()" style="padding:8px 14px;background:#006699;color:#fff;border:none;border-radius:7px;cursor:pointer">Print / Save PDF</button></div>'
     + '<table><thead><tr><th>Date</th><th>Code</th><th>Employee</th><th>Dept</th><th>Manager</th><th>In</th><th>Out</th><th>Actual Present</th><th>Working</th><th>Idle</th><th>Breaks</th><th>Break Availed</th><th>Allotted</th><th>Meeting Time</th><th>Break Exceed</th><th>Productive</th><th>Non-Prod.</th><th>Net Hrs</th><th>Prod.%</th><th>Late (min)</th><th>Data Issue</th><th>Gate IN</th><th>Gate→PC (mins)</th><th>Away</th></tr></thead><tbody>'
     + (rowsHtml || '<tr><td colspan="19">No data</td></tr>') + '</tbody></table>'
     + '<p style="margin-top:14px;color:#878C99;font-size:10px">Generated ' + new Date().toLocaleString() + ' · SmartEPT — Employee Productivity Tracking & Intelligence</p>'

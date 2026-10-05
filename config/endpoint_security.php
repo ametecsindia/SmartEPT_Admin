@@ -12,9 +12,9 @@ return [
 
     // Plan level -> capabilities. Level comes from the licence (Entitlement::level).
     'capabilities' => [
-        'basic' => ['monitoring', 'threat_history', 'compliance', 'refresh', 'quick_scan', 'signature_update', 'reports'],
+        'basic' => ['monitoring', 'threat_history', 'compliance', 'refresh', 'quick_scan', 'signature_update', 'reports', 'pc_audit'],
         'advanced' => ['monitoring', 'threat_history', 'compliance', 'refresh', 'quick_scan', 'signature_update', 'reports',
-            'full_scan', 'custom_scan', 'policies', 'fleet_advanced', 'command_history', 'events', 'advanced_reports'],
+            'full_scan', 'custom_scan', 'policies', 'fleet_advanced', 'command_history', 'events', 'advanced_reports', 'pc_audit'],
     ],
 
     // Endpoint cadence, sent to the service on every sync (seconds). Jitter spreads
@@ -31,6 +31,9 @@ return [
 
     // No security report for this long = "Unable to verify" (computed at read time).
     'stale_minutes' => 45,
+
+    // PC Audit Log (04-Oct-2026): clicks, software, USB, downloads, file sharing kept this long.
+    'pc_audit_retention_days' => 180,
 
     // Defender events kept per machine.
     'event_retention_days' => 180,

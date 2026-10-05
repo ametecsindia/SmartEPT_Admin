@@ -68,7 +68,7 @@ class EndpointSecurityTest extends TestCase
     {
         $m = EnforcementMachine::withoutGlobalScopes()->create([
             'company_id' => $this->companyId, 'machine_id' => 'M-' . $host, 'hostname' => $host,
-            'os_version' => 'Windows 11 23H2', 'enrolled_at' => now(),
+            'os_version' => 'Windows 11 23H2', 'enrolled_at' => now()->subDay(), 'last_seen_at' => now(),
         ]);
 
         return [$m, $m->createToken('enforcer:' . $host, ['enforcer'])->plainTextToken];
@@ -324,6 +324,90 @@ class EndpointSecurityTest extends TestCase
             ->assertJsonPath('error.code', 'AGENT_UPGRADE_REQUIRED');
     }
 
+    public function test_scan_report_shows_outcome_threats_and_events(): void
+    {
+        $this->enforcer();
+        [$m, $tok] = $this->machine();
+        $this->sync($tok, ['health' => $this->health()]);
+        $this->admin();
+        $this->postJson("/api/endpoint-security/devices/{$m->id}/actions/quick-scan")->assertCreated();
+        $cmd = $this->sync($tok)->json('commands.0.id');
+        $id = EndpointSecurityCommand::withoutGlobalScopes()->where('uuid', $cmd)->value('id');
+        $start = now()->subMinutes(3);
+        $this->sync($tok, ['results' => [['commandId' => $cmd, 'status' => 'running', 'startedAt' => $start->toIso8601String()]]]);
+
+        $this->admin();
+        $this->getJson("/api/endpoint-security/commands/$id/report")->assertOk()->assertJsonPath('data.status', 'running')
+            ->assertJsonPath('data.outcome', 'Still running on the PC — open this report again when it completes.');
+
+        $this->sync($tok, [
+            'results' => [['commandId' => $cmd, 'status' => 'completed', 'startedAt' => $start->toIso8601String(), 'completedAt' => now()->toIso8601String()]],
+            'threats' => [['threatId' => '2147519003', 'threatName' => 'Virus:DOS/EICAR_Test_File', 'severity' => 5, 'status' => 'quarantined',
+                'active' => false, 'actionSuccess' => true, 'initialDetectionTime' => now()->subMinute()->utc()->toIso8601String(), 'resources' => ['C:\\Users\\***\\eicar.com']]],
+            'events' => [['recordId' => 900, 'eventId' => 1001, 'kind' => 'scan_completed', 'time' => now()->utc()->toIso8601String()]],
+        ]);
+        $this->admin();
+        $r = $this->getJson("/api/endpoint-security/commands/$id/report")->assertOk();
+        $r->assertJsonPath('data.outcome', 'Completed — 1 threat(s) found by Microsoft Defender.')
+            ->assertJsonPath('data.threats.0.name', 'Virus:DOS/EICAR_Test_File')
+            ->assertJsonPath('data.events.0.kind', 'scan_completed')
+            ->assertJsonPath('data.machine_id', $m->id);
+        $this->assertGreaterThanOrEqual(170, $r->json('data.duration_seconds'));
+    }
+
+    public function test_company_compliance_report_lists_every_pc_and_checkpoint(): void
+    {
+        $this->enforcer();
+        [$m, $tok] = $this->machine('BRANCH-PC-01');
+        $m->forceFill(['device_uuid' => 'CR-1'])->save();
+        $this->sync($tok, ['health' => $this->health(['posture' => [
+            'osName' => 'Microsoft Windows 11 Pro', 'osBuild' => '22631', 'osRelease' => '23H2',
+            'lastPatch' => now()->subDays(10)->toDateString(), 'lastPatchId' => 'KB5050', 'bitlocker' => 'Off',
+            'admins' => ['BRANCH-PC-01\\Administrator', 'BRANCH-PC-01\\ravi'], 'lockSecs' => '600', 'macrosBlocked' => 'True',
+            'evil' => '<script>', // unknown key: dropped
+        ]])])->assertOk();
+        [, $tok2] = $this->machine('BRANCH-PC-02'); // older service: no posture, never "pass" for what it did not report
+        $this->sync($tok2, ['health' => $this->health(['realTimeProtectionEnabled' => false])])->assertOk();
+        \Illuminate\Support\Facades\DB::table('pc_audit_events')->insert(['company_id' => $this->companyId, 'device_uuid' => 'CR-1',
+            'kind' => 'usb_storage', 'occurred_at' => now(), 'title' => 'SanDisk', 'outcome' => 'Blocked by SmartEPT', 'fingerprint' => str_repeat('a', 40)]);
+        $this->assertArrayNotHasKey('evil', EndpointSecurityStatus::withoutGlobalScopes()->where('enforcement_machine_id', $m->id)->first()->posture);
+
+        $this->admin();
+        $d = $this->getJson('/api/endpoint-security/compliance-report?from=' . now()->subDays(30)->toDateString() . '&to=' . now()->toDateString())->assertOk()->json('data');
+        $this->assertSame(2, $d['totals']['pcs']);
+        $this->assertSame(1, $d['totals']['usb_blocked']);
+        $pcs = collect($d['pcs'])->keyBy('device');
+        $one = $pcs['BRANCH-PC-01']['checks'];
+        $this->assertSame('fail', $one['bitlocker']['s']);
+        $this->assertSame('fail', $one['os']['s']); // 23H2 Home/Pro ended 11-Nov-2025
+        $this->assertSame('pass', $one['patch']['s']);
+        $this->assertSame('pass', $one['lock']['s']);
+        $this->assertSame('pass', $one['macros']['s']);
+        $this->assertSame('2: Administrator, ravi', $one['admins']['t']);
+        $this->assertSame(1, $pcs['BRANCH-PC-01']['period']['usb']);
+        $two = $pcs['BRANCH-PC-02']['checks'];
+        $this->assertSame('fail', $two['realtime']['s']);
+        $this->assertSame('unknown', $two['bitlocker']['s']);
+        $this->assertSame('unknown', $two['patch']['s']);
+        $this->assertSame(0, $d['totals']['fully_compliant']);
+
+        $this->getJson('/api/endpoint-security/compliance-report?from=2025-01-01&to=2026-10-04')->assertStatus(422);
+        $this->plan('standard');
+        $this->getJson('/api/endpoint-security/compliance-report?from=2026-10-01&to=2026-10-04')->assertStatus(403);
+    }
+
+    public function test_a_just_enrolled_pc_is_waiting_not_upgrade_required(): void
+    {
+        $this->enforcer();
+        // Same clock for the write and the request (production boots on the company's timezone).
+        Company::withoutGlobalScopes()->whereKey($this->companyId)->update(['timezone' => config('app.timezone')]);
+        [$m] = $this->machine('NEW-PC');
+        $m->forceFill(['enrolled_at' => now()->subMinute()])->save();
+        $this->admin();
+        $this->getJson('/api/endpoint-security/overview')->assertOk()
+            ->assertJsonPath('summary.upgrade_required', 0)->assertJsonPath('data.0.waiting', true);
+    }
+
     public function test_legacy_licence_without_tier_derives_from_existing_features(): void
     {
         $this->plan(null, ['enforcement' => true]);
@@ -343,7 +427,7 @@ class EndpointSecurityTest extends TestCase
         [, $tok] = $this->machine();
         $res = $this->withToken($tok)->postJson('/api/enforcer/heartbeat', ['enforcer_version' => '0.22.0', 'device_uuid' => 'DEV-TEST'])->assertOk();
         $this->assertSame(['ok', 'server_time', 'enforcement'], array_keys($res->json()));
-        $this->assertSame(['mode', 'latest_policy_version', 'resync_required', 'kill_switch', 'employee_id'], array_keys($res->json('enforcement')));
+        $this->assertSame(['mode', 'latest_policy_version', 'resync_required', 'kill_switch', 'employee_id', 'device_only'], array_keys($res->json('enforcement')));
     }
 
     public function test_role_matrix_view_and_edit_ticks(): void
@@ -383,5 +467,74 @@ class EndpointSecurityTest extends TestCase
         $mig->up(); // idempotent re-apply
         $mig->up();
         $this->assertSame($before + 4, \App\Models\Permission::count());
+    }
+
+    public function test_a_half_finished_earlier_run_is_completed_by_migrating_again(): void
+    {
+        // 03-Oct-2026 on MySQL: the threats table was created, then its index failed (name > 64 chars).
+        $mig = require database_path('migrations/2026_10_03_000100_create_endpoint_security_tables.php');
+        \Illuminate\Support\Facades\Schema::table('endpoint_security_threats', fn ($t) => $t->dropUnique('es_threats_machine_threat_uq'));
+        $this->assertFalse(\Illuminate\Support\Facades\Schema::hasIndex('endpoint_security_threats', 'es_threats_machine_threat_uq'));
+        $mig->up();
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasIndex('endpoint_security_threats', 'es_threats_machine_threat_uq'));
+        foreach (\Illuminate\Support\Facades\Schema::getIndexes('endpoint_security_events') as $ix) {
+            $this->assertLessThanOrEqual(64, strlen($ix['name']));
+        }
+    }
+
+    public function test_a_renamed_pc_shows_its_current_name_not_the_enrolment_one(): void
+    {
+        // 03-Oct-2026, Ejaz: the console said DESKTOP-KN8IQRK while Devices said AH.
+        $this->commander();
+        [$m, $tok] = $this->machine('DESKTOP-KN8IQRK');
+        $emp = \App\Models\Employee::withoutGlobalScopes()->where('company_id', $this->companyId)->firstOrFail();
+        $mk = fn ($uuid, $name, $ago) => \App\Models\EmployeeDevice::withoutGlobalScopes()->forceCreate([
+            'company_id' => $this->companyId, 'employee_id' => $emp->id, 'device_uuid' => $uuid,
+            'computer_name' => $name, 'os_version' => 'Windows 11', 'last_heartbeat_at' => now()->subMinutes($ago)]);
+        $mk('DEV-OLD', 'DESKTOP-KN8IQRK', 60 * 24 * 5);   // the row the service enrolled with
+        $mk('DEV-NEW', 'AH', 1);                          // reinstalled + renamed: what Devices shows
+        // A dead record whose own device still exists is a DIFFERENT PC (LRCR8LO case): own name.
+        $m->forceFill(['device_uuid' => 'DEV-OLD', 'signed_in_employee_id' => $emp->id, 'last_seen_at' => now()->subDays(25)])->save();
+        $this->admin();
+        $this->getJson('/api/endpoint-security/overview')->assertJsonPath('data.0.device', 'DESKTOP-KN8IQRK')
+            ->assertJsonPath('data.0.service_offline', true)->assertJsonPath('summary.service_offline', 1);
+        // Its own device row gone (PC renamed/reinstalled, KN8IQRK -> AH): the current name, still offline.
+        \App\Models\EmployeeDevice::withoutGlobalScopes()->where('device_uuid', 'DEV-OLD')->delete();
+        $this->admin();
+        $this->getJson('/api/endpoint-security/overview')->assertJsonPath('data.0.device', 'AH')
+            ->assertJsonPath('data.0.service_offline', true);
+        // A newer phone of the same employee never names the PC.
+        \App\Models\EmployeeDevice::withoutGlobalScopes()->forceCreate([
+            'company_id' => $this->companyId, 'employee_id' => $emp->id, 'device_uuid' => 'DEV-PHONE',
+            'computer_name' => 'samsung SM-M146B', 'os_version' => 'Android 14', 'last_heartbeat_at' => now()]);
+        $this->admin();
+        $this->getJson('/api/endpoint-security/overview')->assertJsonPath('data.0.device', 'AH');
+        \App\Models\EmployeeDevice::withoutGlobalScopes()->where('device_uuid', 'DEV-PHONE')->delete();
+        // A live one takes the current device name.
+        $m->forceFill(['last_seen_at' => now()])->save();
+
+        $this->admin();
+        $this->getJson('/api/endpoint-security/overview')->assertJsonPath('data.0.device', 'AH')
+            ->assertJsonPath('data.0.employee.id', $emp->id);
+
+        // Once the service reports, its own hostname wins.
+        $this->sync($tok, ['hostname' => 'AH', 'health' => $this->health()]);
+        $this->admin();
+        $this->getJson('/api/endpoint-security/overview')->assertJsonPath('data.0.device', 'AH');
+        $this->sync($tok, ['hostname' => 'bad name; drop', 'health' => $this->health()]);
+        $this->assertSame('AH', EndpointSecurityStatus::withoutGlobalScopes()->value('hostname'));
+    }
+
+    public function test_utc_times_from_the_endpoint_are_stored_on_the_company_clock(): void
+    {
+        $this->enforcer();
+        [, $tok] = $this->machine();
+        $z = '2026-10-03T11:34:54Z';
+        $this->sync($tok, ['health' => $this->health(['checkedAt' => $z, 'lastQuickScan' => $z]),
+            'threats' => [['threatId' => '1', 'status' => 'quarantined', 'active' => false, 'initialDetectionTime' => $z]]]);
+        $tz = Company::withoutGlobalScopes()->whereKey($this->companyId)->value('timezone') ?: config('app.timezone');
+        $want = \Illuminate\Support\Carbon::parse($z)->setTimezone($tz)->format('Y-m-d H:i:s'); // the company clock
+        $this->assertSame($want, \Illuminate\Support\Facades\DB::table('endpoint_security_status')->value('last_quick_scan_at'));
+        $this->assertSame($want, \Illuminate\Support\Facades\DB::table('endpoint_security_threats')->value('detected_at'));
     }
 }

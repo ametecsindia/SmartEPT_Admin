@@ -451,6 +451,8 @@ class DeviceController extends Controller
             'meeting' => $meeting,
             'meeting_reminder' => $meetingReminder, // Admin #9: approaching-meeting reminder
             'liveview_requested' => $this->liveviewRequestedFor($device), // Phase 3 POC (12-Sep-2026): plan §7 Option A
+            // 04-Oct-2026: PC Audit Log — the agent records click targets only while this is true.
+            'pc_audit_clicks' => \App\Services\EndpointSecurity\Entitlement::can(\App\Models\Company::find($device->company_id), 'pc_audit'),
         ]);
     }
 

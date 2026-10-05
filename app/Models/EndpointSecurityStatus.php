@@ -15,7 +15,7 @@ class EndpointSecurityStatus extends Model
     protected $guarded = ['id'];
 
     protected $casts = [
-        'installed_providers' => 'array', 'errors' => 'array', 'compliance_issues' => 'array', 'open_alerts' => 'array',
+        'installed_providers' => 'array', 'errors' => 'array', 'compliance_issues' => 'array', 'open_alerts' => 'array', 'posture' => 'array',
         'antivirus_installed' => 'boolean', 'antivirus_enabled' => 'boolean', 'realtime_enabled' => 'boolean',
         'behavior_enabled' => 'boolean', 'ioav_enabled' => 'boolean', 'signature_outdated' => 'boolean',
         'firewall_domain' => 'boolean', 'firewall_private' => 'boolean', 'firewall_public' => 'boolean',
