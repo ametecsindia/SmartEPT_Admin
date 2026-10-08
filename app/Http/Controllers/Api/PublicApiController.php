@@ -107,6 +107,12 @@ class PublicApiController extends Controller
             // punch was an entry or an exit; the bridge must be able to say so.
             'punches.*.direction_confidence' => ['nullable', 'in:HIGH,MEDIUM,NONE'],
             'punches.*.device_status_raw'    => ['nullable', 'string', 'max:64'],
+            // Field-force sign-in from the Caller mobile app (6-Oct-2026): where the
+            // employee was and the PRS geofence verdict. Kept in metadata only.
+            'punches.*.lat'                  => ['nullable', 'numeric', 'between:-90,90'],
+            'punches.*.lng'                  => ['nullable', 'numeric', 'between:-180,180'],
+            'punches.*.accuracy_m'           => ['nullable', 'numeric', 'min:0'],
+            'punches.*.geo_status'           => ['nullable', 'in:within,outside,no-gps,no-rule,unverified'],
         ]);
 
         $punches = $data['punches'];
@@ -193,6 +199,10 @@ class PublicApiController extends Controller
                 'source'               => $p['source'] ?? null,
                 'direction_confidence' => $p['direction_confidence'] ?? null,
                 'device_status_raw'    => $p['device_status_raw'] ?? null,
+                'lat'                  => $p['lat'] ?? null,
+                'lng'                  => $p['lng'] ?? null,
+                'accuracy_m'           => $p['accuracy_m'] ?? null,
+                'geo_status'           => $p['geo_status'] ?? null,
                 'ingested_via'         => 'PUBLIC_API_V1',
                 'api_key_prefix'       => $key->prefix,
             ], fn ($v) => $v !== null && $v !== '');

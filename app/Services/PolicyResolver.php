@@ -6,6 +6,7 @@ use App\Models\ApplicationPolicy;
 use App\Models\Branch;
 use App\Models\Company;
 use App\Models\Department;
+use App\Models\Designation;
 use App\Models\Team;
 use App\Models\AttendancePolicy;
 use App\Models\BreakPolicy;
@@ -252,28 +253,47 @@ class PolicyResolver
     }
 
     /**
+     * Tracking modes, most capture to least.
+     *   FULL           — everything.
+     *   NO_SCREENSHOTS — everything EXCEPT screenshots (07-Oct-2026, Ejaz): app/website
+     *                    usage, productivity %, Active/Idle and webcam presence all run;
+     *                    no screen image is ever captured (timed or violation evidence).
+     *   PRESENCE_ONLY  — attendance + manual breaks only.
+     *   EXCLUDED       — nothing.
+     */
+    public const TRACKING_MODES = ['FULL', 'NO_SCREENSHOTS', 'PRESENCE_ONLY', 'EXCLUDED'];
+
+    /**
      * Effective tracking mode for an employee (optionally on a device), walking
-     * DEVICE > EMPLOYEE > TEAM > DEPARTMENT > BRANCH > COMPANY. First level that
-     * sets a valid mode wins; nothing set anywhere = FULL.
+     * DEVICE > EMPLOYEE > DESIGNATION > TEAM > DEPARTMENT > BRANCH > COMPANY. First
+     * level that sets a valid mode wins; nothing set anywhere = FULL.
      */
     public function effectiveTrackingMode(Employee $employee, ?EmployeeDevice $device = null, ?Company $company = null): string
     {
-        $candidates = [];
-        if ($device) { $candidates[] = $device->tracking_mode; }
-        $candidates[] = $employee->tracking_mode;
-        if ($employee->team_id)       { $candidates[] = optional(Team::withoutGlobalScopes()->find($employee->team_id))->tracking_mode; }
-        if ($employee->department_id) { $candidates[] = optional(Department::withoutGlobalScopes()->find($employee->department_id))->tracking_mode; }
-        if ($employee->branch_id)     { $candidates[] = optional(Branch::withoutGlobalScopes()->find($employee->branch_id))->tracking_mode; }
-        $candidates[] = ($company ?? Company::find($employee->company_id))?->tracking_mode;
+        return $this->resolveTrackingMode($employee, $device, $company)[1];
+    }
 
-        foreach ($candidates as $m) {
+    /** [level, mode] that decides the tracking mode. One chain for the value and its source. */
+    private function resolveTrackingMode(Employee $e, ?EmployeeDevice $device = null, ?Company $company = null): array
+    {
+        $cands = [];
+        if ($device) { $cands[] = ['DEVICE', $device->tracking_mode]; }
+        $cands[] = ['EMPLOYEE', $e->tracking_mode];
+        // DESIGNATION (07-Oct-2026): a job role is chosen per person, so it sits above team.
+        if ($e->designation_id) { $cands[] = ['DESIGNATION', optional(Designation::withoutGlobalScopes()->find($e->designation_id))->tracking_mode]; }
+        if ($e->team_id)        { $cands[] = ['TEAM', optional(Team::withoutGlobalScopes()->find($e->team_id))->tracking_mode]; }
+        if ($e->department_id)  { $cands[] = ['DEPARTMENT', optional(Department::withoutGlobalScopes()->find($e->department_id))->tracking_mode]; }
+        if ($e->branch_id)      { $cands[] = ['BRANCH', optional(Branch::withoutGlobalScopes()->find($e->branch_id))->tracking_mode]; }
+        $cands[] = ['COMPANY', ($company ?? Company::find($e->company_id))?->tracking_mode];
+
+        foreach ($cands as [$level, $m]) {
             $m = strtoupper(trim((string) $m));
-            if (in_array($m, ['FULL', 'PRESENCE_ONLY', 'EXCLUDED'], true)) {
-                return $m;
+            if (in_array($m, self::TRACKING_MODES, true)) {
+                return [$level, $m];
             }
         }
 
-        return 'FULL';
+        return ['DEFAULT', 'FULL'];
     }
 
     /**
@@ -373,15 +393,25 @@ class PolicyResolver
             return;
         }
 
+        // Every non-FULL mode: no screen image at all — timed captures AND the
+        // evidence shot a violation would take (the agent reads on_blocked_* for that).
+        if (isset($policies['screenshot']) && is_array($policies['screenshot'])) {
+            $policies['screenshot']['enabled'] = false;
+            $policies['screenshot']['on_blocked_app'] = false;
+            $policies['screenshot']['on_blocked_website'] = false;
+        }
+
+        // NO_SCREENSHOTS stops here: usage, productivity, Active/Idle and webcam stay on.
+        if ($mode === 'NO_SCREENSHOTS') {
+            return;
+        }
+
         if (isset($policies['monitoring']) && is_array($policies['monitoring'])) {
             $policies['monitoring']['app_usage_enabled'] = false;
             $policies['monitoring']['website_usage_enabled'] = false;
             if ($mode === 'EXCLUDED') {
                 $policies['monitoring']['tracking_enabled'] = false;
             }
-        }
-        if (isset($policies['screenshot']) && is_array($policies['screenshot'])) {
-            $policies['screenshot']['enabled'] = false;
         }
         if (isset($policies['webcam']) && is_array($policies['webcam'])) {
             $policies['webcam']['presence_enabled'] = false;
@@ -558,21 +588,8 @@ class PolicyResolver
     /** Which precedence level set the effective tracking mode (mirrors effectiveTrackingMode). */
     private function trackingModeSource(Employee $e, ?EmployeeDevice $device): string
     {
-        $cands = [];
-        if ($device) { $cands[] = ['DEVICE', $device->tracking_mode]; }
-        $cands[] = ['EMPLOYEE', $e->tracking_mode];
-        if ($e->team_id)       { $cands[] = ['TEAM', optional(Team::withoutGlobalScopes()->find($e->team_id))->tracking_mode]; }
-        if ($e->department_id) { $cands[] = ['DEPARTMENT', optional(Department::withoutGlobalScopes()->find($e->department_id))->tracking_mode]; }
-        if ($e->branch_id)     { $cands[] = ['BRANCH', optional(Branch::withoutGlobalScopes()->find($e->branch_id))->tracking_mode]; }
-        $cands[] = ['COMPANY', optional(Company::find($e->company_id))->tracking_mode];
+        [$level, $m] = $this->resolveTrackingMode($e, $device);
 
-        foreach ($cands as [$level, $m]) {
-            $m = strtoupper(trim((string) $m));
-            if (in_array($m, ['FULL', 'PRESENCE_ONLY', 'EXCLUDED'], true)) {
-                return $level . ' = ' . $m;
-            }
-        }
-
-        return 'DEFAULT = FULL';
+        return $level . ' = ' . $m;
     }
 }

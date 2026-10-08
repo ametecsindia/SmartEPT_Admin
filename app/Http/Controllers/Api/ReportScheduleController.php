@@ -157,6 +157,7 @@ class ReportScheduleController extends Controller
             'scope.department_id' => ['nullable', 'integer'],
             'scope.team_id'     => ['nullable', 'integer'],
             'all_employees_own' => ['boolean'],
+            'team_reports'      => ['boolean'],   // 07-Oct-2026: reporting team's report to each manager
             'recipients'        => ['nullable', 'array', 'max:5000'],
             'recipients.*.employee_id' => ['required', 'integer'],
             'recipients.*.email' => ['nullable', 'email', 'max:190'],

@@ -603,9 +603,7 @@ class GateService
                 'hours' => round($minutes / 60, 1), 'from' => $open->start_at->format('H:i'), 'to' => $at->format('H:i')];
             $t = MailService::TEMPLATES['gate_long_break'];
 
-            foreach (array_keys(MailService::recipients('gate_long_break', $companyId)) as $email) {
-                MailService::send($email, MailService::render($t['subject'], $vars), MailService::render($t['body'], $vars), 'gate_long_break', $companyId, $vars);
-            }
+            MailService::notify('gate_long_break', $companyId, MailService::render($t['subject'], $vars), MailService::render($t['body'], $vars), $vars); // 07-Oct-2026: email and/or popup
         }
     }
 

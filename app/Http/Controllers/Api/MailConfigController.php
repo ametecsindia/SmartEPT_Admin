@@ -171,6 +171,12 @@ class MailConfigController extends Controller
             'prefs.*.subject' => ['nullable', 'string', 'max:250'],
             'prefs.*.body' => ['nullable', 'string', 'max:10000'],
             'prefs.*.hour' => ['integer', 'min:0', 'max:23'],
+            // 07-Oct-2026 (Ejaz): delivery per alert — Send Email / Popup Alert; late login → the employee too.
+            'prefs.*.email' => ['boolean'],
+            'prefs.*.popup' => ['boolean'],
+            'prefs.late_login.employee' => ['boolean'],
+            'prefs.late_login.emp_subject' => ['nullable', 'string', 'max:250'],
+            'prefs.late_login.emp_body' => ['nullable', 'string', 'max:10000'],
         ]);
 
         if ($data['scope'] === 'server' && ! $user->isSuperAdmin()) {

@@ -19,6 +19,7 @@ use Symfony\Component\HttpFoundation\Response;
  *   EXCLUDED      → drop every tracking POST (204). A liveness heartbeat still runs
  *                   on the bootstrap routes, so the PC shows online, not monitored.
  *   PRESENCE_ONLY → allow attendance + manual break only; drop the rest (204).
+ *   NO_SCREENSHOTS → drop screenshot uploads only; everything else passes (07-Oct-2026).
  *   FULL          → pass through.
  *
  * 204 (not 4xx) so the agent's sync queue treats it as delivered and drops the item
@@ -53,6 +54,10 @@ class EnforceTrackingMode
 
         if ($mode === 'EXCLUDED') {
             return response()->noContent(); // 204 — nothing is stored for this person
+        }
+
+        if ($mode === 'NO_SCREENSHOTS' && Str::afterLast($request->path(), '/') === 'screenshot-upload') {
+            return response()->noContent(); // no screen image is stored for this person
         }
 
         if ($mode === 'PRESENCE_ONLY') {

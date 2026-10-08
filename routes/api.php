@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\ProductivityController;
 use App\Http\Controllers\Api\PublicApiController;
+use App\Http\Controllers\Api\FieldForceController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\IntegrationController;
 use App\Http\Controllers\Api\ActivityController;
@@ -332,6 +333,8 @@ Route::middleware(['auth:sanctum', 'company.active', 'licensed'])->group(functio
     // 28-Sep-2026: admin ↔ employee chat from the employee drawer (agent side: agent/chat below).
     // 30-Sep-2026: unread employee replies (console toast/notification + LiveView chat badges).
     Route::get('chat-unread', [\App\Http\Controllers\Api\ChatController::class, 'adminUnread'])->middleware($mgr);
+    // 07-Oct-2026: Popup Alerts chosen in Audit & Ops → Notifications (console polls; shown once).
+    Route::get('alert-popups', [\App\Http\Controllers\Api\AlertPopupController::class, 'index'])->middleware($mgr);
     Route::get('chat/{employee}', [\App\Http\Controllers\Api\ChatController::class, 'adminIndex'])->middleware($mgr);
     Route::post('chat/{employee}', [\App\Http\Controllers\Api\ChatController::class, 'adminSend'])->middleware($mgr);
     // 29-Sep-2026: the admin closed the drawer / full-screen chat — the conversation ends.
@@ -628,4 +631,7 @@ Route::prefix('v1')->middleware('throttle:120,1')->group(function () {
     // biometric ids on its own — the admin mapping endpoints need a session + a role,
     // and 'unmapped' reads $request->user()->company_id, which is null under key auth.
     Route::get('employees', [PublicApiController::class, 'employees'])->middleware('api-key:read');
+    // 6-Oct-2026: field-force location trail from the Caller mobile app (enforcement tracking).
+    Route::post('fieldforce/locations', [FieldForceController::class, 'ingest'])->middleware('api-key:ingest');
+    Route::get('fieldforce/locations', [FieldForceController::class, 'trail'])->middleware('api-key:read');
 });

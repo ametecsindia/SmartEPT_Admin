@@ -310,6 +310,10 @@
   .lv-emp-row{display:flex;align-items:center;gap:8px;padding:6px 12px;font-size:13px;cursor:pointer;white-space:nowrap}
   .lv-emp-row:hover{background:var(--hairline)}
   .lv-emp-allrow{font-weight:600;border-bottom:1px solid var(--hairline)}
+  .lv-dot{width:10px;height:10px;border-radius:50%;flex:none;background:#D92D20;box-shadow:0 0 0 2px rgba(217,45,32,.18)}
+  .lv-dot.on{background:#12B76A;box-shadow:0 0 0 2px rgba(18,183,106,.2)}
+  .lv-emp-row.off{color:var(--ink-3);cursor:not-allowed}
+  .lv-emp-st{margin-left:auto;font-size:11px;color:var(--ink-3)}
   .filters .lv-emp-list input[type=checkbox]{min-width:0;width:auto;padding:0;margin:0;flex:none}
   .lv-tile .lv-tile-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--hairline)}
   .lv-tile .lv-tile-head-left{display:flex;align-items:center;gap:6px;min-width:0;flex:1}
@@ -541,6 +545,8 @@
     <div class="nav" data-view="license"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="12" r="4.6"/><path d="M12.6 12H21M17.5 12v3.4M21 12v2.4"/></svg></span> Licence</div>
     <div class="nav" data-view="integrations"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg></span> API &amp; Integrations</div>
     <div class="nav" data-view="ops"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6.5 5 13L17 12h4"/></svg></span> Audit &amp; Ops</div>
+        <!-- 07-Oct-2026 (Ejaz): Email / SMTP + Notifications, under Audit & Ops -->
+        <div class="nav" data-view="mailalerts" style="padding-left:30px;font-size:12.5px"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 6.5 8.5 6.5 8.5-6.5"/></svg></span> Email &amp; Alerts</div>
     <div class="nav" data-view="help"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.2 9.3a2.9 2.9 0 0 1 5.6 1c0 1.9-2.8 2.6-2.8 2.6"/><path d="M12 17h.01"/></svg></span> Help &amp; Troubleshooting</div>
     </div>
     <div class="foot"><span id="who"></span><br><a id="signout" style="color:var(--ink-3);cursor:pointer">Sign out</a></div>
@@ -614,6 +620,7 @@
           <option value="HALF_DAY">HALF_DAY</option><option value="ON_LEAVE">ON_LEAVE</option>
         </select>
         <button class="btn acc" id="at-load">Load</button>
+        <button class="btn" id="at-export" type="button" title="Excel: employee details + P / A / H / L / WOFF / HOL for every date in the range">⇓ Export</button>
         <button class="btn solid" id="at-add" style="margin-left:auto">+ Add missed day</button>
       </div>
       <div class="card">
@@ -624,7 +631,7 @@
       <div class="card">
         <h3>Holiday calendar
           <span class="row">
-            <span class="hint">no late/absent marking on these days · HD in the register</span>
+            <span class="hint">no late/absent marking on these days · HOL in the register</span>
             <select id="hol-year" style="width:auto;min-width:90px;padding:6px 9px"></select>
           </span>
         </h3>
@@ -767,6 +774,15 @@
           <div><label>Other (min)</label><input id="brk-other" type="number" min="1" max="600" value="10"></div>
         </div>
         <div class="row" style="margin-top:10px"><button class="btn solid" id="brk-save">Save</button><span class="mut" id="brk-msg"></span></div>
+      </div>
+      <div class="card" id="co-track-card">
+        <h3>Tracking mode — company default <span class="hint">applies to everyone unless a branch, department, team, designation or employee sets its own</span></h3>
+        <div class="row"><select id="co-track">
+          <option value="">Full — capture everything (default)</option>
+          <option value="NO_SCREENSHOTS">Activity &amp; productivity — no screenshots</option>
+          <option value="PRESENCE_ONLY">Presence &amp; breaks only — no screenshots, no activity</option>
+          <option value="EXCLUDED">Do Not Track — capture nothing at all</option>
+        </select><button class="btn solid" id="co-track-save">Save</button><span class="mut" id="co-track-msg"></span></div>
       </div>
       <div class="card" id="co-ipx-card">
         <h3>Privacy — raw-IP &amp; local websites <span class="hint">for pages opened by a bare IP address (routers, NAS, internal tools, localhost)</span></h3>
@@ -1180,6 +1196,8 @@
 
           <div style="font-weight:700;margin:16px 0 4px">Who receives it</div>
           <div class="fbool"><input type="checkbox" id="sr-allown"> <span>Every active employee in <b>Covers</b> gets <b>their own</b> report automatically (their day, event by event + summary)</span></div>
+          <!-- 07-Oct-2026 (Ejaz): Reporting team's productivity -->
+          <div class="fbool"><input type="checkbox" id="sr-team"> <span><b>Reporting team's productivity</b> — every reporting manager (Employees → Reporting Manager) gets the report of <b>only the employees who report to them</b>; Company, HR and Branch Admins get the <b>entire company</b></span></div>
           <div class="mut" style="font-size:11.5px;margin:6px 0 8px"><b>Own report</b> = that employee's own day, event by event. <b>Full report</b> = everyone in Covers (for managers / HR).
             Edit an email to send that person's reports somewhere else (blank = the email on their employee record).</div>
           <div class="filters" style="border:none;box-shadow:none;padding:0;background:none;margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -1373,7 +1391,7 @@ The full report with every employee is in your email.</code><br>Submit it and wa
           <div class="row" style="margin-top:10px"><button class="btn acc" id="rp-sum">⇓ Export CSV</button></div>
         </div>
         <div class="exp"><b>Attendance register (monthly)</b>
-          <p>The classic month matrix — one row per employee, one letter per day (P/A/H/L, WO weekly off, HD holiday) with payable-day totals.</p>
+          <p>The classic month matrix — one row per employee, one letter per day (P/A/H/L, WOFF weekly off, HOL holiday) with payable-day totals.</p>
           <div class="row"><input type="month" id="rp-reg-month"></div>
           <div class="row" style="margin-top:10px"><button class="btn acc" id="rp-reg">⇓ Export CSV</button></div>
         </div>
@@ -1507,77 +1525,6 @@ The full report with every employee is in your email.</code><br>Submit it and wa
         </div>
         <div id="quota-buy" class="mut" style="display:none;font-size:12px">Need more space? Contact Ametecs to raise this client's limit.</div>
       </div>
-      <div class="card" id="mail-card">
-        <h3>Email / SMTP <span class="hint">password-reset codes &amp; alerts — your company's own relay, else the global default</span></h3>
-        <div id="mailc-wrap" style="display:none">
-          <h4 style="margin:4px 0 8px;font-size:13px">My company's email (SMTP) <span class="hint">used for YOUR people's reset codes &amp; alerts — blank host = use the global default below</span></h4>
-          <div class="fgrid" style="grid-template-columns:2fr 1fr 1fr">
-            <div><label>SMTP host</label><input id="mc-host" placeholder="e.g. smtp.gmail.com"></div>
-            <div><label>Port</label><input id="mc-port" type="number" placeholder="587"></div>
-            <div><label>Encryption</label><select id="mc-enc"><option value="tls">TLS</option><option value="ssl">SSL</option><option value="none">None</option></select></div>
-          </div>
-          <div class="fgrid" style="grid-template-columns:1fr 1fr">
-            <div><label>Username</label><input id="mc-user" autocomplete="off"></div>
-            <div><label>Password <span class="hint">blank = keep saved</span></label><input id="mc-pass" type="password" autocomplete="new-password"></div>
-          </div>
-          <div class="fgrid" style="grid-template-columns:1fr 1fr">
-            <div><label>From address</label><input id="mc-froma" type="email" placeholder="alerts@yourcompany.com"></div>
-            <div><label>From name</label><input id="mc-fromn" placeholder="Your Company HR"></div>
-          </div>
-          <div class="row" style="margin-top:10px">
-            <button class="btn" id="mc-test">Send test email</button>
-            <button class="btn solid" id="mc-save">Save company SMTP</button>
-            <span class="mut" id="mc-msg"></span>
-          </div>
-        </div>
-        <div id="mailg-wrap" style="display:none;margin-top:14px">
-          <h4 style="margin:4px 0 8px;font-size:13px">Global default relay <span class="hint">Super Admin — used when a company has no SMTP of its own</span></h4>
-          <div class="fgrid" style="grid-template-columns:2fr 1fr 1fr">
-            <div><label>SMTP host</label><input id="mg-host" placeholder="e.g. smtp.gmail.com"></div>
-            <div><label>Port</label><input id="mg-port" type="number" placeholder="587"></div>
-            <div><label>Encryption</label><select id="mg-enc"><option value="tls">TLS</option><option value="ssl">SSL</option><option value="none">None</option></select></div>
-          </div>
-          <div class="fgrid" style="grid-template-columns:1fr 1fr">
-            <div><label>Username</label><input id="mg-user" autocomplete="off"></div>
-            <div><label>Password <span class="hint">blank = keep saved</span></label><input id="mg-pass" type="password" autocomplete="new-password"></div>
-          </div>
-          <div class="fgrid" style="grid-template-columns:1fr 1fr">
-            <div><label>From address</label><input id="mg-froma" type="email" placeholder="noreply@smartept.com"></div>
-            <div><label>From name</label><input id="mg-fromn" placeholder="SmartEPT"></div>
-          </div>
-          <div class="row" style="margin-top:10px">
-            <button class="btn" id="mg-test">Send test email</button>
-            <button class="btn solid" id="mg-save">Save global SMTP</button>
-            <span class="mut" id="mg-msg"></span>
-          </div>
-        </div>
-      </div>
-      <div class="card" id="notify-card" style="display:none">
-        <h3>Notifications <span class="hint">which automatic alert emails go out, to whom and when — nothing is sent until you tick it</span></h3>
-        <div id="nt-co-wrap" style="display:none">
-          <h4 style="margin:4px 0 8px;font-size:13px">My company's alerts <span class="hint">sent only about YOUR company, to the people you choose</span></h4>
-          <div style="overflow-x:auto"><table style="width:100%;font-size:13px">
-            <thead><tr><th style="width:60px">Send?</th><th>Email</th><th>When</th><th>Send to</th><th>Also send to (emails, comma-separated)</th></tr></thead>
-            <tbody id="nt-co-rows"></tbody>
-          </table></div>
-          <div class="row" style="margin-top:10px"><button class="btn solid" id="nt-co-save">Save company alerts</button><span class="mut" id="nt-co-msg"></span></div>
-        </div>
-        <div id="nt-sv-wrap" style="display:none;margin-top:14px">
-          <h4 style="margin:4px 0 8px;font-size:13px">Server alerts <span class="hint">Super Admin — technical, not about any one company</span></h4>
-          <div style="overflow-x:auto"><table style="width:100%;font-size:13px">
-            <thead><tr><th style="width:60px">Send?</th><th>Email</th><th>When</th><th>Send to</th><th>Also send to (emails, comma-separated)</th></tr></thead>
-            <tbody id="nt-sv-rows"></tbody>
-          </table></div>
-          <div class="row" style="margin-top:10px"><button class="btn solid" id="nt-sv-save">Save server alerts</button><span class="mut" id="nt-sv-msg"></span></div>
-        </div>
-        <p class="mut" style="font-size:12px;margin:10px 0 0">Always sent, because a person asks for them: password-reset codes, the data-clear verification code and "Send test email".</p>
-        <details style="margin-top:14px"><summary style="cursor:pointer;font-weight:600">Recent emails (last 100 — sent, failed or blocked)</summary>
-          <div style="overflow-x:auto;margin-top:8px"><table style="width:100%;font-size:12px">
-            <thead><tr><th>When</th><th>To</th><th>Subject</th><th>Result</th></tr></thead>
-            <tbody id="nt-log"><tr><td colspan="4" class="mut">…</td></tr></tbody>
-          </table></div>
-        </details>
-      </div>
       <div class="card" id="gcs-card">
         <h3>Cloud Storage (Google Cloud) <span class="hint">keep screenshots &amp; evidence in your own GCS bucket — no server setup</span></h3>
         <div id="gcs-status" class="mut" style="margin-bottom:10px">…</div>
@@ -1625,6 +1572,83 @@ The full report with every employee is in your email.</code><br>Submit it and wa
           <button class="btn danger" id="dz-exec">2) Clear selected data</button>
         </div>
         <div class="mut" id="dz-result" style="margin-top:10px;font-size:12px"></div>
+      </div>
+    </div>
+
+    <!-- 07-Oct-2026 (Ejaz): Email & Alerts — its own tab under Audit & Ops (SMTP + Notifications +
+         the email log), so it is not mixed up with the Audit trail. Card permissions stay ops.mail_smtp
+         and ops.notifications. -->
+    <div class="view" id="v-mailalerts">
+      <div class="card" id="mail-card">
+        <h3>Email / SMTP <span class="hint">password-reset codes &amp; alerts — your company's own relay, else the global default</span></h3>
+        <div id="mailc-wrap" style="display:none">
+          <h4 style="margin:4px 0 8px;font-size:13px">My company's email (SMTP) <span class="hint">used for YOUR people's reset codes &amp; alerts — blank host = use the global default below</span></h4>
+          <div class="fgrid" style="grid-template-columns:2fr 1fr 1fr">
+            <div><label>SMTP host</label><input id="mc-host" placeholder="e.g. smtp.gmail.com"></div>
+            <div><label>Port</label><input id="mc-port" type="number" placeholder="587"></div>
+            <div><label>Encryption</label><select id="mc-enc"><option value="tls">TLS</option><option value="ssl">SSL</option><option value="none">None</option></select></div>
+          </div>
+          <div class="fgrid" style="grid-template-columns:1fr 1fr">
+            <div><label>Username</label><input id="mc-user" autocomplete="off"></div>
+            <div><label>Password <span class="hint">blank = keep saved</span></label><input id="mc-pass" type="password" autocomplete="new-password"></div>
+          </div>
+          <div class="fgrid" style="grid-template-columns:1fr 1fr">
+            <div><label>From address</label><input id="mc-froma" type="email" placeholder="alerts@yourcompany.com"></div>
+            <div><label>From name</label><input id="mc-fromn" placeholder="Your Company HR"></div>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn" id="mc-test">Send test email</button>
+            <button class="btn solid" id="mc-save">Save company SMTP</button>
+            <span class="mut" id="mc-msg"></span>
+          </div>
+        </div>
+        <div id="mailg-wrap" style="display:none;margin-top:14px">
+          <h4 style="margin:4px 0 8px;font-size:13px">Global default relay <span class="hint">Super Admin — used when a company has no SMTP of its own</span></h4>
+          <div class="fgrid" style="grid-template-columns:2fr 1fr 1fr">
+            <div><label>SMTP host</label><input id="mg-host" placeholder="e.g. smtp.gmail.com"></div>
+            <div><label>Port</label><input id="mg-port" type="number" placeholder="587"></div>
+            <div><label>Encryption</label><select id="mg-enc"><option value="tls">TLS</option><option value="ssl">SSL</option><option value="none">None</option></select></div>
+          </div>
+          <div class="fgrid" style="grid-template-columns:1fr 1fr">
+            <div><label>Username</label><input id="mg-user" autocomplete="off"></div>
+            <div><label>Password <span class="hint">blank = keep saved</span></label><input id="mg-pass" type="password" autocomplete="new-password"></div>
+          </div>
+          <div class="fgrid" style="grid-template-columns:1fr 1fr">
+            <div><label>From address</label><input id="mg-froma" type="email" placeholder="noreply@smartept.com"></div>
+            <div><label>From name</label><input id="mg-fromn" placeholder="SmartEPT"></div>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn" id="mg-test">Send test email</button>
+            <button class="btn solid" id="mg-save">Save global SMTP</button>
+            <span class="mut" id="mg-msg"></span>
+          </div>
+        </div>
+      </div>
+      <div class="card" id="notify-card" style="display:none">
+        <h3>Notifications <span class="hint">which automatic alerts go out — Send Email and/or Popup Alert — to whom and when; nothing is sent until you tick it</span></h3>
+        <div id="nt-co-wrap" style="display:none">
+          <h4 style="margin:4px 0 8px;font-size:13px">My company's alerts <span class="hint">sent only about YOUR company, to the people you choose</span></h4>
+          <div style="overflow-x:auto"><table style="width:100%;font-size:13px">
+            <thead><tr><th style="width:120px">Send as</th><th>Alert</th><th>When</th><th>Send to</th><th>Also send to (emails, comma-separated)</th></tr></thead>
+            <tbody id="nt-co-rows"></tbody>
+          </table></div>
+          <div class="row" style="margin-top:10px"><button class="btn solid" id="nt-co-save">Save company alerts</button><span class="mut" id="nt-co-msg"></span></div>
+        </div>
+        <div id="nt-sv-wrap" style="display:none;margin-top:14px">
+          <h4 style="margin:4px 0 8px;font-size:13px">Server alerts <span class="hint">Super Admin — technical, not about any one company</span></h4>
+          <div style="overflow-x:auto"><table style="width:100%;font-size:13px">
+            <thead><tr><th style="width:120px">Send as</th><th>Alert</th><th>When</th><th>Send to</th><th>Also send to (emails, comma-separated)</th></tr></thead>
+            <tbody id="nt-sv-rows"></tbody>
+          </table></div>
+          <div class="row" style="margin-top:10px"><button class="btn solid" id="nt-sv-save">Save server alerts</button><span class="mut" id="nt-sv-msg"></span></div>
+        </div>
+        <p class="mut" style="font-size:12px;margin:10px 0 0">Always sent, because a person asks for them: password-reset codes, the data-clear verification code and "Send test email".</p>
+        <details style="margin-top:14px"><summary style="cursor:pointer;font-weight:600">Recent emails (last 100 — sent, failed or blocked)</summary>
+          <div style="overflow-x:auto;margin-top:8px"><table style="width:100%;font-size:12px">
+            <thead><tr><th>When</th><th>To</th><th>Subject</th><th>Result</th></tr></thead>
+            <tbody id="nt-log"><tr><td colspan="4" class="mut">…</td></tr></tbody>
+          </table></div>
+        </details>
       </div>
     </div>
 
@@ -2140,8 +2164,9 @@ The full report with every employee is in your email.</code><br>Submit it and wa
         <div class="full"><label>Biometric ID (optional)</label><input id="f-bio" placeholder="ID on the punch device"></div>
         <div class="full"><label>Tracking mode <span style="font-weight:400;color:var(--ink-3)">— what the agent captures on this person's PCs</span></label>
           <select id="f-track">
-            <option value="">Inherit (from team / department / company)</option>
+            <option value="">Inherit (from designation / team / department / branch / company)</option>
             <option value="FULL">Full — capture everything</option>
+            <option value="NO_SCREENSHOTS">Activity &amp; productivity — no screenshots</option>
             <option value="PRESENCE_ONLY">Presence &amp; breaks only — no screenshots, no activity</option>
             <option value="EXCLUDED">Do Not Track — capture nothing at all</option>
           </select></div>
@@ -2771,7 +2796,7 @@ function applyPermissionNav() {
   const NAVP = {
     dashboard: 'dashboard.view', screenshots: 'screenshot.view', webcam: 'webcam.view', usage: 'activity.view',
     attendance: 'attendance.view', violations: 'dashboard.view', reports: 'export.data', schedrep: 'export.data',
-    policies: 'policy.view', ops: 'audit.view',
+    policies: 'policy.view', ops: 'audit.view', mailalerts: 'audit.view',
     // QA Phase 4 (B5): the Meetings screen is gated on meeting.view.
     meetings: 'meeting.view',
     // LiveView Phase 4 (14-Sep-2026): same pattern as meetings above.
@@ -2784,7 +2809,9 @@ function applyPermissionNav() {
     document.querySelectorAll('.nav[data-view]').forEach((el) => {
       const v = el.getAttribute('data-view');
       if (v === 'meetings' || v === 'liveview' || v === 'tenants') return;
-      if (!perms.some((p) => p.indexOf('card.' + v + '.') === 0)) el.style.display = 'none';
+      // 07-Oct-2026: Email & Alerts shows the two ops cards that moved into it.
+      const pre = v === 'mailalerts' ? ['card.ops.mail_smtp.', 'card.ops.notifications.'] : ['card.' + v + '.'];
+      if (!perms.some((p) => pre.some((x) => p.indexOf(x) === 0))) el.style.display = 'none';
     });
     ['meetings', 'liveview'].forEach((view) => {
       const el = document.querySelector('.nav[data-view="' + view + '"]');
@@ -2923,6 +2950,7 @@ const TITLES = {
   integrations: ['API & Integrations', 'Connect SmartEPT to SmartPRS & any external device or app'],
   gateexcl: ['Gate Exclusions', 'Who may sign in without a door punch — and until when'],
   ops: ['Audit & Ops', 'Who did what, storage growth & database backups'],
+  mailalerts: ['Email & Alerts', 'SMTP settings, automatic alerts (Send Email / Popup Alert) and the email log'],
   help: ['Help & Troubleshooting', 'System health, common fixes & the application log'],
 };
 $$('.nav').forEach((n) => n.onclick = () => show(n.dataset.view));
@@ -2962,6 +2990,7 @@ function show(v) {
   if (v === 'license') loadLicense();
   if (v === 'integrations') initIntegrations();
   if (v === 'ops') loadOps();
+  if (v === 'mailalerts') { loadMailConfig(); loadNotify(); }
   if (v === 'help') initHelp();
   { const a=document.getElementById('app'); if(a) a.classList.remove('nav-open'); }
   CURRENT = v;
@@ -2995,6 +3024,7 @@ function refreshView() {
   else if (v === 'license') loadLicense();
   else if (v === 'integrations') initIntegrations();
   else if (v === 'ops') loadOps();
+  else if (v === 'mailalerts') { loadMailConfig(); loadNotify(); }
   else if (v === 'help') runDiagnostics();
 }
 (function bindRefresh(){ const b = document.getElementById('btn-refresh'); if (b) b.onclick = refreshView; })();
@@ -3864,6 +3894,7 @@ let EMP_EDIT_ID = null, EMP_DEV_COUNTS = null, EMP_SEARCH_TIMER = null;
 function trackBadge(m) {
   if (m === 'EXCLUDED') return ' <span class="tag t-off" title="Do Not Track — the agent captures nothing on this person\'s PCs">Not tracked</span>';
   if (m === 'PRESENCE_ONLY') return ' <span class="tag t-warn" title="Presence &amp; breaks only — no screenshots or activity">Presence only</span>';
+  if (m === 'NO_SCREENSHOTS') return ' <span class="tag t-warn" title="Activity &amp; productivity tracked — no screenshots are captured">No screenshots</span>';
   return '';
 }
 // An exemption from blocking has to be visible in the LIST, not only inside the
@@ -4404,7 +4435,7 @@ const ORG_DEFS = {
   teams:        { label: 'Team',        cols: ['name','code','department'],
                   fields: [['name','Name','text',1],['code','Code','text'],['department_id','Department','select:departments'],['tracking_mode','Tracking mode for this team','trackmode'],['enforcement_mode','App/Web enforcement for this team','enfmode'],['gate_mode','Gate-to-PC exclusion for this team','gatemode'],['gate_mode_from','… valid from (blank = immediately)','date'],['gate_mode_until','… valid until, inclusive (blank = permanent)','date'],['gate_mode_reason','… reason (e.g. door reader under repair)','text']] },
   designations: { label: 'Designation', cols: ['name','code','level'],
-                  fields: [['name','Name','text',1],['code','Code','text'],['level','Level (0=junior)','num']] },
+                  fields: [['name','Name','text',1],['code','Code','text'],['level','Level (0=junior)','num'],['tracking_mode','Tracking mode for this designation','trackmode']] },
   shifts:       { label: 'Shift',       cols: ['name','code','timing'],
                   fields: [['name','Name','text',1],['code','Code','text'],['start_time','Start (HH:MM)','time'],['end_time','End (HH:MM)','time'],['grace_minutes','Grace (min)','num'],['break_minutes_allowed','Break allowed (min)','num'],['post_shift_auto_logout_minutes','Auto sign-out after shift end (min) — blank = never','num'],['restrict_login_to_shift','Block agent sign-in outside these hours (the SmartEPT agent only — never the admin console)','yesno',1],['enforcement_mode','App/Web enforcement for this shift','enfmode',1]] },
 };
@@ -4469,6 +4500,23 @@ async function initOrg() {
         $('#brk-msg').textContent = '✓ Saved.';
       } catch (e) { $('#brk-msg').textContent = '✕ ' + e.message; }
     };
+  }
+  if (!window.COTRACK_INIT) {
+    window.COTRACK_INIT = true;
+    const sel = $('#co-track');
+    if (sel) {
+      (async () => {
+        try { const c = (await api('/companies/' + ME.company_id)).data; sel.value = (c && c.tracking_mode) || ''; }
+        catch (e) { const card = $('#co-track-card'); if (card) card.style.display = 'none'; }
+      })();
+      $('#co-track-save').onclick = async () => {
+        try {
+          await api('/companies/' + ME.company_id, { method: 'PUT', body: JSON.stringify({ tracking_mode: sel.value || null }) });
+          toast('Saved');
+          $('#co-track-msg').textContent = '✓ Saved — applies after each PC’s agent next syncs its policy.';
+        } catch (e) { $('#co-track-msg').textContent = '✕ ' + e.message; }
+      };
+    }
   }
   if (!window.COIPX_INIT) {
     window.COIPX_INIT = true;
@@ -4557,6 +4605,7 @@ function orgField(f, val) {
   }
   if (type === 'trackmode') {
     const opts = [['', 'Inherit (from parent / company)'], ['FULL', 'Full — capture everything'],
+      ['NO_SCREENSHOTS', 'Activity & productivity — no screenshots'],
       ['PRESENCE_ONLY', 'Presence & breaks only — no screenshots or activity'], ['EXCLUDED', 'Do Not Track — capture nothing']];
     return '<label>' + label + star + '</label><select data-k="' + k + '">'
       + opts.map((o) => '<option value="' + o[0] + '"' + ((val || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>';
@@ -5010,7 +5059,10 @@ function initLiveView() {
   $('#lv-show-all').onclick = lvOpenWall;
   $('#lv-manage-perm').onclick = lvOpenPermissions;
   $('#lv-employee').onchange = lvEmpChanged;
-  $('#lv-emp-all').onchange = (e) => { $('#lv-employee').querySelectorAll('input').forEach((cb) => { cb.checked = e.target.checked; }); lvEmpChanged(); };
+  $('#lv-emp-all').onchange = (e) => { $('#lv-employee').querySelectorAll('input:not(:disabled)').forEach((cb) => { cb.checked = e.target.checked; }); lvEmpChanged(); };
+  // 08-Oct-2026 (Ejaz): keep the green/red list current — on opening the picker and every 30s.
+  $('#lv-emp-dd').addEventListener('toggle', () => { if ($('#lv-emp-dd').open) lvLoadPermittedEmployees(); });
+  setInterval(() => { if ($('#v-liveview').classList.contains('active') || lvTiles.size) lvLoadPermittedEmployees(); }, 30000);
   // Close the employee picker on any click outside it.
   document.addEventListener('click', (e) => { const dd = $('#lv-emp-dd'); if (dd.open && !dd.contains(e.target)) dd.open = false; });
   $('#lvperm-x').onclick = $('#lvperm-close').onclick = () => $('#lvperm-ovl').classList.remove('open');
@@ -5054,7 +5106,7 @@ function lvSelectedEmps() {
 }
 function lvEmpChanged() {
   const sel = lvSelectedEmps();
-  const all = $('#lv-employee').querySelectorAll('input').length;
+  const all = $('#lv-employee').querySelectorAll('input:not(:disabled)').length;
   $('#lv-emp-all').checked = all > 0 && sel.length === all;
   $('#lv-emp-sum').textContent = !sel.length ? 'Select employees' : sel.length === 1 ? sel[0].label : sel.length + ' employees selected';
   lvPopulateMonitors(sel.map((e) => e.id));
@@ -5065,8 +5117,14 @@ function lvUpdateStatus() {
 // 21-Sep-2026: the employee dropdown only offers employees GRANTED LiveView
 // permission (see Manage LiveView Permissions) — the server enforces this too
 // (LIVEVIEW_NOT_PERMITTED), this just keeps the UI from offering a dead end.
+// 08-Oct-2026 (Ejaz): green dot = Active / Idle / On break / Meeting (agent online, screen can open);
+// red dot = Offline, Inactive, or not on the live board — unselectable, skipped by Select all and
+// Start, listed last. Status comes from the same /dashboard/live-status the Live Dashboard uses.
+const LV_ST = {}; // employee id -> work_status (missing = inactive / not visible)
+let lvStKnown = false; // live status never loaded (e.g. role without the dashboard) → don't block anyone
+const lvAvailable = (id) => !lvStKnown || (!!LV_ST[id] && LV_ST[id] !== 'OFFLINE');
 function lvLoadPermittedEmployees() {
-  api('/liveview/permissions').then((d) => {
+  return Promise.all([api('/liveview/permissions'), api('/dashboard/live-status').catch(() => null)]).then(([d, live]) => {
     const sel = $('#lv-employee');
     const prevChecked = new Set(lvSelectedEmps().map((e) => e.id));
     const permitted = (d.employees || []).filter((e) => e.liveview_enabled);
@@ -5075,9 +5133,21 @@ function lvLoadPermittedEmployees() {
       $('#lv-status').textContent = 'No employees are permitted for LiveView yet — click "Manage permissions" to grant access.';
       return;
     }
+    if (live) { // status unknown (request failed) → keep the last known one rather than blank everyone
+      Object.keys(LV_ST).forEach((k) => delete LV_ST[k]);
+      (live.employees || []).forEach((e) => { LV_ST[e.employee_id] = e.work_status || 'OFFLINE'; });
+      lvStKnown = true;
+      // A screen already open for someone who has gone offline / inactive can't show anything — close it.
+      [...lvTiles.entries()].forEach(([sid, t]) => { if (!lvAvailable(t.empId)) lvStop(sid); });
+    }
+    permitted.sort((a, b) => (lvAvailable(b.id) ? 1 : 0) - (lvAvailable(a.id) ? 1 : 0));
     sel.innerHTML = permitted.map((e) => {
       const name = esc(fullName(e) || e.employee_code || ('#' + e.id));
-      return '<label class="lv-emp-row"><input type="checkbox" value="' + e.id + '" data-label="' + name + '"' + (prevChecked.has(e.id) ? ' checked' : '') + '> ' + name + '</label>';
+      const on = lvAvailable(e.id), ws = LV_ST[e.id];
+      const st = !lvStKnown ? '' : !ws ? 'Inactive' : (WORK_LABEL[ws] || ws);
+      return '<label class="lv-emp-row' + (on ? '' : ' off') + '" title="' + (on ? 'Available for LiveView' : 'Not available — ' + st) + '">'
+        + '<input type="checkbox" value="' + e.id + '" data-label="' + name + '"' + (on && prevChecked.has(e.id) ? ' checked' : '') + (on ? '' : ' disabled') + '> '
+        + (lvStKnown ? '<span class="lv-dot' + (on ? ' on' : '') + '"></span>' : '') + name + '<span class="lv-emp-st">' + esc(st) + '</span></label>';
     }).join('');
     lvEmpChanged();
   }).catch(() => {});
@@ -5123,8 +5193,9 @@ async function lvStartOne(emp, monitorIndex, quality) {
   return true;
 }
 async function lvStartMany(allScreens) {
-  const emps = lvSelectedEmps();
-  if (!emps.length) { $('#lv-status').textContent = 'Tick at least one employee first.'; return; }
+  await lvLoadPermittedEmployees(); // fresh status: anyone who went offline since ticking is unticked
+  const emps = lvSelectedEmps().filter((e) => lvAvailable(e.id));
+  if (!emps.length) { $('#lv-status').textContent = 'Tick at least one available (green) employee first.'; return; }
   $('#lv-emp-dd').open = false;
   const quality = $('#lv-quality').value;
   const monitorIndex = parseInt($('#lv-monitor').value, 10) || 0;
@@ -7557,17 +7628,17 @@ async function loadProductivity() {
       '<td data-sort="' + x.break_seconds + '">' + hms(x.break_seconds) + '</td>' +
       '<td data-sort="' + (x.allotted_break_seconds||0) + '" title="' + esc(x.allotted_break_basis || '') + '">' + hms(x.allotted_break_seconds||0) + '</td>' +
       '<td data-sort="' + (x.meeting_seconds || 0) + '">' + (x.meeting_seconds ? hms(x.meeting_seconds) : '—') + '</td>' +
-      '<td data-sort="' + (x.break_exceed_seconds||0) + '">' + (x.break_exceed_seconds ? hms(x.break_exceed_seconds) : '—') + '</td>' +
+      '<td data-sort="' + (x.break_exceed_seconds||0) + '"' + PR_RED(PR_RULES.breakExceed(x)) + '>' + (x.break_exceed_seconds ? hms(x.break_exceed_seconds) : '—') + '</td>' +
       '<td data-sort="' + (x.productive_seconds||0) + '" title="Working + Meeting"><b>' + hms(x.productive_seconds||0) + '</b></td>' +
       '<td data-sort="' + (x.non_productive_seconds||0) + '" title="Idle + Break Exceed + Away">' + hms(x.non_productive_seconds||0) + '</td>' +
       '<td data-sort="' + (x.net_working_seconds||0) + '" title="Actual Present − Allotted break (' + hms(x.allotted_break_seconds||0) + ')"><b>' + hms(x.net_working_seconds||0) + '</b></td>' +
       '<td data-sort="' + x.timeouts + '">' + x.timeouts + '</td>' +
-      '<td data-sort="' + (x.productivity==null?-1:x.productivity) + '"><b>' + pct(x.productivity) + '</b></td>' +
-      '<td data-sort="' + (x.late_minutes||0) + '">' + (x.late_minutes ? '<span class="tag t-warn">' + x.late_minutes + '</span>' : '0') + '</td>' +
+      '<td data-sort="' + (x.productivity==null?-1:x.productivity) + '"' + PR_RED(PR_RULES.lowProd(x)) + '><b>' + pct(x.productivity) + '</b></td>' +
+      '<td data-sort="' + (x.late_minutes||0) + '"' + PR_RED(PR_RULES.late(x)) + '>' + (PR_RULES.late(x) ? x.late_minutes : (x.late_minutes ? '<span class="tag t-warn">' + x.late_minutes + '</span>' : '0')) + '</td>' +
       '<td data-sort="' + (x.away_seconds||0) + '">' + (x.away_seconds > 60 ? '<span class="tag t-warn">' + hms(x.away_seconds) + '</span>' : '<span class="mut">—</span>') + '</td>' +
       '<td class="mut" style="font-size:11px;min-width:340px;max-width:460px;white-space:normal;line-height:1.4">' + esc(x.data_issue_text || '') + '</td></tr>'
     ).join('') : '<tr><td colspan="25" class="mut">No activity in this range.</td></tr>';
-    $('#pr-note').textContent = PROD_ROWS.length + ' rows · ' + from + ' → ' + to + ' · Actual Present = Logged out − Logged in (for today, the current time is used as logout so the % is live) · Productive = Working + Meeting · Non-Productive = Idle + Break Exceed + Away · Net Hrs = Actual Present − Allotted break · Productive % = Productive ÷ Net Hrs. Allotted break = shift allowance, pro-rated on early logout. An extract of today uses the same current-time-as-logout values. Away = punched out without a break and punched back in, or signed out of the app and signed back in (non-productive). Idle = signed in with no keyboard/mouse activity, including time the agent sent nothing for (PC off / agent closed).';
+    $('#pr-note').textContent = PROD_ROWS.length + ' rows · ' + from + ' → ' + to + ' · Actual Present = Logged out − Logged in (for today, the current time is used as logout so the % is live) · Productive = Working + Meeting · Non-Productive = Idle + Break Exceed + Away · Net Hrs = Actual Present − Allotted break · Productive % = Productive ÷ Net Hrs. Allotted break = shift allowance, pro-rated on early logout. An extract of today uses the same current-time-as-logout values. Away = punched out without a break and punched back in, or signed out of the app and signed back in (non-productive). Idle = signed in with no keyboard/mouse activity, including time the agent sent nothing for (PC off / agent closed). Red = ' + PR_LEGEND + '.';
     attachTableFilter($('#pr-q'), '#pr-rows');
   } catch (e) { $('#pr-rows').innerHTML = '<tr><td colspan="25" class="mut">' + esc(e.message) + '</td></tr>'; }
 }
@@ -7620,6 +7691,14 @@ $('#pr-rows').addEventListener('click', async (ev) => {
     d.firstChild.innerHTML = prDetailHtml(r.data);
   } catch (e) { d.firstChild.innerHTML = '<div class="err">' + esc(e.message) + '</div>'; }
 });
+// 08-Oct-2026 (Ejaz): red font for out-of-limit values — screen, PDF and Excel (ProductivityController::spreadsheet) use the same limits.
+const PR_RULES = {
+  breakExceed: (x) => (x.break_exceed_seconds || 0) > 5 * 60,           // break exceeded by more than 5 min
+  lowProd: (x) => x.productivity != null && Number(x.productivity) < 60,  // productivity below 60%
+  late: (x) => (x.late_minutes || 0) > 15,                                // late login more than 15 min
+};
+const PR_LEGEND = 'Break exceed over 5 min · Productivity below 60% · Late login over 15 min';
+const PR_RED = (on) => (on ? ' style="color:#D92D20;font-weight:700"' : '');
 // R4 item 6: extracted reports use hh:mm, not raw seconds/minutes.
 const hhmm = (sec) => { const m = Math.max(0, Math.round((sec || 0) / 60)); return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
 function prCSV() {
@@ -7632,7 +7711,7 @@ function prCSV() {
 }
 function prPDF() {
   const from = $('#pr-from').value, to = $('#pr-to').value;
-  const rowsHtml = PROD_ROWS.map((x) => '<tr><td>' + esc(x.work_date) + '</td><td>' + esc(x.employee_code||'') + '</td><td>' + esc(x.name) + '</td><td>' + esc(x.department||'') + '</td><td>' + esc(x.reporting_manager||'—') + '</td><td>' + esc(x.first_in||'—') + '</td><td>' + esc(x.last_out||'—') + '</td><td>' + hhmm(x.present_seconds) + '</td><td>' + hhmm(x.work_seconds) + '</td><td>' + hhmm(x.idle_seconds) + '</td><td>' + x.break_count + '</td><td>' + hhmm(x.break_seconds) + '</td><td>' + hhmm(x.allotted_break_seconds) + '</td><td>' + hhmm(x.meeting_seconds) + '</td><td>' + hhmm(x.break_exceed_seconds) + '</td><td>' + hhmm(x.productive_seconds) + '</td><td>' + hhmm(x.non_productive_seconds) + '</td><td>' + hhmm(x.net_working_seconds) + '</td><td>' + (x.productivity==null?'—':Number(x.productivity).toFixed(0)+'%') + '</td><td>' + (x.late_minutes||0) + '</td><td>' + esc(x.data_issue_text||'') + '</td><td>' + esc(x.gate_in||'—') + '</td><td>' + (x.gate_to_pc_minutes||0) + '</td><td>' + hhmm(x.away_seconds||0) + '</td></tr>').join('');
+  const rowsHtml = PROD_ROWS.map((x) => '<tr><td>' + esc(x.work_date) + '</td><td>' + esc(x.employee_code||'') + '</td><td>' + esc(x.name) + '</td><td>' + esc(x.department||'') + '</td><td>' + esc(x.reporting_manager||'—') + '</td><td>' + esc(x.first_in||'—') + '</td><td>' + esc(x.last_out||'—') + '</td><td>' + hhmm(x.present_seconds) + '</td><td>' + hhmm(x.work_seconds) + '</td><td>' + hhmm(x.idle_seconds) + '</td><td>' + x.break_count + '</td><td>' + hhmm(x.break_seconds) + '</td><td>' + hhmm(x.allotted_break_seconds) + '</td><td>' + hhmm(x.meeting_seconds) + '</td><td' + PR_RED(PR_RULES.breakExceed(x)) + '>' + hhmm(x.break_exceed_seconds) + '</td><td>' + hhmm(x.productive_seconds) + '</td><td>' + hhmm(x.non_productive_seconds) + '</td><td>' + hhmm(x.net_working_seconds) + '</td><td' + PR_RED(PR_RULES.lowProd(x)) + '>' + (x.productivity==null?'—':Number(x.productivity).toFixed(0)+'%') + '</td><td' + PR_RED(PR_RULES.late(x)) + '>' + (x.late_minutes||0) + '</td><td>' + esc(x.data_issue_text||'') + '</td><td>' + esc(x.gate_in||'—') + '</td><td>' + (x.gate_to_pc_minutes||0) + '</td><td>' + hhmm(x.away_seconds||0) + '</td></tr>').join('');
   const co = ($('#company-name') ? $('#company-name').textContent : 'Company');
   const w = window.open('', '_blank');
   w.document.write('<html><head><title>SmartEPT Productivity ' + from + ' to ' + to + '</title><style>'
@@ -7646,6 +7725,7 @@ function prPDF() {
     + '<button class="np" onclick="window.print()" style="padding:8px 14px;background:#006699;color:#fff;border:none;border-radius:7px;cursor:pointer">Print / Save PDF</button></div>'
     + '<table><thead><tr><th>Date</th><th>Code</th><th>Employee</th><th>Dept</th><th>Manager</th><th>In</th><th>Out</th><th>Actual Present</th><th>Working</th><th>Idle</th><th>Breaks</th><th>Break Availed</th><th>Allotted</th><th>Meeting Time</th><th>Break Exceed</th><th>Productive</th><th>Non-Prod.</th><th>Net Hrs</th><th>Prod.%</th><th>Late (min)</th><th>Data Issue</th><th>Gate IN</th><th>Gate→PC (mins)</th><th>Away</th></tr></thead><tbody>'
     + (rowsHtml || '<tr><td colspan="19">No data</td></tr>') + '</tbody></table>'
+    + '<p style="margin-top:10px;font-size:10px"><b style="color:#D92D20">Red</b> = ' + PR_LEGEND + '</p>'
     + '<p style="margin-top:14px;color:#878C99;font-size:10px">Generated ' + new Date().toLocaleString() + ' · SmartEPT — Employee Productivity Tracking & Intelligence</p>'
     + '</body></html>');
   w.document.close();
@@ -7842,9 +7922,9 @@ async function loadTab(tab) {
         + row('Tracking', c.tracking) + row('App usage', c.app_usage) + row('Website usage', c.website_usage)
         + row('Screenshots', c.screenshots) + row('Webcam presence', c.webcam)
         + '</tbody></table>'
-        + '<div class="mut" style="margin-top:8px">Precedence: <b>DEVICE ▸ EMPLOYEE ▸ TEAM ▸ DEPARTMENT ▸ BRANCH ▸ COMPANY</b> — the most specific level wins. '
+        + '<div class="mut" style="margin-top:8px">Precedence: <b>DEVICE ▸ EMPLOYEE ▸ DESIGNATION ▸ TEAM ▸ DEPARTMENT ▸ BRANCH ▸ COMPANY</b> — the most specific level wins. '
         + 'If a capability is OFF unexpectedly, the "Set at level" column shows which level/policy turned it off (e.g. an EMPLOYEE or DEVICE override beats the team). '
-        + 'A tracking mode of PRESENCE_ONLY forces App/Website/Screenshots/Webcam off; EXCLUDED forces everything off. '
+        + 'A tracking mode of NO_SCREENSHOTS forces only Screenshots off; PRESENCE_ONLY forces App/Website/Screenshots/Webcam off; EXCLUDED forces everything off. '
         + '“EMPLOYEE_LINK” = the direct monitoring policy set on the employee record.</div>';
     }
   } catch (e) { body.innerHTML = '<div class="mut">' + (isDenied(e) ? 'Your role cannot view this tab.' : esc(e.message)) + '</div>'; }
@@ -8026,6 +8106,36 @@ async function chatUnreadPoll() {
   finally { CHAT_UNREAD_BUSY = false; }
 }
 setInterval(chatUnreadPoll, 5000);
+// ---- 07-Oct-2026 (Ejaz): Popup Alerts (Audit & Ops -> Notifications -> "Popup Alert") ----
+// Stays on screen until closed; also a Windows/browser notification when allowed.
+let ALERT_POP_OFF = false, ALERT_POP_BUSY = false;
+function alertPopShow(a) {
+  let box = $('#alert-pops');
+  if (!box) { box = document.createElement('div'); box.id = 'alert-pops'; box.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:300;display:flex;flex-direction:column;gap:8px;max-width:380px;width:calc(100vw - 32px)'; document.body.appendChild(box); }
+  const c = document.createElement('div');
+  c.style.cssText = 'background:#fff;border:1px solid #E5E1D8;border-left:4px solid #DC2626;border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.18);padding:10px 12px;font-size:13px;color:#0F1E26';
+  c.innerHTML = '<div style="display:flex;gap:8px;align-items:flex-start"><b style="flex:1">\uD83D\uDD14 ' + esc(a.title) + '</b><button type="button" class="btn" style="padding:0 8px" title="Close">\u2715</button></div>'
+    + '<div style="white-space:pre-wrap;max-height:180px;overflow:auto;margin-top:4px;color:#4A5A66">' + esc(a.body) + '</div>'
+    + '<div class="mut" style="font-size:11px;margin-top:4px">' + esc(String(a.created_at || '').replace('T', ' ').slice(0, 16)) + '</div>';
+  c.querySelector('button').onclick = () => c.remove();
+  box.appendChild(c);
+  while (box.children.length > 5) box.firstElementChild.remove();
+  try {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const n = new Notification(a.title, { body: String(a.body || '').slice(0, 240), tag: 'ept-alert-' + a.id });
+      n.onclick = () => { n.close(); window.focus(); };
+    }
+  } catch (e) { /* notifications unavailable */ }
+}
+async function alertPopPoll() {
+  if (!TOKEN || !ME || isEmp() || ALERT_POP_OFF || ALERT_POP_BUSY) return;
+  ALERT_POP_BUSY = true;
+  try { ((await api('/alert-popups')).data || []).forEach(alertPopShow); }
+  catch (e) { if (isDenied(e)) ALERT_POP_OFF = true; }
+  finally { ALERT_POP_BUSY = false; }
+}
+setInterval(alertPopPoll, 30000);
+setTimeout(alertPopPoll, 4000);
 function chatClose() {
   // 29-Sep-2026 (Ejaz): closing the chat ends the conversation — delete the thread.
   if (CHAT_EMP && !isEmp()) api('/chat/' + CHAT_EMP, { method: 'DELETE' }).catch(() => {});
@@ -8152,7 +8262,7 @@ async function loadSchedRep() {
     const sc = s.scope || {}, parts = [nm((SR_ORG || {}).branches, sc.branch_id), nm((SR_ORG || {}).departments, sc.department_id), nm((SR_ORG || {}).teams, sc.team_id)].filter(Boolean);
     const rec = s.recipients || [], own = rec.filter((r) => r.mode === 'OWN').length, full = rec.filter((r) => r.mode === 'FULL').length, ex = (s.extra_emails || []).length;
     const wa = s.whatsapp_enabled ? 'WhatsApp: ' + [s.whatsapp_admins ? 'Company Admin' : '', (s.whatsapp_numbers || []).length ? (s.whatsapp_numbers || []).length + ' number' + ((s.whatsapp_numbers || []).length > 1 ? 's' : '') : ''].filter(Boolean).join(' + ') : '';
-    const to = [s.all_employees_own ? 'Every employee: own' : (own ? own + ' own' : ''), full ? full + ' full' : '', ex ? ex + ' extra email' + (ex > 1 ? 's' : '') : '', wa].filter(Boolean).join(' · ') || '<span class="mut">nobody yet</span>';
+    const to = [s.all_employees_own ? 'Every employee: own' : (own ? own + ' own' : ''), s.team_reports ? 'Reporting managers: team' : '', full ? full + ' full' : '', ex ? ex + ' extra email' + (ex > 1 ? 's' : '') : '', wa].filter(Boolean).join(' · ') || '<span class="mut">nobody yet</span>';
     const last = s.last_run_at ? new Date(s.last_run_at).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
     return '<tr data-id="' + s.id + '"><td><b>' + esc(s.name) + '</b>' + (s.creator ? '<div class="mut" style="font-size:11px">by ' + esc(s.creator.name) + '</div>' : '') + '</td>'
       + '<td>' + esc(when) + '</td><td>' + esc(parts.join(' › ') || 'Whole company') + '</td><td>' + to + '</td>'
@@ -8164,7 +8274,7 @@ async function loadSchedRep() {
 }
 function srPayload(s) {
   return { name: s.name, enabled: !!s.enabled, frequency: s.frequency, send_time: s.send_time, days: s.days || [], day_of_month: s.day_of_month || 1,
-    scope: s.scope || {}, all_employees_own: !!s.all_employees_own, recipients: s.recipients || [], extra_emails: s.extra_emails || [],
+    scope: s.scope || {}, all_employees_own: !!s.all_employees_own, team_reports: !!s.team_reports, recipients: s.recipients || [], extra_emails: s.extra_emails || [],
     skip_empty: !!s.skip_empty, skip_holidays: !!s.skip_holidays, attach_excel: !!s.attach_excel, subject: s.subject || null, message: s.message || null,
     whatsapp_enabled: !!s.whatsapp_enabled, whatsapp_admins: !!s.whatsapp_admins, whatsapp_numbers: s.whatsapp_numbers || [] };
 }
@@ -8227,7 +8337,7 @@ function srOpen(s) {
   $('#sr-name').value = SR_EDIT.name || ''; $('#sr-enabled').checked = !!SR_EDIT.enabled;
   $('#sr-freq').value = SR_EDIT.frequency; $('#sr-time').value = SR_EDIT.send_time; $('#sr-dom').value = SR_EDIT.day_of_month || 1;
   const sc = SR_EDIT.scope || {}; $('#sr-b').value = sc.branch_id || ''; $('#sr-d').value = sc.department_id || ''; $('#sr-t').value = sc.team_id || '';
-  $('#sr-allown').checked = !!SR_EDIT.all_employees_own; $('#sr-extra').value = (SR_EDIT.extra_emails || []).join(', ');
+  $('#sr-allown').checked = !!SR_EDIT.all_employees_own; $('#sr-team').checked = !!SR_EDIT.team_reports; $('#sr-extra').value = (SR_EDIT.extra_emails || []).join(', ');
   $('#sr-skip-empty').checked = !!SR_EDIT.skip_empty; $('#sr-skip-hol').checked = !!SR_EDIT.skip_holidays; $('#sr-excel').checked = !!SR_EDIT.attach_excel;
   $('#sr-subject').value = SR_EDIT.subject || ''; $('#sr-msg').value = SR_EDIT.message || '';
   $('#sr-wa').checked = !!SR_EDIT.whatsapp_enabled; $('#sr-wa-admins').checked = !!SR_EDIT.whatsapp_admins;
@@ -8249,7 +8359,7 @@ async function srSave(andTest) {
     name: $('#sr-name').value.trim(), enabled: $('#sr-enabled').checked, frequency: $('#sr-freq').value, send_time: $('#sr-time').value,
     days, day_of_month: +$('#sr-dom').value || 1,
     scope: { branch_id: +$('#sr-b').value || null, department_id: +$('#sr-d').value || null, team_id: +$('#sr-t').value || null },
-    all_employees_own: $('#sr-allown').checked, recipients, extra_emails: extra,
+    all_employees_own: $('#sr-allown').checked, team_reports: $('#sr-team').checked, recipients, extra_emails: extra,
     skip_empty: $('#sr-skip-empty').checked, skip_holidays: $('#sr-skip-hol').checked, attach_excel: $('#sr-excel').checked,
     subject: $('#sr-subject').value.trim() || null, message: $('#sr-msg').value.trim() || null,
     whatsapp_enabled: $('#sr-wa').checked, whatsapp_admins: $('#sr-wa-admins').checked,
@@ -8258,7 +8368,7 @@ async function srSave(andTest) {
   if (body.whatsapp_enabled && !body.whatsapp_admins && !body.whatsapp_numbers.length) { out.textContent = '✕ Add a WhatsApp number or tick Company Admin(s).'; return; }
   if (!body.name) { out.textContent = '✕ Give the schedule a name.'; return; }
   if (!body.send_time) { out.textContent = '✕ Pick the time to send.'; return; }
-  if (!body.all_employees_own && !recipients.length && !extra.length && !body.whatsapp_enabled) { out.textContent = '✕ Choose who receives it (employees, every employee, or additional emails).'; return; }
+  if (!body.all_employees_own && !body.team_reports && !recipients.length && !extra.length && !body.whatsapp_enabled) { out.textContent = '✕ Choose who receives it (employees, every employee, or additional emails).'; return; }
   out.textContent = andTest ? 'Saving and sending the test…' : 'Saving…';
   try {
     const r = await api('/report-schedules' + (SR_EDIT && SR_EDIT.id ? '/' + SR_EDIT.id : ''), { method: SR_EDIT && SR_EDIT.id ? 'PUT' : 'POST', body: JSON.stringify(body) });
@@ -8494,6 +8604,11 @@ $('#at-load').onclick = loadAttendance;
 $('#at-date').addEventListener('change', loadAttendance);
 $('#at-status').addEventListener('change', loadAttendance);
 $('#at-add').onclick = () => openAttModal(null);
+// 07-Oct-2026 (Ejaz): attendance for the selected range — employee details + one column per date.
+$('#at-export').onclick = () => {
+  const from = $('#at-date').value || today(), to = $('#at-to').value || from;
+  downloadCsv('/export/attendance-register?format=xlsx&from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to), 'attendance_' + from + '_' + to + '.xlsx');
+};
 $('#at-rows').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-att-edit]');
   if (!btn) return;
@@ -8961,8 +9076,6 @@ async function loadOps() {
   loadRetention();
   loadStorageConfig();
   loadStorageQuota();
-  loadMailConfig();
-  loadNotify();
   try {
     const s = await api('/ops/storage-usage');
     $('#ops-storage').innerHTML = (s.data || []).length
@@ -9092,14 +9205,14 @@ const NT_CO = [
     when: (p) => 'After <input type="number" min="1" max="10080" data-f="minutes" value="' + p.minutes + '" style="width:70px"> minutes of silence' },
   { k: 'violation_spike', name: 'Violations', what: 'Rule violations in your company within one hour. At most one email per hour.',
     when: (p) => 'When <input type="number" min="1" data-f="threshold" value="' + p.threshold + '" style="width:70px"> or more in 1 hour' },
-  { k: 'late_login', name: 'Late logins', what: 'One list per day of employees who logged in late.',
+  { k: 'late_login', name: 'Late logins', what: 'One list per day of employees who logged in late. Tick "The late employee" to also tell each late employee (once a day, soon after they sign in).', emp: true,
     when: (p) => 'More than <input type="number" min="1" data-f="minutes" value="' + p.minutes + '" style="width:60px"> min late — sent at ' + NT_HOURS('hour', p.hour) },
   { k: 'gate_long_break', name: 'Long out-of-office break', what: 'The biometric door shows an employee stayed out too long.',
     when: (p) => 'Break longer than <input type="number" min="0.1" max="24" step="0.1" data-f="hours" value="' + p.hours + '" style="width:60px"> hours' },
   { k: 'security_alert', name: 'Endpoint security', what: 'A PC lost antivirus / real-time protection / firewall, has outdated signatures, or Defender found a threat. Sent once when a problem starts (Enforcer & Commander).',
     when: () => 'When a security problem first appears' },
   { k: 'USER_CREDENTIALS', name: 'New sign-in details', what: 'Temporary password sent to a person when an admin creates their login or resets their password.',
-    when: () => 'When an admin creates / resets a login', fixedTo: 'The person the login is for', copy: true },
+    when: () => 'When an admin creates / resets a login', fixedTo: 'The person the login is for', copy: true, noPopup: true },
 ];
 const NT_SV = [
   { k: 'error_digest', name: 'Daily server error report', what: 'Technical errors the server logged in the last 24 hours. Sent only if there were errors.',
@@ -9112,29 +9225,41 @@ function ntRows(defs, prefs, roles) {
   return defs.map((r) => {
     const p = prefs[r.k] || {};
     const to = r.fixedTo ? '<span class="mut">' + esc(r.fixedTo) + '</span>'
-      : roles.map(([v, l]) => '<label style="display:block;white-space:nowrap"><input type="checkbox" data-role="' + v + '"' + ((p.roles || []).includes(v) ? ' checked' : '') + '> ' + l + '</label>').join('');
+      : roles.map(([v, l]) => '<label style="display:block;white-space:nowrap"><input type="checkbox" data-role="' + v + '"' + ((p.roles || []).includes(v) ? ' checked' : '') + '> ' + l + '</label>').join('')
+        // 07-Oct-2026 (Ejaz): late login -> the respective employee (email + popup on their SmartEPT agent).
+        + (r.emp ? '<label style="display:block;white-space:nowrap" title="Email to the employee and/or a popup on their SmartEPT agent, as ticked under Send as"><input type="checkbox" data-f="employee"' + (p.employee ? ' checked' : '') + '> The late employee</label>' : '');
+    // 07-Oct-2026 (Ejaz): Send Email / Popup Alert per alert; the old single tick = either one.
+    const sendAs = '<label style="display:block;white-space:nowrap"><input type="checkbox" data-f="email"' + (p.on && p.email !== false ? ' checked' : '') + '> Send Email</label>'
+      + (r.noPopup ? '' : '<label style="display:block;white-space:nowrap" title="Pops up in the SmartEPT console for the people ticked under Send to (and on the employee agent where shown)"><input type="checkbox" data-f="popup"' + (p.on && p.popup ? ' checked' : '') + '> Popup Alert</label>');
+    const et = (NT_TPL || {}).late_login_employee || {};
+    const empEdit = r.emp ? '<div style="margin-top:10px;font-weight:600">Message to the late employee</div>'
+      + '<label>Subject</label><input data-c="emp_subject" data-default="' + esc(et.subject || '') + '" value="' + esc(p.emp_subject || et.subject || '') + '" style="width:100%">'
+      + '<label style="margin-top:6px;display:block">Message</label><textarea data-c="emp_body" data-default="' + esc(et.body || '') + '" rows="6" style="width:100%;font-family:monospace;font-size:12px">' + esc(p.emp_body || et.body || '') + '</textarea>'
+      + '<div class="mut" style="font-size:12px">You can use: ' + (et.vars || []).map((v) => '<code>{' + esc(v) + '}</code>').join(' ') + '</div>' : '';
     const extra = (r.fixedTo && !r.copy) ? '' : '<input data-f="extra" value="' + esc(p.extra || '') + '" placeholder="' + (r.copy ? 'copy to (gets the temporary password too)' : 'e.g. it@yourcompany.com') + '" style="width:100%">';
     const t = (NT_TPL || {})[r.k] || {};
     const vars = (t.vars || []).map((v) => '<code>{' + esc(v) + '}</code>').join(' ');
-    return '<tr data-k="' + r.k + '"><td><input type="checkbox" data-f="on"' + (p.on ? ' checked' : '') + '></td>'
+    return '<tr data-k="' + r.k + '"><td>' + sendAs + '</td>'
       + '<td><b>' + esc(r.name) + '</b><div class="mut" style="font-size:12px">' + esc(r.what) + '</div>'
-      + '<a href="#" style="font-size:12px" onclick="const e=this.closest(\'tr\').nextElementSibling;e.style.display=e.style.display===\'none\'?\'\':\'none\';return false">Edit email content</a></td>'
+      + '<a href="#" style="font-size:12px" onclick="const e=this.closest(\'tr\').nextElementSibling;e.style.display=e.style.display===\'none\'?\'\':\'none\';return false">Edit alert content</a></td>'
       + '<td>' + r.when(p) + '</td><td>' + to + '</td><td>' + extra + '</td></tr>'
       + '<tr data-edit="' + r.k + '" style="display:none"><td></td><td colspan="4">'
       + '<label>Subject</label><input data-c="subject" data-default="' + esc(t.subject || '') + '" value="' + esc(p.subject || t.subject || '') + '" style="width:100%">'
       + '<label style="margin-top:6px;display:block">Message</label><textarea data-c="body" data-default="' + esc(t.body || '') + '" rows="8" style="width:100%;font-family:monospace;font-size:12px">' + esc(p.body || t.body || '') + '</textarea>'
       + '<div class="mut" style="font-size:12px">You can use: ' + vars + ' — filled in automatically. '
-      + '<a href="#" onclick="const e=this.closest(\'tr\');e.querySelectorAll(\'[data-c]\').forEach((x)=>{x.value=x.dataset.default});return false">Reset to built-in text</a></div></td></tr>';
+      + '<a href="#" onclick="const e=this.closest(\'tr\');e.querySelectorAll(\'[data-c]\').forEach((x)=>{x.value=x.dataset.default});return false">Reset to built-in text</a></div>' + empEdit + '</td></tr>';
   }).join('');
 }
 function ntCollect(sel) {
   const prefs = {};
   document.querySelectorAll(sel + ' tr[data-k]').forEach((tr) => {
-    const p = { on: tr.querySelector('[data-f="on"]').checked };
+    const p = {};
     tr.querySelectorAll('[data-f]').forEach((el) => {
-      const f = el.dataset.f; if (f === 'on') return;
-      p[f] = f === 'extra' ? el.value.trim() : Number(el.value);
+      const f = el.dataset.f;
+      p[f] = el.type === 'checkbox' ? el.checked : f === 'extra' ? el.value.trim() : Number(el.value);
     });
+    p.popup = !!p.popup;
+    p.on = !!(p.email || p.popup); // 07-Oct-2026: on = Send Email or Popup Alert ticked
     const roles = [...tr.querySelectorAll('[data-role]')];
     if (roles.length) p.roles = roles.filter((c) => c.checked).map((c) => c.dataset.role);
     // Wording: left identical to the built-in text → saved blank, so it keeps following the built-in.
@@ -9168,7 +9293,8 @@ async function loadNotify() {
     const m = $('#nt-' + id + '-msg'); m.textContent = 'Saving…';
     try {
       await api('/ops/notify-prefs', { method: 'PUT', body: JSON.stringify({ scope, prefs: ntCollect('#nt-' + id + '-rows') }) });
-      m.textContent = '\u2713 Saved — only the ticked emails will be sent';
+      m.textContent = '\u2713 Saved — only the ticked alerts will be sent';
+      try { if ('Notification' in window && Notification.permission === 'default' && document.querySelector('#nt-' + id + '-rows [data-f="popup"]:checked')) Notification.requestPermission(); } catch (e) {}
     } catch (e) { m.textContent = '\u2715 ' + e.message; }
   };
 });
@@ -9373,7 +9499,7 @@ $('#ops-backup-now').onclick = async () => {
 const HELP = {
   tenants: ['Tenants', '<h5>What</h5>The host\'s (operator\'s) view of every company on this server. Cloud tenants (AMETECS-SaaS) each carry their <b>own</b> licence — status, plan, seats and expiry — plus live device counts, user/employee counts, evidence-storage use against quota, and when their agents last reported.<h5>Why</h5>On a shared cloud install, one tenant\'s licence must never affect another\'s, and the operator needs one screen to spot a tenant running out of seats or storage before it becomes a support call. Commercial records — orders, invoices, plans, payments — deliberately live in SmartEPT Central only, so there is exactly one source of truth.<h5>How</h5>Rows are sorted cloud-tenants-first. Click a tenant\'s /slug to open their branded console. "Validate" forces that tenant\'s licence to re-check with Central right now (after a renewal or seat upgrade). Storage figures are cached for 10 minutes; the bar turns amber at 70% and red at 90% of quota.'],
   dashboard: ['Live Dashboard', '<h5>What</h5>A real-time picture of the whole company: who is active, idle, on break or offline, plus today\'s violation and screenshot counts and the health of every agent below.<h5>Why</h5>One glance tells you whether the floor is working and whether the monitoring agents themselves are alive and syncing.<h5>How</h5>The table refreshes every 15 seconds automatically. Click any employee row to open their full day — timeline, apps, websites and compliance — in the side drawer.'],
-  attendance: ['Attendance', '<h5>What</h5>The day\'s attendance sheet — status per employee (Present, Absent, Half-day, On leave) with check-in/out, late minutes and the source of each verdict — plus the company holiday calendar.<h5>Why</h5>This sheet feeds payroll, so it must be complete and correctable: a downed biometric reader or a forgotten leave application should not cost anyone a day\'s pay.<h5>How</h5>Pick a date and optionally a status filter. Edit any row to regularize it, or use "+ Add missed day" for a date with no record — both require a written reason that is stored on the record and audit-logged, and the row\'s source becomes MANUAL. Maintain holidays below: no late/absent marking happens on them and they appear as HD in the monthly register.'],
+  attendance: ['Attendance', '<h5>What</h5>The day\'s attendance sheet — status per employee (Present, Absent, Half-day, On leave) with check-in/out, late minutes and the source of each verdict — plus the company holiday calendar.<h5>Why</h5>This sheet feeds payroll, so it must be complete and correctable: a downed biometric reader or a forgotten leave application should not cost anyone a day\'s pay.<h5>How</h5>Pick a date and optionally a status filter. Edit any row to regularize it, or use "+ Add missed day" for a date with no record — both require a written reason that is stored on the record and audit-logged, and the row\'s source becomes MANUAL. Maintain holidays below: no late/absent marking happens on them and they appear as HOL in the register. <b>⇓ Export</b> downloads the selected date range as Excel — employee details and one column per date (P, A, H half day, L leave, WOFF weekly off, HOL holiday) with totals.'],
   screenshots: ['Screenshots', '<h5>What</h5>The screen captures the desktop agent uploaded for one employee on one day, with the app in focus and the reason each capture fired (interval, random or violation).<h5>Why</h5>Screenshots are the evidence layer: they turn a "13 minutes on YouTube" number into something you can verify before acting.<h5>How</h5>Pick an employee and a date, then click a tile for the full-size image. Captures only exist where the assigned screenshot policy enables them, and every image you open here is recorded in the audit log.'],
   usage: ['Usage & Compliance', '<h5>What</h5>Per-employee time by application and by website for a chosen day, alongside that day\'s compliance events.<h5>Why</h5>This is where productive vs unproductive time becomes concrete — which tools the employee actually used and where policy lines were crossed.<h5>How</h5>Pick an employee and date; categories (PRODUCTIVE, NEUTRAL, blocked) come from the application and website policies you define under Policies. Website names are read from the browser window title in this release.'],
   violations: ['Violations', '<h5>What</h5>The company-wide feed of compliance events: blocked apps and sites, category and severity, what the agent did about it, and a link to screenshot evidence when one was captured.<h5>Why</h5>Reviewing this daily keeps enforcement fair and consistent — the same event always produces the same recorded action.<h5>How</h5>Use "View evidence" to jump straight to that employee\'s screenshots for the day of the event. Export the full log as CSV for HR or audit.'],
@@ -9385,6 +9511,7 @@ const HELP = {
   biometric: ['Biometric', '<h5>What</h5>Door-punch integration: connect a biometric attendance API — <b>eTimeOffice</b> or <b>eSSL (eTimeTrackLite)</b> — and its punches import into Attendance &amp; payroll automatically, plus the punch log, CSV import, biometric-ID-to-employee mapping, and a daily reconciliation of first punch vs first agent login.<h5>Why</h5>The gap between "in the office" and "at the system" is invisible to either source alone — the mismatch report exposes it in minutes per employee.<h5>How</h5>In Biometric Device Setup, pick the <b>provider</b> first — the form then asks only for that vendor\'s fields. eTimeOffice needs the API base URL, endpoint, corporate ID and credentials; eSSL needs the eTimeTrackLite Web API URL, the reader\'s serial number and the Web API login. Press Test connection to preview punches, then Save with automatic sync on — or press Sync now anytime.<h5>Several branches, floors and readers</h5>Add <b>one entry per physical reader</b> and give each its own Branch, Floor/location and <b>Punch direction</b>. Use <b>IN only</b> / <b>OUT only</b> where entry and exit have separate readers. Use <b>IN + OUT</b> where one reader is used both ways: SmartEPT works the direction out from that employee\'s punch sequence for the day — 1st IN, 2nd OUT, 3rd IN, 4th OUT — and re-checks the whole day on every sync, so a late or repeated punch never leaves the sequence wrong. <b>Automatic</b> is the original behaviour: the IN/OUT machine IDs decide, then the feed\'s own flag. Employee codes match automatically by employee code or biometric ID (use the prefix field when the feed drops a letter); anything unmatched appears under Map biometric ID → employee, and old punches back-fill once mapped. The mismatch report reads: OK, MISMATCH over 15 minutes, or NO_BIOMETRIC.'],
   integrations: ['API & Integrations', '<h5>What</h5>SmartEPT as an integration hub: API keys let external devices/apps push attendance IN and read it OUT; outbound targets push attendance to SmartPRS or other systems automatically.<h5>Why</h5>No manual CSV shuffling between your gate devices, SmartPRS and SmartEPT — secure API keys in, HMAC-signed pushes out.<h5>How</h5>Create a key (shown once), give it ingest/read scope. Add an outbound target with its URL + shared secret; Test push sends a day now, the nightly job ships the previous day. The Integration guide card has the exact URLs, JSON and signature check for the other side.'],
   license: ['Licence', '<h5>What</h5>This server\'s SmartEPT licence: the key, the plan and company it belongs to, how many device seats are licensed vs registered, the expiry date with its grace window, and when the server last confirmed all of this with SmartEPT Central. A server with no key runs a <b>7-day free evaluation</b>, then monitoring stops until a key is entered.<h5>Why</h5>The licence is what ties your installation to what you purchased — seats, plan features and validity. Only licence metadata travels to Central: screenshots, activity and camera data never leave this server. If a paid renewal is missed, agents keep working through the grace days so a busy week never stops monitoring mid-shift; trials stop the moment they end.<h5>How</h5>Paste the key from your order email or the <a href="https://smartept.com/client" target="_blank" rel="noopener">client portal</a> and click "Save & validate" — the server confirms it with Central instantly and then re-checks once a day on its own. "Validate now" forces a fresh check after a renewal or seat upgrade. If the status shows EXPIRED, renew from the <a href="https://smartept.com/client" target="_blank" rel="noopener">client portal</a>; the seats line tells you when you\'re close to the licensed device limit.'],
+  mailalerts: ['Email & Alerts', '<h5>What</h5>Everything about outgoing email in one place: your company\'s SMTP relay (and the global default for Super Admin), the automatic alerts — PC offline, violations, late logins, long breaks, endpoint security, new sign-in details — and the log of every email sent.<h5>Why</h5>Kept apart from Audit & Ops so the email log is never confused with the audit trail of admin actions.<h5>How</h5>Set up SMTP and send a test first. Then for each alert tick <b>Send Email</b> and/or <b>Popup Alert</b>, choose who gets it (and for late logins, the late employee too) and when, and Save. Nothing is sent until it is ticked.'],
   ops: ['Audit & Ops', '<h5>What</h5>Three operational views in one place: the full audit trail (every admin action, export, screenshot view and licence event with who, when and from which IP), storage consumed by screenshot/webcam evidence per company, and the state of your database backups.<h5>Why</h5>Monitoring software must itself be accountable — when an employee questions an action, the audit trail shows exactly who did what. Storage growth and backups are the two quiet things that sink servers: full disks and "we never had a backup".<h5>How</h5>Filter the trail by action text or date range. Backups run automatically every night at 01:30 (newest 14 kept in storage/app/backups — copy them off this PC for real safety); "Back up now" runs one immediately before risky changes. If a company\'s evidence storage grows fast, tighten its screenshot policy, shorten retention, or use \'Free up storage\' to bulk-delete old screenshots and logs by date range — violation evidence is kept unless you explicitly say otherwise, and every cleanup is itself audit-logged.'],
   reports: ['Reports & Exports', '<h5>What</h5>CSV exports — attendance, productivity, compliance, daily-summary scores and the classic monthly attendance register — plus an on-screen monthly summary with payable days.<h5>Why</h5>These are the hand-off artifacts: payroll wants the register and payable days, managers want productivity, HR wants compliance, and the MD wants the one-page summary.<h5>How</h5>Set the date range (or month for the register and summary), click Export, and the file downloads ready to open in Excel. The monthly summary renders here on screen: working days, P/A/H/L counts, payable days (P + 0.5×H + L) and average productivity. Every export is recorded in the audit log with who ran it and for which dates.'],
 };

@@ -159,4 +159,47 @@ class M10AlertsTest extends TestCase
         $this->assertSame(1, $sent->pluck('to')->countBy()->max()); // once per person per day
         $this->assertStringContainsString('late logins today', $sent->first()->subject);
     }
+
+    /** 07-Oct-2026 (Ejaz): Popup Alert only → console popups for the ticked roles, no email. */
+    public function test_popup_only_alert_creates_popups_and_no_email(): void
+    {
+        $cid = Employee::first()->company_id;
+        \App\Models\Setting::put('notify_prefs:company:' . $cid, json_encode([
+            'device_offline' => ['on' => true, 'email' => false, 'popup' => true, 'roles' => ['COMPANY_ADMIN']],
+        ]));
+        $this->makeDevice('POP-1', 'ONLINE', now()->subHours(2));
+
+        $this->artisan('smartept:alerts')->assertSuccessful();
+
+        $this->assertSame(0, MailLog::where('kind', 'device_offline')->count());
+        $admin = \App\Models\User::where('email', 'admin@ametecs.io')->firstOrFail();
+        $this->assertSame(1, \App\Models\AlertPopup::where('user_id', $admin->id)->count());
+
+        $t = $this->postJson('/api/auth/login', ['email' => 'admin@ametecs.io', 'password' => 'password'])->json('token');
+        $this->withToken($t)->getJson('/api/alert-popups')->assertOk()->assertJsonCount(1, 'data');
+        $this->withToken($t)->getJson('/api/alert-popups')->assertOk()->assertJsonCount(0, 'data'); // shown once
+    }
+
+    /** 07-Oct-2026 (Ejaz): late login → the respective employee gets an email + an agent popup, once a day. */
+    public function test_late_employee_is_told_by_email_and_agent_popup_once(): void
+    {
+        $e = Employee::first();
+        \App\Models\Setting::put('notify_prefs:company:' . $e->company_id, json_encode([
+            'late_login' => ['on' => true, 'email' => true, 'popup' => true, 'employee' => true, 'roles' => [], 'minutes' => 15, 'hour' => 23],
+        ]));
+        \App\Models\EmployeeAttendanceLog::withoutGlobalScopes()->create([
+            'company_id' => $e->company_id, 'employee_id' => $e->id, 'work_date' => now()->toDateString(),
+            'source' => 'CLIENT', 'late_minutes' => 40, 'check_in_at' => now()->subHour(),
+        ]);
+
+        $this->artisan('smartept:alerts')->assertSuccessful();
+        $this->artisan('smartept:alerts')->assertSuccessful();
+
+        $this->assertSame(1, MailLog::where('kind', 'late_login_employee')->count());
+        $this->assertSame(0, MailLog::where('kind', 'late_login')->count()); // the list waits for 23:00
+        $msg = \App\Models\EmployeeChatMessage::withoutGlobalScopes()->where('employee_id', $e->id)->get();
+        $this->assertCount(1, $msg);
+        $this->assertStringContainsString('40 minutes late', $msg->first()->body);
+        $this->assertSame('SmartEPT Alert', $msg->first()->toChat()['name']);
+    }
 }

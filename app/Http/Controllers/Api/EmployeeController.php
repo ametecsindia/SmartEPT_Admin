@@ -449,7 +449,7 @@ class EmployeeController extends Controller
             'monitoring_policy_id' => ['nullable', 'integer', Rule::exists('monitoring_policies', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
             'compliance_policy_id' => ['nullable', 'integer', Rule::exists('compliance_policies', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
             // Tracking mode override (null = inherit from team/dept/branch/company).
-            'tracking_mode'        => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
+            'tracking_mode'        => ['nullable', 'in:FULL,NO_SCREENSHOTS,PRESENCE_ONLY,EXCLUDED'],
             // Gate-to-PC exclusion override (null = inherit from team/dept/branch), with an
             // optional validity window — "her fingerprint won't read, 18–25 Aug".
             // Per-employee enforcement. Same shape as tracking_mode and the gate

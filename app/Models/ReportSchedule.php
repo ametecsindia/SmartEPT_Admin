@@ -14,7 +14,7 @@ class ReportSchedule extends Model
 
     protected $casts = [
         'enabled' => 'boolean', 'all_employees_own' => 'boolean', 'skip_empty' => 'boolean',
-        'skip_holidays' => 'boolean', 'attach_excel' => 'boolean',
+        'skip_holidays' => 'boolean', 'attach_excel' => 'boolean', 'team_reports' => 'boolean',
         'whatsapp_enabled' => 'boolean', 'whatsapp_admins' => 'boolean', 'whatsapp_numbers' => 'array',
         'days' => 'array', 'scope' => 'array', 'recipients' => 'array', 'extra_emails' => 'array',
         'day_of_month' => 'integer', 'last_run_at' => 'datetime',

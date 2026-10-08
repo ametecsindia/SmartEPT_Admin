@@ -121,9 +121,7 @@ class SecurityCompliance
             }
             $vars = ['device' => $label, 'issues' => implode("\n", array_map(fn ($c) => '- ' . (self::LABELS[$c] ?? $c), $codes))];
             $t = MailService::TEMPLATES['security_alert'];
-            foreach (array_keys(MailService::recipients('security_alert', (int) $s->company_id)) as $to) {
-                MailService::send($to, MailService::render($t['subject'], $vars), MailService::render($t['body'], $vars), 'security_alert', (int) $s->company_id, $vars);
-            }
+            MailService::notify('security_alert', (int) $s->company_id, MailService::render($t['subject'], $vars), MailService::render($t['body'], $vars), $vars); // 07-Oct-2026: email and/or popup
         } catch (\Throwable $e) {
             report($e);
         }

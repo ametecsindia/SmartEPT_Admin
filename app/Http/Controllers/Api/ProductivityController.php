@@ -399,6 +399,15 @@ class ProductivityController extends Controller
             $sheet->setCellValue('W' . $r, (int) ($x['gate_to_pc_minutes'] ?? 0));       // Gate to PC mins (W)
             $this->fmt($sheet, 23, $r, '0');
             $this->putDur($sheet, 24, $r, $x['away_seconds'] ?? 0, $DUR);                // Away (X)
+            // 08-Oct-2026 (Ejaz): red font for out-of-limit values — same limits as the screen/PDF (PR_RULES).
+            $red = [
+                'O' => ($x['break_exceed_seconds'] ?? 0) > 5 * 60,                               // break exceed > 5 min
+                'S' => $x['productivity'] !== null && (float) $x['productivity'] < 60,           // productivity < 60%
+                'T' => ($x['late_minutes'] ?? 0) > 15,                                           // late login > 15 min
+            ];
+            foreach (array_keys(array_filter($red)) as $c) {
+                $sheet->getStyle($c . $r)->getFont()->setBold(true)->getColor()->setRGB('D92D20');
+            }
             $r++;
         }
 

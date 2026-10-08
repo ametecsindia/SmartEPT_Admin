@@ -74,9 +74,7 @@ class SendErrorDigest extends Command
         $vars = ['total' => $total, 'hours' => $hours, 'lines' => implode("\n", $matches)
             . ($total > count($matches) ? "\n… and " . ($total - count($matches)) . ' more (see storage/logs/laravel.log).' : '')];
         $to = MailService::recipients('error_digest');
-        foreach ($to as $email => $companyId) {
-            MailService::send($email, "SmartEPT daily error digest — {$total} error(s)", $body, 'error_digest', $companyId, $vars);
-        }
+        MailService::notify('error_digest', null, "SmartEPT daily error digest — {$total} error(s)", $body, $vars); // 07-Oct-2026: email and/or popup
 
         $this->warn("Digest sent: {$total} error(s), " . count($to) . ' recipient(s).');
 

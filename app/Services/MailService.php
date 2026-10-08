@@ -102,16 +102,20 @@ class MailService
      * test) are NOT listed — switching them off would break "Forgot password".
      */
     public const COMPANY_NOTIFY = [
-        'device_offline'   => ['on' => false, 'roles' => ['COMPANY_ADMIN'], 'extra' => '', 'minutes' => 30, 'subject' => '', 'body' => ''],
-        'violation_spike'  => ['on' => false, 'roles' => ['COMPANY_ADMIN'], 'extra' => '', 'threshold' => 20, 'subject' => '', 'body' => ''],
-        'late_login'       => ['on' => false, 'roles' => ['COMPANY_ADMIN', 'HR_ADMIN'], 'extra' => '', 'minutes' => 15, 'hour' => 11, 'subject' => '', 'body' => ''],
-        'gate_long_break'  => ['on' => false, 'roles' => ['COMPANY_ADMIN', 'HR_ADMIN'], 'extra' => '', 'hours' => 3, 'subject' => '', 'body' => ''],
-        'security_alert'   => ['on' => false, 'roles' => ['COMPANY_ADMIN'], 'extra' => '', 'subject' => '', 'body' => ''], // 03-Oct-2026: Endpoint Security
-        'USER_CREDENTIALS' => ['on' => true, 'extra' => '', 'subject' => '', 'body' => ''],
+        // 07-Oct-2026 (Ejaz): 'email' / 'popup' = how it is delivered (Send Email / Popup Alert);
+        // 'on' stays the master switch (= either ticked). late_login 'employee' = also tell the
+        // late employee themselves (email + agent popup, same ticks), wording emp_subject/emp_body.
+        'device_offline'   => ['on' => false, 'email' => true, 'popup' => false, 'roles' => ['COMPANY_ADMIN'], 'extra' => '', 'minutes' => 30, 'subject' => '', 'body' => ''],
+        'violation_spike'  => ['on' => false, 'email' => true, 'popup' => false, 'roles' => ['COMPANY_ADMIN'], 'extra' => '', 'threshold' => 20, 'subject' => '', 'body' => ''],
+        'late_login'       => ['on' => false, 'email' => true, 'popup' => false, 'roles' => ['COMPANY_ADMIN', 'HR_ADMIN'], 'extra' => '', 'minutes' => 15, 'hour' => 11, 'subject' => '', 'body' => '',
+                               'employee' => false, 'emp_subject' => '', 'emp_body' => ''],
+        'gate_long_break'  => ['on' => false, 'email' => true, 'popup' => false, 'roles' => ['COMPANY_ADMIN', 'HR_ADMIN'], 'extra' => '', 'hours' => 3, 'subject' => '', 'body' => ''],
+        'security_alert'   => ['on' => false, 'email' => true, 'popup' => false, 'roles' => ['COMPANY_ADMIN'], 'extra' => '', 'subject' => '', 'body' => ''], // 03-Oct-2026: Endpoint Security
+        'USER_CREDENTIALS' => ['on' => true, 'email' => true, 'extra' => '', 'subject' => '', 'body' => ''], // never a popup (it carries a password)
     ];
 
     public const SERVER_NOTIFY = [
-        'error_digest' => ['on' => false, 'roles' => ['SUPER_ADMIN'], 'extra' => '', 'hour' => 7, 'subject' => '', 'body' => ''],
+        'error_digest' => ['on' => false, 'email' => true, 'popup' => false, 'roles' => ['SUPER_ADMIN'], 'extra' => '', 'hour' => 7, 'subject' => '', 'body' => ''],
     ];
 
     /**
@@ -128,6 +132,10 @@ class MailService
         'late_login' => ['vars' => ['date', 'minutes', 'count', 'list'],
             'subject' => 'SmartEPT: late logins today — {date}',
             'body' => "These employees logged in more than {minutes} minutes late today ({date}):\n\n{list}\n\nOpen the console → Attendance for the full day.\n\n— SmartEPT"],
+        // 07-Oct-2026: to the late employee themselves (email and/or SmartEPT agent popup).
+        'late_login_employee' => ['vars' => ['name', 'date', 'late', 'check_in'],
+            'subject' => 'Late login — {date}',
+            'body' => "Hi {name},\n\nYou signed in {late} minutes late today ({date}, first login {check_in}).\n\nIf there was a genuine reason, please inform your reporting manager / HR.\n\n— SmartEPT"],
         'gate_long_break' => ['vars' => ['employee', 'employee_code', 'hours', 'from', 'to'],
             'subject' => 'SmartEPT: long out-of-office break — {employee}',
             'body' => "{employee} ({employee_code}) was out of office for {hours} hours today ({from}–{to}, recorded by the biometric door).\n\nBeyond 3 hours the day normally counts as a half-day — the attendance sheet applies this automatically tonight; use Attendance → regularize if there is a genuine reason (client visit, medical).\n\n— SmartEPT"],
@@ -228,11 +236,9 @@ class MailService
         return $out;
     }
 
-    /** Send a raw-text mail and record the attempt. Returns the resulting status. */
-    /** @param array $vars values for the {placeholders} a custom subject/body (Notifications editor) may use */
-    public static function send(string $to, string $subject, string $body, ?string $kind = null, ?int $companyId = null, array $vars = []): string
+    /** Custom wording saved in Audit & Ops → Notifications (blank = the built-in text). */
+    public static function wording(?string $kind, ?int $companyId, string $subject, string $body, array $vars): array
     {
-        // Custom wording saved in Audit & Ops → Notifications (blank = the built-in text).
         if ($kind && (isset(self::COMPANY_NOTIFY[$kind]) || isset(self::SERVER_NOTIFY[$kind]))) {
             $p = self::prefs(isset(self::SERVER_NOTIFY[$kind]) ? null : $companyId)[$kind] ?? [];
             if (trim((string) ($p['subject'] ?? '')) !== '') {
@@ -242,6 +248,85 @@ class MailService
                 $body = self::render($p['body'], $vars);
             }
         }
+
+        return [$subject, $body];
+    }
+
+    /**
+     * 07-Oct-2026 (Ejaz): deliver one alert as chosen in Audit & Ops → Notifications —
+     * Send Email (to the ticked roles + extra addresses) and/or Popup Alert (to the console
+     * users holding the ticked roles). Returns true if the alert is switched on at all.
+     */
+    public static function notify(string $kind, ?int $companyId, string $subject, string $body, array $vars = []): bool
+    {
+        $server = isset(self::SERVER_NOTIFY[$kind]);
+        $p = self::prefs($server ? null : $companyId)[$kind] ?? null;
+        if (! $p || empty($p['on']) || (! $server && ! $companyId)) {
+            return false;
+        }
+        if ($p['email'] ?? true) {
+            foreach (self::recipients($kind, $companyId) as $to => $cid) {
+                self::send($to, $subject, $body, $kind, $server ? $cid : $companyId, $vars);
+            }
+        }
+        if (! empty($p['popup'])) {
+            [$s, $b] = self::wording($kind, $companyId, $subject, $body, $vars);
+            foreach (self::recipientUsers($kind, $server ? null : $companyId, $p) as $u) {
+                \App\Models\AlertPopup::create(['company_id' => $u->company_id, 'user_id' => $u->id, 'kind' => $kind,
+                    'title' => mb_substr($s, 0, 250), 'body' => mb_substr(preg_replace('/\n*— SmartEPT\s*$/u', '', $b), 0, 4000)]);
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * 07-Oct-2026 (Ejaz): late login → the employee themselves, when "The late employee" is
+     * ticked: an email (Send Email) and/or a popup on their SmartEPT agent (Popup Alert — it
+     * arrives through the agent's chat window, so no agent update is needed).
+     */
+    public static function notifyEmployee(\App\Models\Employee $e, array $vars): void
+    {
+        $p = self::prefs((int) $e->company_id)['late_login'];
+        if (empty($p['on']) || empty($p['employee'])) {
+            return;
+        }
+        $t = self::TEMPLATES['late_login_employee'];
+        $s = self::render(trim((string) $p['emp_subject']) !== '' ? trim($p['emp_subject']) : $t['subject'], $vars);
+        $b = self::render(trim((string) $p['emp_body']) !== '' ? $p['emp_body'] : $t['body'], $vars);
+        if ($p['email'] ?? true) {
+            $to = trim((string) ($e->email ?: $e->user?->email));
+            self::send($to, $s, $b, 'late_login_employee', (int) $e->company_id);
+        }
+        if (! empty($p['popup'])) {
+            \App\Models\EmployeeChatMessage::withoutGlobalScopes()->create([
+                'company_id' => $e->company_id, 'employee_id' => $e->id, 'sender' => 'ADMIN', 'sender_user_id' => null,
+                'body' => $s . "\n\n" . preg_replace('/\n*— SmartEPT\s*$/u', '', $b),
+            ]);
+        }
+    }
+
+    /** Console users holding the ticked roles (company alerts: that company only). */
+    private static function recipientUsers(string $kind, ?int $companyId, array $p)
+    {
+        $server = isset(self::SERVER_NOTIFY[$kind]);
+        $allowed = $server ? ['SUPER_ADMIN', 'COMPANY_ADMIN'] : ['COMPANY_ADMIN', 'HR_ADMIN', 'MANAGER'];
+        $roles = array_values(array_intersect((array) ($p['roles'] ?? []), $allowed));
+        if (! $roles) {
+            return collect();
+        }
+
+        return User::query()->where('status', 'ACTIVE')
+            ->whereHas('role', fn ($q) => $q->whereIn('slug', $roles))
+            ->when(! $server, fn ($q) => $q->where('company_id', $companyId))
+            ->get(['id', 'company_id']);
+    }
+
+    /** Send a raw-text mail and record the attempt. Returns the resulting status. */
+    /** @param array $vars values for the {placeholders} a custom subject/body (Notifications editor) may use */
+    public static function send(string $to, string $subject, string $body, ?string $kind = null, ?int $companyId = null, array $vars = []): string
+    {
+        [$subject, $body] = self::wording($kind, $companyId, $subject, $body, $vars);
 
         $status = 'sent';
         $error  = null;

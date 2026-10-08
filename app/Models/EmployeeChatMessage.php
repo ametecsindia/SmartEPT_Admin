@@ -31,7 +31,8 @@ class EmployeeChatMessage extends Model
         return [
             'id'         => $this->id,
             'sender'     => $this->sender,
-            'name'       => $this->sender === 'ADMIN' ? ($this->senderUser?->name ?: 'Admin') : null,
+            // 07-Oct-2026: no sender user = an automatic SmartEPT alert (e.g. late login popup).
+            'name'       => $this->sender === 'ADMIN' ? ($this->senderUser?->name ?: ($this->sender_user_id ? 'Admin' : 'SmartEPT Alert')) : null,
             // 30-Sep-2026 (Ejaz): the agent shows who wrote it — "Ravi Teja · Team Leader".
             'role'       => $this->sender === 'ADMIN' ? static::roleLabel($this->senderUser) : null,
             'body'       => $this->body,

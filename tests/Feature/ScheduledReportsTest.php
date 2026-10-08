@@ -248,4 +248,42 @@ class ScheduledReportsTest extends TestCase
         $this->app['auth']->forgetGuards();
         $this->withToken($this->token('priya.raman@ametecs.io'))->getJson('/api/report-schedules')->assertForbidden();
     }
+
+    /** 07-Oct-2026 (Ejaz): a reporting manager gets only their reporting employees; admins get the whole company. */
+    public function test_reporting_team_report_goes_to_each_manager_and_admins(): void
+    {
+        $this->workDay();
+        $t = $this->token();
+        $roleId = \App\Models\Role::withoutGlobalScopes()->where('slug', 'MANAGER')->value('id');
+        if (! $roleId) {
+            $this->markTestSkipped('No MANAGER role seeded.');
+        }
+        $admin = \App\Models\User::withoutGlobalScopes()->where('email', 'admin@ametecs.io')->firstOrFail();
+        $lead = $admin->replicate();
+        $lead->forceFill(['name' => 'Team Lead', 'email' => 'lead@example.com', 'role_id' => $roleId, 'phone' => null])->save();
+        Employee::withoutGlobalScopes()->whereIn('employee_code', ['E-1001', 'E-1002'])->update(['reporting_manager_user_id' => $lead->id]);
+        Employee::withoutGlobalScopes()->where('employee_code', 'E-1003')->update(['reporting_manager_user_id' => null]);
+
+        $this->withToken($t)->postJson('/api/report-schedules', $this->payload([
+            'recipients' => [], 'extra_emails' => [], 'team_reports' => true, 'subject' => null, 'message' => null,
+        ]))->assertCreated();
+        $this->summarise($t);
+        $this->travelTo(Carbon::parse('2026-07-08 09:01:00'));
+        $this->artisan('smartept:scheduled-reports')->assertSuccessful();
+
+        $msgs = collect(app('mailer')->getSymfonyTransport()->messages())->map->getOriginalMessage()
+            ->keyBy(fn ($m) => $m->getTo()[0]->getAddress());
+        $this->assertTrue($msgs->has('lead@example.com'), 'manager gets the team report');
+        $this->assertTrue($msgs->has('admin@ametecs.io'), 'company admin gets the whole company');
+
+        $team = $msgs['lead@example.com'];
+        $this->assertStringStartsWith("Reporting team's productivity", $team->getSubject());
+        $this->assertStringContainsString('Priya Raman', $team->getHtmlBody());
+        $this->assertStringNotContainsString('Arjun Mehta', $team->getHtmlBody());   // not in this team
+
+        $all = $msgs['admin@ametecs.io']->getHtmlBody();
+        $this->assertStringContainsString('Priya Raman', $all);
+        $this->assertStringContainsString('Arjun Mehta', $all);
+        $this->assertStringContainsString('reporting-team', ReportSchedule::first()->last_status);
+    }
 }

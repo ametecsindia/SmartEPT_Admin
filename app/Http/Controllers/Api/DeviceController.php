@@ -605,7 +605,7 @@ class DeviceController extends Controller
     public function trackingMode(Request $request, EmployeeDevice $device): JsonResponse
     {
         $data = $request->validate([
-            'tracking_mode' => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
+            'tracking_mode' => ['nullable', 'in:FULL,NO_SCREENSHOTS,PRESENCE_ONLY,EXCLUDED'],
         ]);
 
         $device->update(['tracking_mode' => $data['tracking_mode'] ?? null]);

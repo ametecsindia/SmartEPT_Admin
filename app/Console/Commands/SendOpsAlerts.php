@@ -86,9 +86,8 @@ class SendOpsAlerts extends Command
             $vars = ['count' => $due->count(), 'minutes' => $alertAfter, 'devices' => $lines];
             $t = MailService::TEMPLATES['device_offline'];
 
-            foreach (array_keys(MailService::recipients('device_offline', (int) $companyId)) as $email) {
-                MailService::send($email, MailService::render($t['subject'], $vars), MailService::render($t['body'], $vars), 'device_offline', (int) $companyId, $vars);
-            }
+            // 07-Oct-2026: Send Email and/or Popup Alert, as ticked in Notifications.
+            MailService::notify('device_offline', (int) $companyId, MailService::render($t['subject'], $vars), MailService::render($t['body'], $vars), $vars);
             foreach ($due as $d) {
                 Cache::put('smartept:offline_alerted:' . $d->id, $d->last_heartbeat_at->toIso8601String(), now()->addDays(3));
             }
@@ -122,8 +121,10 @@ class SendOpsAlerts extends Command
             // in the subject changes as more violations arrive (23-Sep-2026).
             // One alert per company per clock hour (kind + company + hour — independent of the
             // subject, which the company may have reworded).
+            // 07-Oct-2026: a popup-only alert writes no mail log — the cache claim dedupes both.
             if (MailLog::where('kind', 'violation_spike')->where('company_id', $companyId)
-                ->where('created_at', '>=', now()->startOfHour())->exists()) {
+                ->where('created_at', '>=', now()->startOfHour())->exists()
+                || ! Cache::add('smartept:alerted:violation_spike:' . $companyId . ':' . now()->format('YmdH'), 1, now()->addHours(2))) {
                 continue;
             }
 
@@ -131,9 +132,7 @@ class SendOpsAlerts extends Command
             $t = MailService::TEMPLATES['violation_spike'];
             $body = MailService::render($t['body'], $vars);
 
-            foreach (array_keys(MailService::recipients('violation_spike', (int) $companyId)) as $email) {
-                MailService::send($email, $subject, $body, 'violation_spike', (int) $companyId, $vars);
-            }
+            MailService::notify('violation_spike', (int) $companyId, $subject, $body, $vars);
 
             $this->warn("Violation spike: {$total} events for company {$companyId}.");
         }
@@ -153,7 +152,7 @@ class SendOpsAlerts extends Command
         $today = now()->toDateString();
 
         $rows = EmployeeAttendanceLog::withoutGlobalScopes()
-            ->with('employee:id,first_name,last_name,employee_code')
+            ->with('employee:id,company_id,first_name,last_name,employee_code,email,user_id', 'employee.user:id,email')
             ->whereDate('work_date', $today)
             ->where('late_minutes', '>', 0)
             ->selectRaw('company_id, employee_id, MAX(late_minutes) as late_minutes')
@@ -162,12 +161,30 @@ class SendOpsAlerts extends Command
 
         foreach ($rows->groupBy('company_id') as $companyId => $late) {
             $p = MailService::prefs((int) $companyId)['late_login'];
-            if (empty($p['on']) || (int) now()->format('G') < (int) $p['hour']) {
+            if (empty($p['on'])) {
                 continue;
             }
             $late = $late->filter(fn ($r) => $r->late_minutes >= (int) $p['minutes'])->sortByDesc('late_minutes');
+
+            // 07-Oct-2026 (Ejaz): "The late employee" ticked → each late employee is told once a
+            // day, on the first sweep after their late login (not held back to the list hour).
+            if (! empty($p['employee'])) {
+                foreach ($late as $r) {
+                    if ($r->employee && Cache::add('smartept:alerted:late_emp:' . $r->employee_id . ':' . $today, 1, now()->addDays(2))) {
+                        $in = \App\Models\EmployeeAttendanceLog::withoutGlobalScopes()->where('employee_id', $r->employee_id)
+                            ->whereDate('work_date', $today)->whereNotNull('check_in_at')->min('check_in_at');
+                        MailService::notifyEmployee($r->employee, ['name' => $r->employee->fullName(), 'date' => $today,
+                            'late' => (int) $r->late_minutes, 'check_in' => $in ? \Illuminate\Support\Carbon::parse($in)->format('h:i A') : '-']);
+                    }
+                }
+            }
+
+            if ((int) now()->format('G') < (int) $p['hour']) {
+                continue;
+            }
             if ($late->isEmpty() || MailLog::where('kind', 'late_login')->where('company_id', $companyId)
-                ->where('created_at', '>=', now()->startOfDay())->exists()) {
+                ->where('created_at', '>=', now()->startOfDay())->exists()
+                || ! Cache::add('smartept:alerted:late_login:' . $companyId . ':' . $today, 1, now()->addDays(2))) {
                 continue; // one list per company per day
             }
 
@@ -176,9 +193,7 @@ class SendOpsAlerts extends Command
                     $r->employee?->fullName() ?? 'Employee #' . $r->employee_id, $r->employee?->employee_code ?? '-', $r->late_minutes))->implode("\n")];
             $t = MailService::TEMPLATES['late_login'];
 
-            foreach (array_keys(MailService::recipients('late_login', (int) $companyId)) as $email) {
-                MailService::send($email, MailService::render($t['subject'], $vars), MailService::render($t['body'], $vars), 'late_login', (int) $companyId, $vars);
-            }
+            MailService::notify('late_login', (int) $companyId, MailService::render($t['subject'], $vars), MailService::render($t['body'], $vars), $vars);
             $this->warn("Late logins: {$late->count()} employee(s) for company {$companyId}.");
         }
     }

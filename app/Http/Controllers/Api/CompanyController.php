@@ -50,7 +50,7 @@ class CompanyController extends Controller
             // Privacy: skip capturing raw-IP / local-IP websites (logs them as "Unknown source").
             'exclude_ip_sites'    => ['nullable', 'boolean'],
             // Company-wide default tracking mode (org levels below can still override).
-            'tracking_mode'       => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
+            'tracking_mode'       => ['nullable', 'in:FULL,NO_SCREENSHOTS,PRESENCE_ONLY,EXCLUDED'],
         ]);
 
         $company = Company::create($data);
@@ -79,7 +79,7 @@ class CompanyController extends Controller
             // Privacy: skip capturing raw-IP / local-IP websites (logs them as "Unknown source").
             'exclude_ip_sites'    => ['nullable', 'boolean'],
             // Company-wide default tracking mode (org levels below can still override).
-            'tracking_mode'       => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
+            'tracking_mode'       => ['nullable', 'in:FULL,NO_SCREENSHOTS,PRESENCE_ONLY,EXCLUDED'],
             // Section 3: per-company break-time limits (minutes). Positive, capped at 10h.
             'break_limit_lunch_min' => ['nullable', 'integer', 'min:1', 'max:600'],
             'break_limit_tea_min'   => ['nullable', 'integer', 'min:1', 'max:600'],
@@ -97,6 +97,7 @@ class CompanyController extends Controller
                 'break_limit_tea_min'   => ['org.break_limits'],
                 'break_limit_other_min' => ['org.break_limits'],
                 'exclude_ip_sites'      => ['org.privacy_rawip'],
+                'tracking_mode'         => ['org.privacy_rawip'], // company-wide tracking mode sits on the same Organisation card group
             ];
             $held = $request->user()->permissionSlugs();
             foreach (array_keys($data) as $field) {

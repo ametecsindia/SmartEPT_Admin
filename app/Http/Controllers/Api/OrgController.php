@@ -82,7 +82,7 @@ class OrgController extends Controller
                 'city' => ['nullable', 'string'], 'state' => ['nullable', 'string'],
                 'country' => ['nullable', 'string'], 'public_ip_whitelist' => ['nullable', 'array'],
                 'timezone' => ['nullable', 'timezone'],   // EPT-20: per-branch override of company timezone
-                'tracking_mode' => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
+                'tracking_mode' => ['nullable', 'in:FULL,NO_SCREENSHOTS,PRESENCE_ONLY,EXCLUDED'],
                 // Enforcement at this level (27-Aug-2026, Ejaz). ENFORCED = these people's PCs
                 // apply the blocking rules; EXEMPT = they are outside enforcement; null =
                 // inherit from the level above. Resolved most-specific-wins in
@@ -99,7 +99,7 @@ class OrgController extends Controller
             ],
             'departments' => $base + [
                 'branch_id' => ['nullable', 'integer', Rule::exists('branches', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
-                'tracking_mode' => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
+                'tracking_mode' => ['nullable', 'in:FULL,NO_SCREENSHOTS,PRESENCE_ONLY,EXCLUDED'],
                 // Enforcement at this level (27-Aug-2026, Ejaz). ENFORCED = these people's PCs
                 // apply the blocking rules; EXEMPT = they are outside enforcement; null =
                 // inherit from the level above. Resolved most-specific-wins in
@@ -118,7 +118,7 @@ class OrgController extends Controller
                 'department_id' => ['nullable', 'integer', Rule::exists('departments', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
                 'manager_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
                 'team_leader_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where(fn ($q) => $q->where('company_id', $companyId))],
-                'tracking_mode' => ['nullable', 'in:FULL,PRESENCE_ONLY,EXCLUDED'],
+                'tracking_mode' => ['nullable', 'in:FULL,NO_SCREENSHOTS,PRESENCE_ONLY,EXCLUDED'],
                 // Enforcement at this level (27-Aug-2026, Ejaz). ENFORCED = these people's PCs
                 // apply the blocking rules; EXEMPT = they are outside enforcement; null =
                 // inherit from the level above. Resolved most-specific-wins in
@@ -133,7 +133,8 @@ class OrgController extends Controller
                 'gate_mode_until' => ['nullable', 'date', 'after_or_equal:gate_mode_from'],
                 'gate_mode_reason' => ['nullable', 'string', 'max:255'],
             ],
-            'designations' => $base + ['level' => ['nullable', 'integer', 'min:0']],
+            'designations' => $base + ['level' => ['nullable', 'integer', 'min:0'],
+                'tracking_mode' => ['nullable', 'in:FULL,NO_SCREENSHOTS,PRESENCE_ONLY,EXCLUDED']],
             'shifts' => $base + [
                 'start_time' => ['nullable', 'date_format:H:i:s'],
                 'end_time' => ['nullable', 'date_format:H:i:s'],

@@ -26,6 +26,8 @@ class ScheduledReports
 
     public const KIND = 'scheduled_report';
     private const FULL_TABLE_CAP = 300;
+    /** 07-Oct-2026 (Ejaz): these roles get the whole company in the Reporting team's report. */
+    public const TEAM_ADMIN_ROLES = ['COMPANY_ADMIN', 'HR_ADMIN', 'BRANCH_ADMIN'];
 
     /** Is the schedule due at this company-local moment? Once per local date. */
     public static function isDue(ReportSchedule $s, Carbon $local): bool
@@ -192,6 +194,56 @@ class ScheduledReports
                 }
             }
 
+            // 07-Oct-2026 (Ejaz): Reporting team's productivity. Each reporting manager (Employees →
+            // Reporting Manager) gets only the employees who report to them; Company / HR / Branch
+            // Admins get the whole company. Anyone already on the full-report list is not mailed twice.
+            $teamN = 0;
+            if ($s->team_reports) {
+                $teamTo = []; // email => [name, rows, isTeam]
+                foreach (User::withoutGlobalScopes()->where('company_id', $s->company_id)->where('status', 'ACTIVE')
+                    ->whereHas('role', fn ($q) => $q->whereIn('slug', self::TEAM_ADMIN_ROLES))->orderBy('id')->get(['id', 'name', 'email']) as $u) {
+                    $m = strtolower(trim((string) $u->email));
+                    if (filter_var($m, FILTER_VALIDATE_EMAIL)) {
+                        $teamTo[$m] = [$u->name, $rows, false];
+                    }
+                }
+                $teams = [];
+                foreach (Employee::withoutGlobalScopes()->where('company_id', $s->company_id)->where('employment_status', 'ACTIVE')
+                    ->whereNotNull('reporting_manager_user_id')->get(['id', 'reporting_manager_user_id']) as $e) {
+                    $teams[(int) $e->reporting_manager_user_id][] = (int) $e->id;
+                }
+                foreach (User::withoutGlobalScopes()->where('company_id', $s->company_id)->where('status', 'ACTIVE')
+                    ->whereIn('id', array_keys($teams))->orderBy('id')->get(['id', 'name', 'email']) as $u) {
+                    $m = strtolower(trim((string) $u->email));
+                    if (filter_var($m, FILTER_VALIDATE_EMAIL) && ! isset($teamTo[$m])) {
+                        $ids = $teams[$u->id];
+                        $teamTo[$m] = [$u->name, array_values(array_filter($rows, fn ($r) => in_array((int) $r['employee_id'], $ids, true))), true];
+                    }
+                }
+                if ($onlyTo) {
+                    // Test: one sample, a manager's team report if there is one.
+                    $pick = collect($teamTo)->filter(fn ($x) => $x[2])->keys()->first() ?? array_key_first($teamTo);
+                    $teamTo = $pick ? [$onlyTo => $teamTo[$pick] + [3 => $pick]] : [];
+                } else {
+                    $teamTo = array_diff_key($teamTo, $fullTo);
+                }
+                foreach ($teamTo as $m => $x) {
+                    [$who, $tr, $isTeam] = $x;
+                    if (! array_filter($tr, [self::class, 'hasActivity']) && $s->skip_empty && ! $onlyTo) {
+                        $out['skipped']++;
+                        $noData++;
+                        continue;
+                    }
+                    $title = $isTeam ? "Reporting team's productivity" : 'Productivity report';
+                    $subject = $this->subject($s, $title . ' — ' . $label, $label, $who, $company);
+                    $html = $this->fullHtml($s, $tr, $label, $company, $onlyTo ? [$x[3]] : null, $who, $title,
+                        $isTeam ? 'Employees reporting to ' . $who : 'Whole company');
+                    $track(MailService::sendHtml($m, ($onlyTo ? '[TEST] ' : '') . $subject, $html,
+                        $this->xlsx($s, $tr, 'SmartEPT-' . ($isTeam ? 'Team' : 'Productivity') . '-Report-' . $from . '_' . $to . '.xlsx'), self::KIND, (int) $s->company_id));
+                    $teamN++;
+                }
+            }
+
             // 30-Sep-2026 (Ejaz): the full-report snapshot as an image on WhatsApp — to the
             // Company Admin(s) and/or the numbers typed on the schedule. Not in "test to me" mode
             // (that is email only; the WhatsApp card has its own test).
@@ -201,7 +253,7 @@ class ScheduledReports
             }
 
             $text = $out['sent'] . ' sent · ' . $out['failed'] . ' failed · ' . $out['skipped'] . ' skipped'
-                . ($noData ? ' (' . $noData . ' had no activity)' : '') . ' — covers ' . $label;
+                . ($noData ? ' (' . $noData . ' had no activity)' : '') . ($teamN ? ' · ' . $teamN . ' reporting-team' : '') . ' — covers ' . $label;
             if ($out['sent'] + $out['failed'] + $out['skipped'] === 0) {
                 $text = ($wa ? 'No emails' : 'Nobody to send to') . ' — covers ' . $label;
             }
@@ -515,7 +567,8 @@ class ScheduledReports
         return $this->shell($company, 'Your productivity report — ' . $label, $name . ($e->employee_code ? ' (' . $e->employee_code . ')' : ''), $msg, $inner, $banner);
     }
 
-    private function fullHtml(ReportSchedule $s, array $rows, string $label, string $company, ?array $testAudience, string $who = 'Team'): string
+    private function fullHtml(ReportSchedule $s, array $rows, string $label, string $company, ?array $testAudience, string $who = 'Team',
+                              string $title = 'Productivity report', ?string $sub = null): string
     {
         $by = collect($rows)->groupBy('employee_id')->map(function ($rs) {
             $a = $rs->all();
@@ -550,6 +603,6 @@ class ScheduledReports
 
         $msg = trim((string) $s->message) !== '' ? self::fill((string) $s->message, $who, $label, $company, $s->name) : null;
 
-        return $this->shell($company, 'Productivity report — ' . $label, $s->name, $msg, $inner, $banner);
+        return $this->shell($company, $title . ' — ' . $label, $sub ? $sub . ' · ' . $s->name : $s->name, $msg, $inner, $banner);
     }
 }
