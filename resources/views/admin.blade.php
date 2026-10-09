@@ -95,6 +95,24 @@
   .nav .ic{width:18px;height:18px;display:flex;align-items:center;justify-content:center;opacity:.9;flex:none}
   .nav .ic svg{width:16.5px;height:16.5px;display:block}
   .nav.active .ic{opacity:1}
+  /* 08-Oct-2026 (Ejaz): grouped, collapsible menu with icons on coloured tiles (one colour per group). */
+  .navsec .navgrp-t{display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;border-radius:6px;padding:4px 2px 4px 0;margin:14px 10px 4px}
+  .navsec .navgrp-t:hover{color:#A9C8DC}
+  .navsec .chev::after{content:'';display:inline-block;width:6px;height:6px;border-right:1.6px solid currentColor;border-bottom:1.6px solid currentColor;transform:rotate(45deg);margin:0 2px 3px 0;transition:transform .15s}
+  .navsec.collapsed .chev::after{transform:rotate(-45deg);margin-bottom:0}
+  .navsec.collapsed .navsec-items{display:none}
+  .navsec-items{display:flex;flex-direction:column;gap:2px}
+  .navsec .nav{padding:5px 10px;gap:11px}
+  .navsec .nav .ic{width:28px;height:28px;border-radius:8px;color:#fff;opacity:1;box-shadow:0 2px 6px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.25)}
+  .navsec .nav .ic svg{width:16px;height:16px}
+  .navsec[data-sec="monitoring"] .nav .ic{background:linear-gradient(135deg,#14B8A6,#0E7C8F)}
+  .navsec[data-sec="people"] .nav .ic{background:linear-gradient(135deg,#3B82F6,#1D4ED8)}
+  .navsec[data-sec="reports"] .nav .ic{background:linear-gradient(135deg,#F59E0B,#D97706)}
+  .navsec[data-sec="setup"] .nav .ic{background:linear-gradient(135deg,#8B5CF6,#6D28D9)}
+  .navsec[data-sec="system"] .nav .ic{background:linear-gradient(135deg,#64748B,#334155)}
+  .navsec .nav.active{background:rgba(255,255,255,.12);box-shadow:inset 3px 0 0 #4FB3E0}
+  .navsec .nav.active .ic{background:#fff !important;color:var(--accent)}
+  #v-reports .rs-off{display:none !important}
   .side .foot{flex:0 0 auto;font-size:11px;color:#7FA6C0;padding:12px 8px 2px;border-top:1px solid rgba(255,255,255,.09);line-height:1.7}
   .side .foot a{color:#A9C8DC!important}
   .side .foot a:hover{color:#fff!important}
@@ -326,13 +344,14 @@
   .lv-tile .lv-tile-actions button.btn{font-size:11.5px;padding:4px 9px}
   /* 29-Sep-2026 (Ejaz): chat / screenshot / full-screen were faint white squares nobody noticed —
      solid brand buttons with larger icons, readable on the light header and in full screen. */
-  .lv-tile .lv-fs-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;
-    background:var(--accent);border:1.5px solid var(--accent);color:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+  /* 08-Oct-2026 (Ejaz): too big — 32px → 24px buttons, 18px → 14px icons (tile, full screen and Live Wall). */
+  .lv-tile .lv-fs-btn{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;
+    background:var(--accent);border:1px solid var(--accent);color:#fff;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,.2)}
   .lv-tile .lv-fs-btn:hover{background:var(--accent-ink);border-color:var(--accent-ink);color:#fff}
-  .lv-tile .lv-tile-actions .lv-fs-btn svg{width:18px !important;height:18px !important;flex:none}
-  .lv-tile .lv-tile-actions .x{width:32px;height:32px}
+  .lv-tile .lv-tile-actions .lv-fs-btn svg{width:14px !important;height:14px !important;flex:none}
+  .lv-tile .lv-tile-actions .x{width:24px;height:24px}
   .lv-tile .lv-tile-actions .x{background:var(--danger-w);border:1px solid var(--danger);color:var(--danger);font-size:12px;cursor:pointer;
-    font-family:inherit;width:26px;height:26px;border-radius:8px;transition:background .12s,color .12s;flex-shrink:0}
+    font-family:inherit;width:24px;height:24px;border-radius:6px;transition:background .12s,color .12s;flex-shrink:0}
   .lv-tile .lv-tile-actions .x:hover{background:var(--danger);color:#fff}
   .lv-tile .lv-tile-body{position:relative;aspect-ratio:16/9;background:#0B1418;display:flex;align-items:center;justify-content:center}
   .lv-tile canvas{width:100%;height:100%;object-fit:contain;display:none}
@@ -480,6 +499,51 @@
   .empty{border:1.5px dashed #C9D6DE;border-radius:14px;padding:38px 22px;text-align:center;color:var(--ink-3);
     font-size:12.5px;line-height:1.75;background:var(--card-2)}
   .empty b{color:var(--ink-2)}
+
+  /* =====================================================================
+     08-Oct-2026 (Ejaz): typography + side-menu polish. One type scale for the whole console:
+     page title 22 / card title 15 / body & table 13–14 / labels & table headers 11.5–12.
+     Overrides only sizes, weights and spacing — no layout or behaviour change.
+     ===================================================================== */
+  body{font-size:14px;line-height:1.45}
+  .top h2{font-size:22px;font-weight:700;letter-spacing:-.015em}
+  .top .sub{font-size:13px;color:var(--ink-2)}
+  .card h3{font-size:15px;font-weight:700;color:var(--ink);letter-spacing:-.005em}
+  .card h3 .hint{font-size:12px;font-weight:500;color:var(--ink-3)}
+  table{font-size:13px}
+  th{font-size:11.5px;font-weight:700;letter-spacing:.04em;padding:10px 12px}
+  td{padding:10px 12px;color:var(--ink-2)}
+  td b,td .nm{font-weight:600}
+  .tag{font-size:11px;font-weight:600;padding:3px 9px}
+  .btn{font-size:13px;font-weight:600;padding:7px 14px;border-width:1px}
+  label{font-size:12px;font-weight:600}
+  input,select,textarea{font-size:13.5px}
+  .filters input,.filters select{padding:8px 11px}
+  .mut{font-size:13px}
+  .kpi .l,.kpi .kside .l{font-size:11.5px;letter-spacing:.04em}
+
+  /* ---- side menu: calmer, tighter, easier to scan ---- */
+  .side{width:236px;padding:16px 12px 12px}
+  .main{margin-left:236px}
+  .navwrap{gap:0}
+  .navsec .navgrp-t{font-family:'Inter','Segoe UI',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:1.3px;
+    color:#7FA3BE;margin:18px 8px 6px 10px;padding:0}
+  .navsec:first-of-type .navgrp-t{margin-top:10px}
+  .navsec .navgrp-t:hover{color:#CFE3EF}
+  .navsec-items{gap:1px}
+  .navsec .nav{padding:6px 10px;gap:10px;border-radius:8px;font-size:13.5px;font-weight:500;color:#C9DCE8;letter-spacing:0}
+  .navsec .nav:hover{background:rgba(255,255,255,.06);color:#fff}
+  .navsec .nav .ic{width:26px;height:26px;border-radius:7px;box-shadow:inset 0 1px 0 rgba(255,255,255,.22)}
+  .navsec .nav .ic svg{width:15px;height:15px}
+  .navsec .nav.active{background:rgba(255,255,255,.11);color:#fff;font-weight:600;box-shadow:inset 3px 0 0 #4FB3E0}
+  @media(max-width:860px){.main{margin-left:0}}
+  /* 08-Oct-2026 (Ejaz): icons too loud — one quiet, monochrome style instead of a colour per group.
+     Line icon in soft blue-grey on a faint translucent square; the page you're on gets the brand blue. */
+  .navsec .nav .ic,
+  .navsec[data-sec] .nav .ic{background:rgba(255,255,255,.07) !important;color:#9DB9CC;box-shadow:none;border:1px solid rgba(255,255,255,.06)}
+  .navsec .nav:hover .ic{color:#E3EEF5;background:rgba(255,255,255,.1) !important}
+  .navsec .nav.active .ic{background:var(--accent-2) !important;color:#fff;border-color:transparent}
+  .navsec .nav .ic svg{stroke-width:1.6}
 </style>
 </head>
 <body>
@@ -517,37 +581,66 @@
     <!-- HOST (12-Aug-2026): the operator's cross-tenant view — Super Admin only, hidden for everyone else. -->
     <div class="navgrp" id="navgrp-host" style="display:none">HOST</div>
     <div class="nav" data-view="tenants" id="nav-tenants" style="display:none"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V9.5l5-3.2V21M10 21V3.8l9 3.4V21"/><path d="M13.5 10h.01M16.5 10h.01M13.5 13.5h.01M16.5 13.5h.01M13.5 17h.01M16.5 17h.01"/></svg></span> Tenants</div>
-    <div class="navgrp">MONITOR</div>
-    <div class="nav active" data-view="dashboard"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/></svg></span> Live Dashboard</div>
-    <div class="nav" data-view="attendance"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.4V12l3.2 1.9"/></svg></span> Attendance</div>
-    <div class="nav" data-view="screenshots"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="13" rx="2"/><path d="M8.5 21h7M12 17.5V21"/><circle cx="9" cy="9.4" r="1.5"/><path d="M21 14.5l-4.2-4.2-5.3 5.2"/></svg></span> Screenshots</div>
-    <div class="nav" data-view="webcam"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m23 7-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></span> Webcam</div>
-    <div class="nav" data-view="usage"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12A9 9 0 1 1 12 3"/><path d="M12 3a9 9 0 0 1 9 9h-9z"/></svg></span> Usage &amp; Compliance</div>
-    <div class="nav" data-view="violations"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 4.1 2.9 17a2 2 0 0 0 1.7 3h14.8a2 2 0 0 0 1.7-3L13.7 4.1a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4.2M12 16.9h.01"/></svg></span> Violations</div>
-    <div class="navgrp">MANAGE</div>
-    <div class="nav" data-view="employees"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.2" r="3.4"/><path d="M2.8 20.2a6.2 6.2 0 0 1 12.4 0"/><circle cx="17.2" cy="9.4" r="2.6"/><path d="M16 15.6a5 5 0 0 1 5.2 4.6"/></svg></span> Employees</div>
-    <div class="nav" data-view="org"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5M9 10h.01M15 10h.01M12 10h.01"/></svg></span> Organisation</div>
-    <div class="nav" data-view="meetings"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v3M16 3v3M8 13h3M8 16.5h6"/></svg></span> Meetings</div>
-    <div class="nav" data-view="users"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.4" r="3.6"/><path d="M4.8 20.4a7.2 7.2 0 0 1 14.4 0"/></svg></span> Users</div>
-    <div class="nav" data-view="devices"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="12.5" rx="2"/><path d="M8.5 21h7M12 17v4"/></svg></span> Devices</div>
-    <!-- LiveView Phase 4 (14-Sep-2026): gated by liveview.view via applyPermissionNav's NAVP map -->
-    <div class="nav" data-view="liveview"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4.5" width="19" height="13" rx="2"/><path d="M8 21h8M12 17.5V21"/><circle cx="12" cy="11" r="3"/></svg></span> LiveView</div>
-    <div class="nav" data-view="policies"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.5 3v5.2c0 4.8-3.2 8.2-7.5 9.8-4.3-1.6-7.5-5-7.5-9.8V6z"/><path d="M9 11.8l2.1 2.1 3.9-4.2"/></svg></span> Policies</div>
-    <div class="nav" data-view="rules"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h11M4 18h7"/><circle cx="18.5" cy="16.5" r="3"/><path d="M20.6 18.6 23 21"/></svg></span> App &amp; Web Rules</div>
-    <div class="nav" data-view="endsec" style="display:none"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.5 3v5.2c0 4.8-3.2 8.2-7.5 9.8-4.3-1.6-7.5-5-7.5-9.8V6z"/><path d="M12 8v4.5M12 15.6h.01"/></svg></span> Endpoint Security</div>
-    <div class="nav" data-view="pcaudit" style="display:none"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4M7 8h6M7 11h10"/></svg></span> PC Audit Log</div>
-    <div class="nav" data-view="biometric"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8A9 9 0 0 1 21 12c0 2.6-.4 5-1.2 7"/><path d="M3.6 8.4A9 9 0 0 0 3 12c0 2.8.6 5.2 1.6 7.2"/><path d="M12 8.4a3.6 3.6 0 0 1 3.6 3.6c0 2.3-.3 4.5-1 6.6"/><path d="M8.4 12a3.6 3.6 0 0 1 .4-1.7M8.6 15.6c.3 1.5.2 3-.2 4.6"/><path d="M12 12v2.4c0 1.7-.2 3.4-.7 5"/></svg></span> Biometric</div>
-        <div class="nav" data-view="gateexcl"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V6.2a2 2 0 0 1 1.3-1.9l7-2.2a1 1 0 0 1 1.3 1v18"/><path d="M12.6 21H21V9.4a2 2 0 0 0-1.4-1.9l-7-2.2"/><path d="M8.4 12.2v1.6"/><path d="M2 21h20"/></svg></span> Gate Exclusions</div>
-<div class="navgrp">INSIGHT</div>
-    <div class="nav" data-view="reports"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11.5M7.5 10l4.5 4.5L16.5 10"/><path d="M4 17v2.4A1.6 1.6 0 0 0 5.6 21h12.8a1.6 1.6 0 0 0 1.6-1.6V17"/></svg></span> Reports &amp; Exports</div>
-        <!-- 30-Sep-2026 (Ejaz): scheduled Productivity report emails, under Reports & Exports -->
-        <div class="nav" data-view="schedrep" style="padding-left:30px;font-size:12.5px"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2.5h6"/></svg></span> Schedule Report</div>
-    <div class="nav" data-view="license"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="12" r="4.6"/><path d="M12.6 12H21M17.5 12v3.4M21 12v2.4"/></svg></span> Licence</div>
-    <div class="nav" data-view="integrations"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg></span> API &amp; Integrations</div>
-    <div class="nav" data-view="ops"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6.5 5 13L17 12h4"/></svg></span> Audit &amp; Ops</div>
-        <!-- 07-Oct-2026 (Ejaz): Email / SMTP + Notifications, under Audit & Ops -->
-        <div class="nav" data-view="mailalerts" style="padding-left:30px;font-size:12.5px"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 6.5 8.5 6.5 8.5-6.5"/></svg></span> Email &amp; Alerts</div>
-    <div class="nav" data-view="help"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.2 9.3a2.9 2.9 0 0 1 5.6 1c0 1.9-2.8 2.6-2.8 2.6"/><path d="M12 17h.01"/></svg></span> Help &amp; Troubleshooting</div>
+    <!-- 08-Oct-2026 (Ejaz): menu regrouped — Monitoring / People / Reports / Configuration-Setup / System.
+         Collapsible groups (one open at a time, Monitoring by default); icons on a coloured tile per group. -->
+    <!-- 08-Oct-2026 (Ejaz): Live Dashboard sits on its own above Monitoring and is the page everyone lands on. -->
+    <div class="navsec" data-sec="home" style="margin-top:10px">
+      <div class="navsec-items">
+        <div class="nav" data-view="dashboard"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg></span> Live Dashboard</div>
+      </div>
+    </div>
+    <div class="navsec" data-sec="monitoring">
+      <div class="navgrp navgrp-t" role="button" tabindex="0"><span>MONITORING</span><span class="chev"></span></div>
+      <div class="navsec-items">
+        <div class="nav" data-view="liveview"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M10 7.5v5l4-2.5z"/></svg></span> Live View</div>
+        <div class="nav" data-view="screenshots"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></span> Screenshots</div>
+        <div class="nav" data-view="webcam"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="8"/><circle cx="12" cy="10" r="3"/><path d="M7 22h10M12 22v-4"/></svg></span> Webcam</div>
+        <div class="nav" data-view="usage"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9M13 17V5M8 17v-3"/></svg></span> Usage &amp; Compliance</div>
+        <div class="nav" data-view="violations"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4M12 16h.01"/></svg></span> Violations</div>
+        <div class="nav" data-view="endsec" style="display:none"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span> Endpoint Security</div>
+        <div class="nav" data-view="pcaudit" style="display:none"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></svg></span> PC Audit Log</div>
+      </div>
+    </div>
+    <div class="navsec" data-sec="people">
+      <div class="navgrp navgrp-t" role="button" tabindex="0"><span>PEOPLE</span><span class="chev"></span></div>
+      <div class="navsec-items">
+        <div class="nav" data-view="employees"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Employees</div>
+        <div class="nav" data-view="attendance"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m9 16 2 2 4-4"/></svg></span> Attendance</div>
+        <div class="nav" data-view="meetings"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg></span> Meetings</div>
+        <div class="nav" data-view="devices"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"/></svg></span> Devices</div>
+        <div class="nav" data-view="users"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m16 11 2 2 4-4"/></svg></span> Users</div>
+      </div>
+    </div>
+    <div class="navsec" data-sec="reports">
+      <div class="navgrp navgrp-t" role="button" tabindex="0"><span>REPORTS</span><span class="chev"></span></div>
+      <div class="navsec-items">
+        <div class="nav" data-view="reports" data-rsec="prod"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/></svg></span> Productivity</div>
+        <div class="nav" data-view="reports" data-rsec="break"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v2M14 2v2M6 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/></svg></span> Break</div>
+        <div class="nav" data-view="reports" data-rsec="meet"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h20M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/></svg></span> Meeting</div>
+        <div class="nav" data-view="reports" data-rsec="att"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg></span> Attendance</div>
+        <div class="nav" data-view="schedrep"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4M8 2v4M3 10h5"/><circle cx="17.5" cy="17.5" r="4.5"/><path d="M17.5 15.5v2l1.5 1"/></svg></span> Schedule Report</div>
+      </div>
+    </div>
+    <div class="navsec" data-sec="setup">
+      <div class="navgrp navgrp-t" role="button" tabindex="0"><span>CONFIGURATION / SETUP</span><span class="chev"></span></div>
+      <div class="navsec-items">
+        <div class="nav" data-view="org"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4M10 10h4M10 14h4M10 18h4"/></svg></span> Organisation</div>
+        <div class="nav" data-view="policies"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M10 9H8M16 13H8M16 17H8"/></svg></span> Policies</div>
+        <div class="nav" data-view="rules"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20"/></svg></span> App &amp; Web Rules</div>
+        <div class="nav" data-view="biometric"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4M14 13.12c0 2.38 0 6.38-1 8.88M17.29 21.02c.12-.6.43-2.3.5-3.02M2 12a10 10 0 0 1 18-6M2 16h.01M21.8 16c.2-2 .131-5.354 0-6M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2M8.65 22c.21-.66.45-1.32.57-2M9 6.8a6 6 0 0 1 9 5.2v2"/></svg></span> Biometric</div>
+        <div class="nav" data-view="gateexcl"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M13 4h3a2 2 0 0 1 2 2v14M2 20h3M13 20h9M10 12v.01"/><path d="M13 4.562v16.157a1 1 0 0 1-1.242.97L5 20V5.562a2 2 0 0 1 1.515-1.94l4-1A2 2 0 0 1 13 4.561Z"/></svg></span> Gate Exclusions</div>
+        <div class="nav" data-view="mailalerts"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></span> Email Configuration</div>
+        <div class="nav" data-view="integrations"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-5M9 8V2M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/></svg></span> API &amp; Integrations</div>
+        <div class="nav" data-view="license"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg></span> Licence</div>
+      </div>
+    </div>
+    <div class="navsec" data-sec="system">
+      <div class="navgrp navgrp-t" role="button" tabindex="0"><span>SYSTEM</span><span class="chev"></span></div>
+      <div class="navsec-items">
+        <div class="nav" data-view="ops"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg></span> Audit &amp; Ops</div>
+        <div class="nav" data-view="help"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></svg></span> Help &amp; Troubleshooting</div>
+      </div>
+    </div>
     </div>
     <div class="foot"><span id="who"></span><br><a id="signout" style="color:var(--ink-3);cursor:pointer">Sign out</a></div>
   </div>
@@ -1287,7 +1380,7 @@ The full report with every employee is in your email.</code><br>Submit it and wa
     </div>
 
     <div class="view" id="v-reports">
-      <div class="card">
+      <div class="card" data-rsec="prod">
         <h3>Live productivity — all employees <span class="hint">day-wise · today updates live · click a column to sort</span></h3>
         <div class="filters" style="border:none;box-shadow:none;padding:0;background:none;margin-bottom:12px">
           <label>From</label><input type="date" id="pr-from" style="min-width:0">
@@ -1315,6 +1408,8 @@ The full report with every employee is in your email.</code><br>Submit it and wa
         </div>
         <div id="pr-overview"></div>
         <div style="overflow-x:auto">
+        <style>/* 09-Oct-2026 (Ejaz): one line per employee — no wrapped names/managers/times; the table scrolls sideways instead. Data-issue cell keeps its own wrapping. */
+          #pr-table th,#pr-table td{white-space:nowrap;vertical-align:middle}</style>
         <table id="pr-table"><thead><tr>
           <th>Date</th><th>Code</th><th>Employee</th><th>Dept</th><th title="Reporting Manager">Manager</th>
           <th title="First door (biometric) IN punch">Gate IN</th><th>Logged in</th><th title="Minutes from the door IN punch to the first agent sign-in">Gate→PC (mins)</th><th>Logged out</th>
@@ -1337,7 +1432,7 @@ The full report with every employee is in your email.</code><br>Submit it and wa
       </div>
 
       <!-- Section 3 & 14: Break report -->
-      <div class="card">
+      <div class="card" data-rsec="break">
         <h3>Break report <span class="hint">permitted vs actual, excess &amp; the employee's reason · Meeting is never a break</span></h3>
         <div class="filters" style="border:none;box-shadow:none;padding:0;background:none;margin-bottom:12px">
           <label>From</label><input type="date" id="br-from" style="min-width:0">
@@ -1355,7 +1450,7 @@ The full report with every employee is in your email.</code><br>Submit it and wa
       </div>
 
       <!-- Section 14: Meeting report -->
-      <div class="card">
+      <div class="card" data-rsec="meet">
         <h3>Meeting report <span class="hint">scheduled vs actual attendance · meeting time is productive</span></h3>
         <div class="filters" style="border:none;box-shadow:none;padding:0;background:none;margin-bottom:12px">
           <label>From</label><input type="date" id="mr-from" style="min-width:0">
@@ -1369,40 +1464,40 @@ The full report with every employee is in your email.</code><br>Submit it and wa
       </div>
 
       <div class="exp-grid">
-        <div class="exp"><b>Attendance report</b>
+        <div class="exp" data-rsec="att"><b>Attendance report</b>
           <p>Punch in/out, agent login, late marks, source — day-wise per employee. CSV opens directly in Excel.</p>
           <div class="row"><input type="date" id="rp-att-from"><input type="date" id="rp-att-to"></div>
           <div class="row" style="margin-top:10px"><button class="btn acc" id="rp-att">⇓ Export CSV</button></div>
         </div>
-        <div class="exp"><b>Productivity report</b>
+        <div class="exp" data-rsec="prod"><b>Productivity report</b>
           <p>Active vs idle vs break hours per employee over a date range — the raw material for productivity %.</p>
           <div class="row"><input type="date" id="rp-prod-from"><input type="date" id="rp-prod-to"></div>
           <div class="row" style="margin-top:10px"><button class="btn acc" id="rp-prod">⇓ Export CSV</button></div>
         </div>
         <!-- 25-Sep-2026 (Ejaz): hidden until asked for; remove style="display:none" to bring it back. -->
-        <div class="exp" style="display:none"><b>Compliance report</b>
+        <div class="exp" data-rsec="comp" style="display:none"><b>Compliance report</b>
           <p>Violations by employee &amp; type, severity, detected value and the action the agent took.</p>
           <div class="row"><input type="date" id="rp-comp-from"><input type="date" id="rp-comp-to"></div>
           <div class="row" style="margin-top:10px"><button class="btn acc" id="rp-comp">⇓ Export CSV</button></div>
         </div>
-        <div class="exp"><b>Daily summary (scoring)</b>
+        <div class="exp" data-rsec="prod"><b>Daily summary (scoring)</b>
           <p>Nightly per-employee rollup over a date range: hours, violations, productivity &amp; compliance scores (0–100).</p>
           <div class="row"><input type="date" id="rp-sum-from"><input type="date" id="rp-sum-to"></div>
           <div class="row" style="margin-top:10px"><button class="btn acc" id="rp-sum">⇓ Export CSV</button></div>
         </div>
-        <div class="exp"><b>Attendance register (monthly)</b>
+        <div class="exp" data-rsec="att"><b>Attendance register (monthly)</b>
           <p>The classic month matrix — one row per employee, one letter per day (P/A/H/L, WOFF weekly off, HOL holiday) with payable-day totals.</p>
           <div class="row"><input type="month" id="rp-reg-month"></div>
           <div class="row" style="margin-top:10px"><button class="btn acc" id="rp-reg">⇓ Export CSV</button></div>
         </div>
-        <div class="exp"><b>Monthly summary</b>
+        <div class="exp" data-rsec="att"><b>Monthly summary</b>
           <p>Per-employee month rollup: working days, P/A/H/L counts, payable days and average productivity — rendered right here.</p>
           <div class="row"><input type="month" id="rp-ms-month"></div>
           <div class="row" style="margin-top:10px"><button class="btn acc" id="rp-ms">View summary</button></div>
         </div>
       </div>
       <div class="mut" id="rp-msg"></div>
-      <div class="card hide" id="ms-card">
+      <div class="card hide" id="ms-card" data-rsec="att">
         <h3 id="ms-title">Monthly summary <span class="hint">payable days = present + 0.5 × half-day + paid leave</span></h3>
         <table><thead><tr><th>Code</th><th>Employee</th><th>Working days</th><th>P</th><th>A</th><th>H</th><th>L</th><th>Payable days</th><th>Avg productivity</th></tr></thead>
         <tbody id="ms-rows"></tbody></table>
@@ -2120,6 +2215,7 @@ The full report with every employee is in your email.</code><br>Submit it and wa
     <div class="dchat-list" id="d-chat-list"></div>
     <form class="dchat-f" id="d-chat-f" autocomplete="off">
       <input id="d-chat-in" maxlength="2000" placeholder="Type a message to this employee…">
+      <button class="btn" type="button" id="d-chat-buzz" title="Buzz — rings and shakes the chat on the employee's PC">&#128276; Buzz</button>
       <button class="btn solid" type="submit">Send</button>
     </form>
   </div>
@@ -2528,6 +2624,8 @@ function enterApp() {
   var isHost = !!(ME && ME.role === 'SUPER_ADMIN');
   var hn = document.getElementById('nav-tenants'); if (hn) hn.style.display = isHost ? '' : 'none';
   var hg = document.getElementById('navgrp-host'); if (hg) hg.style.display = isHost ? '' : 'none';
+  navGroupsRefresh();
+  // 08-Oct-2026 (Ejaz): everyone — every licence and role — lands on Live Dashboard after login.
   show('dashboard');
   // 28-Sep-2026: bring LiveView screens (and so the open Live Wall) back on refresh even though
   // the page lands on Dashboard — waiting for a click on LiveView left the wall empty.
@@ -2820,8 +2918,7 @@ function applyPermissionNav() {
     return;
   }
   Object.entries(NAVP).forEach(([view, perm]) => {
-    const el = document.querySelector('.nav[data-view="' + view + '"]');
-    if (el && !perms.includes(perm)) el.style.display = 'none';
+    document.querySelectorAll('.nav[data-view="' + view + '"]').forEach((el) => { if (!perms.includes(perm)) el.style.display = 'none'; });
   });
 }
 $('#btn-login').onclick = async () => {
@@ -2938,7 +3035,7 @@ const TITLES = {
   meetings: ['Meetings', 'Schedule meetings & track participation'],
   users: ['Users', 'Login accounts, roles & credentials'],
   devices: ['Devices', 'Registered endpoints & agent health'],
-  liveview: ['LiveView', 'Watch an employee\'s screen, live'],
+  liveview: ['Live View', 'Watch an employee\'s screen, live'],
   policies: ['Policies', 'The control room — what is tracked, for whom'],
   rules: ['App & Web Rules', 'Track, allow, block or flag apps & websites — company-wide'],
   endsec: ['Endpoint Security', 'Microsoft Defender status, threats, scans & security compliance'],
@@ -2950,18 +3047,49 @@ const TITLES = {
   integrations: ['API & Integrations', 'Connect SmartEPT to SmartPRS & any external device or app'],
   gateexcl: ['Gate Exclusions', 'Who may sign in without a door punch — and until when'],
   ops: ['Audit & Ops', 'Who did what, storage growth & database backups'],
-  mailalerts: ['Email & Alerts', 'SMTP settings, automatic alerts (Send Email / Popup Alert) and the email log'],
+  mailalerts: ['Email Configuration', 'SMTP settings, automatic alerts (Send Email / Popup Alert) and the email log'],
   help: ['Help & Troubleshooting', 'System health, common fixes & the application log'],
 };
-$$('.nav').forEach((n) => n.onclick = () => show(n.dataset.view));
+// 08-Oct-2026 (Ejaz): Reports menu = one item per report (data-rsec); RSEC picks the section shown.
+var RSEC = null;
+const RSEC_TITLES = { prod: ['Productivity report', 'Live productivity per employee per day, plus Productivity and Daily-summary exports'],
+  break: ['Break report', 'Permitted vs actual breaks, excess and the employee\'s reason'],
+  meet: ['Meeting report', 'Scheduled vs actual meeting attendance'],
+  att: ['Attendance report', 'Attendance export, monthly register and monthly summary'] };
+$$('.nav').forEach((n) => n.onclick = () => { if (n.dataset.rsec) RSEC = n.dataset.rsec; show(n.dataset.view); });
+// 08-Oct-2026 (Ejaz): every group is expanded all the time; clicking a heading folds / unfolds
+// ONLY that group — the others never change. A group folded by hand opens again by itself only
+// when a page inside it is shown (e.g. from the dashboard's Live View eye).
+$$('.navsec .navgrp-t').forEach((t) => {
+  const go = () => t.closest('.navsec').classList.toggle('collapsed');
+  t.onclick = go;
+  t.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+});
+// A group whose every item is hidden (role / licence / attendance mode) hides its heading too.
+function navGroupsRefresh() {
+  $$('.navsec').forEach((s) => {
+    const any = [...s.querySelectorAll('.nav')].some((n) => n.style.display !== 'none');
+    if (s.style.display !== (any ? '' : 'none')) s.style.display = any ? '' : 'none';
+  });
+}
+{ const w = document.querySelector('.navwrap');
+  if (w) new MutationObserver(navGroupsRefresh).observe(w, { subtree: true, attributes: true, attributeFilter: ['style'] }); }
 { const ub = document.getElementById('btn-check-update'); if (ub) ub.onclick = updCheck; }
 (function(){ const a=document.getElementById('app'), t=document.getElementById('nav-toggle'), b=document.getElementById('nav-backdrop');
   if(t) t.onclick=()=>a.classList.toggle('nav-open'); if(b) b.onclick=()=>a.classList.remove('nav-open'); })();
 function show(v) {
-  $$('.nav').forEach((n) => n.classList.toggle('active', n.dataset.view === v));
+  if (v === 'reports' && !RSEC) RSEC = 'prod';
+  $$('.nav').forEach((n) => n.classList.toggle('active', n.dataset.view === v && (!n.dataset.rsec || n.dataset.rsec === RSEC)));
   $$('.view').forEach((el) => el.classList.remove('active'));
   $('#v-' + v).classList.add('active');
   $('#page-title').textContent = TITLES[v][0]; $('#page-sub').textContent = TITLES[v][1];
+  if (v === 'reports') {
+    $$('#v-reports [data-rsec]').forEach((el) => el.classList.toggle('rs-off', el.dataset.rsec !== RSEC));
+    const rt = RSEC_TITLES[RSEC]; if (rt) { $('#page-title').textContent = rt[0]; $('#page-sub').textContent = rt[1]; }
+  }
+  // 08-Oct-2026: make sure the group of the page shown is open (other groups untouched).
+  { const an = document.querySelector('.navsec .nav.active'), sec = an && an.closest('.navsec');
+    if (sec) sec.classList.remove('collapsed'); }
   // The update button belongs to the Licence screen — this server's version
   // and its licence are the same conversation with Central.
   { const ub = document.getElementById('btn-check-update'); if (ub) ub.style.display = (v === 'license') ? 'inline-flex' : 'none'; }
@@ -5383,12 +5511,12 @@ function lvWallSetup(win) {
     // header button already uses, just surfaced on hover here instead of always-on,
     // since a wall tile has no header bar to put a persistent button in.
     // 29-Sep-2026 (Ejaz): always visible (were hidden until hover), solid brand colour, bigger icons.
-    + '.lv-wtile .lv-wfs,.lv-wtile .lv-wcap,.lv-wtile .lv-wchat{position:absolute;top:8px;width:34px;height:34px;border:1.5px solid rgba(255,255,255,.85);border-radius:8px;'
+    + '.lv-wtile .lv-wfs,.lv-wtile .lv-wcap,.lv-wtile .lv-wchat{position:absolute;top:6px;width:24px;height:24px;border:1px solid rgba(255,255,255,.85);border-radius:6px;'
     + 'display:flex;align-items:center;justify-content:center;color:#fff;background:#006699;'
     + 'cursor:pointer;opacity:1;box-shadow:0 2px 6px rgba(0,0,0,.45)}'
-    + '.lv-wtile .lv-wfs svg,.lv-wtile .lv-wcap svg,.lv-wtile .lv-wchat svg{width:18px;height:18px}'
-    + '.lv-wtile .lv-wfs{right:8px}'
-    + '.lv-wtile .lv-wcap{right:48px}.lv-wtile .lv-wchat{right:88px}'
+    + '.lv-wtile .lv-wfs svg,.lv-wtile .lv-wcap svg,.lv-wtile .lv-wchat svg{width:14px;height:14px}'
+    + '.lv-wtile .lv-wfs{right:6px}'
+    + '.lv-wtile .lv-wcap{right:34px}.lv-wtile .lv-wchat{right:62px}'
     + '.lv-wtile .lv-wfs:hover,.lv-wtile .lv-wcap:hover,.lv-wtile .lv-wchat:hover{background:#00527A}'
     // Drag & drop (26-Sep-2026): grab any tile, drop it on another — the two swap places.
     + '.lv-wtile{cursor:grab}.lv-wtile.lv-wdrag{opacity:.4}'
@@ -5572,6 +5700,7 @@ function lvChatFocus(tile, doc) {
     + '<div data-f="st" style="font-size:11px;color:#f0a7a7;padding:0 10px"></div>'
     + '<form data-f="form" autocomplete="off" style="display:flex;gap:6px;padding:8px;background:#0f2a33">'
     + '<input data-f="in" maxlength="2000" placeholder="Type a message" style="flex:1;min-width:0;padding:9px 12px;border-radius:18px;border:1px solid #2f5260;background:#06222A;color:#fff;font-size:13px;outline:none">'
+    + '<button type="button" data-f="buzz" title="Buzz — rings and shakes the chat on the employee\'s PC" style="width:38px;height:38px;border:none;border-radius:50%;background:#F5A623;color:#051418;font-size:16px;cursor:pointer">&#128276;</button>'
     + '<button type="submit" title="Send" style="width:38px;height:38px;border:none;border-radius:50%;background:#2bb3c0;color:#051418;font-weight:700;cursor:pointer">➤</button>'
     + '</form></div>';
   const q = (k) => root.querySelector('[data-f="' + k + '"]');
@@ -5631,6 +5760,10 @@ function lvChatFocus(tile, doc) {
     }
     catch (e) { q('st').textContent = 'Not sent: ' + (e.message || 'error'); }
     finally { inp.disabled = false; inp.focus(); }
+  });
+  q('buzz').onclick = (ev) => chatBuzz(ev.currentTarget, tile.empId, async () => {
+    while (f.busy) await new Promise((r) => setTimeout(r, 100));
+    await load(false);
   });
   q('x').onclick = lvChatFocusClose;
   root.addEventListener('keydown', (e) => { if (e.key === 'Escape') lvChatFocusClose(); });
@@ -8142,6 +8275,18 @@ function chatClose() {
   if (CHAT_TIMER) clearInterval(CHAT_TIMER);
   CHAT_TIMER = null; CHAT_EMP = null;
 }
+// 08-Oct-2026 (Ejaz): Buzz — sends this exact text; the agent plays a buzzer and shakes its chat window.
+const CHAT_BUZZ = '🔔 BUZZ';
+async function chatBuzz(btn, empId, after) {
+  btn.disabled = true;
+  try { await api('/chat/' + empId, { method: 'POST', body: JSON.stringify({ body: CHAT_BUZZ }) }); await after(); }
+  catch (e) { toast('Buzz not sent: ' + (e.message || 'error')); }
+  finally { setTimeout(() => { btn.disabled = false; }, 5000); } // no buzz spamming
+}
+$('#d-chat-buzz').addEventListener('click', (ev) => {
+  if (!CHAT_EMP) return;
+  chatBuzz(ev.currentTarget, CHAT_EMP, async () => { while (CHAT_BUSY) await new Promise((r) => setTimeout(r, 100)); await chatLoad(false); });
+});
 $('#d-chat-f').addEventListener('submit', async (ev) => {
   ev.preventDefault();
   const inp = $('#d-chat-in'), body = inp.value.trim();

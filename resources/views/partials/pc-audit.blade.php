@@ -4,6 +4,32 @@
   api, apiBlob, esc, toast. Nav visibility comes from /endpoint-security/access (capability pc_audit).
 --}}
 <div class="view" id="v-pcaudit">
+  {{-- 08-Oct-2026 (Ejaz): Compliance report moved here from Endpoint Security, as the first option.
+       The ids (es-cr-from / es-cr-to / es-cr) are unchanged, so endpoint-security.blade.php still
+       sets the dates and builds the PDF (compliancePdf). --}}
+  <div class="card" id="pa-cr-card">
+    <div class="pa-cr-head">
+      <div>
+        <div class="pa-cr-title">Compliance report</div>
+        <div class="pa-cr-sub">One audit-ready PDF covering every PC with the SmartEPT Agent Service, for the period you choose — ready to share with auditors, clients or banks.</div>
+      </div>
+      <div class="pa-cr-run">
+        <label>From<input type="date" id="es-cr-from" title="From"></label>
+        <label>To<input type="date" id="es-cr-to" title="To"></label>
+        <button class="btn solid" id="es-cr" title="Every PC, every checkpoint, for the chosen period — audit-ready PDF">Download PDF</button>
+      </div>
+    </div>
+    <div class="pa-cr-k">What the report contains</div>
+    <ol class="pa-cr-list">
+      <li><b>Executive summary</b><span>PCs passing every security checkpoint, threats detected, scans run, USB use, policy violations and tamper attempts.</span></li>
+      <li><b>Checkpoint summary</b><span>Pass / fail count and pass rate for each checkpoint across all PCs.</span></li>
+      <li><b>Status of every PC</b><span>A checkpoint matrix — Windows version, patches, antivirus, real-time protection, definitions, last scan, firewall, BitLocker, screen lock, local administrators, agent reporting.</span></li>
+      <li><b>Items requiring action</b><span>Every failed or review checkpoint, with the PC, the employee and what was found.</span></li>
+      <li><b>Activity in the period</b><span>Per PC: threats, scans, USB connected / blocked, files copied to USB, downloads, software changes, violations, blocked programs, tamper.</span></li>
+      <li><b>Reported values</b><span>Exactly what each PC last reported — Windows build, last patch, antivirus, definitions, BitLocker, screen lock, administrators.</span></li>
+    </ol>
+  </div>
+
   <div class="card" id="pa-card">
     <h3>PC Audit Log <span class="hint">everything that happened on each PC where the SmartEPT Agent is installed</span></h3>
     <div class="filters" style="margin-bottom:10px">
@@ -25,6 +51,23 @@
 </div>
 
 <style>
+  /* 08-Oct-2026 (Ejaz): Compliance report card — crisp dark text, clear structure (was faint grey paragraph). */
+  #pa-cr-card { padding:20px 22px; }
+  #pa-cr-card .pa-cr-head { display:flex; flex-wrap:wrap; gap:16px 24px; align-items:flex-start; justify-content:space-between; }
+  #pa-cr-card .pa-cr-head > div:first-child { flex:1 1 380px; min-width:0; }
+  #pa-cr-card .pa-cr-title { font-size:17px; font-weight:800; color:var(--ink); letter-spacing:-.1px; }
+  #pa-cr-card .pa-cr-sub { margin-top:4px; font-size:13.5px; line-height:1.5; color:var(--ink-2); }
+  #pa-cr-card .pa-cr-run { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+  #pa-cr-card .pa-cr-run label { display:flex; flex-direction:column; gap:4px; font-size:11.5px; font-weight:700; color:var(--ink-2); text-transform:uppercase; letter-spacing:.04em; }
+  #pa-cr-card .pa-cr-run input { font-size:13.5px; color:var(--ink); padding:8px 10px; }
+  #pa-cr-card .pa-cr-run .btn { padding:9px 18px; font-size:13.5px; }
+  #pa-cr-card .pa-cr-k { margin:18px 0 10px; font-size:12px; font-weight:800; color:var(--accent); text-transform:uppercase; letter-spacing:.06em; }
+  #pa-cr-card .pa-cr-list { list-style:none; counter-reset:cr; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:10px; }
+  #pa-cr-card .pa-cr-list li { counter-increment:cr; position:relative; padding:11px 14px 11px 46px; border:1px solid var(--border); border-radius:10px; background:var(--card-2); }
+  #pa-cr-card .pa-cr-list li::before { content:counter(cr); position:absolute; left:12px; top:11px; width:24px; height:24px; border-radius:50%;
+    background:var(--accent); color:#fff; font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center; }
+  #pa-cr-card .pa-cr-list b { display:block; font-size:13.5px; color:var(--ink); margin-bottom:3px; }
+  #pa-cr-card .pa-cr-list span { display:block; font-size:12.5px; line-height:1.5; color:var(--ink-2); }
   /* 04-Oct-2026: the per-PC log opens full-window as a timeline: day > hour > 10 minutes > entries. */
   #pa-ovl .modal { width:100vw; max-width:100vw; height:100vh; max-height:100vh; border-radius:0; display:flex; flex-direction:column; }
   #pa-ovl .mbody { flex:1; overflow:auto; }

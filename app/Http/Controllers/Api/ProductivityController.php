@@ -160,6 +160,16 @@ class ProductivityController extends Controller
             ->selectRaw('employee_id, DATE(login_at) d, MIN(login_at) t')
             ->groupBy('employee_id', DB::raw('DATE(login_at)'))->get()
             ->keyBy(fn ($r) => $r->employee_id . '|' . $r->d);
+        // 09-Oct-2026 (Ejaz): days closed by the post-shift AUTO sign-out. That sign-out lands at
+        // shift end + the post-shift minutes (e.g. 20:00), which is not when the person left —
+        // row() moves the day's end back to the real one (see autoLogoutEnd()).
+        $autoOuts = EmployeeLoginSession::where('company_id', $companyId)
+            ->whereBetween('login_at', [$from, $to])
+            ->when($empId, fn ($q) => $q->where('employee_id', $empId))
+            ->where('logout_reason', 'POST_SHIFT_AUTO')
+            ->selectRaw('employee_id, DATE(login_at) d, MAX(logout_at) t')
+            ->groupBy('employee_id', DB::raw('DATE(login_at)'))->get()
+            ->keyBy(fn ($r) => $r->employee_id . '|' . $r->d);
 
         $rows = [];
 
@@ -202,6 +212,7 @@ class ProductivityController extends Controller
                 'score' => (float) $s->productivity_score, 'live' => false,
                 'gate_in' => $gateIns[$s->employee_id . '|' . $d]->t ?? null,
                 'pc_in' => $pcIns[$s->employee_id . '|' . $d]->t ?? null,
+                'auto_out' => $autoOuts[$s->employee_id . '|' . $d]->t ?? null,
                 'away_adjust' => $this->awayAdjust($emp, $d, $doorAway),
             ]);
         }
@@ -265,6 +276,7 @@ class ProductivityController extends Controller
                     'score' => $present > 0 ? round($work / max($present, 1) * 100, 1) : 0, 'live' => true,
                     'gate_in' => $gateIns[$emp->id . '|' . $today]->t ?? null,
                     'pc_in' => $pcIns[$emp->id . '|' . $today]->t ?? null,
+                    'auto_out' => $autoOuts[$emp->id . '|' . $today]->t ?? null,
                     'away_adjust' => $this->awayAdjust($emp, $today, $doorAway),
                 ]);
             }
@@ -415,6 +427,8 @@ class ProductivityController extends Controller
             $sheet->getColumnDimension($this->col($c))->setAutoSize(true);
         }
         $sheet->freezePane('A2');
+        // 08-Oct-2026 (Ejaz): filter + sort arrows on every column header (export and scheduled emails).
+        $sheet->setAutoFilter('A1:X' . max(1, $r - 1));
 
         return $ss;
     }
@@ -826,6 +840,17 @@ class ProductivityController extends Controller
         $returnWalk = (int) $adj['return_gate_to_pc'];
         $dayStart = ($gateIn && (! $firstIn || Carbon::parse($gateIn)->lessThan(Carbon::parse($firstIn)))) ? $gateIn : $firstIn;
 
+        // 09-Oct-2026 (Ejaz): a day closed by the post-shift AUTO sign-out ends when the person
+        // really left — last door punch-out, else the start of the final idle stretch (last
+        // activity), else shift end — not at the auto sign-out time. The idle after that is dropped.
+        $autoOut = $m['auto_out'] ?? null;
+        if ($autoOut && $lastOut && $dayStart
+            && abs(Carbon::parse($lastOut)->diffInSeconds(Carbon::parse($autoOut), true)) <= 120) {
+            [$lastOut, $trimIdle] = $this->autoLogoutEnd($emp, $date, Carbon::parse($dayStart), Carbon::parse($lastOut));
+            $idle = max(0, $idle - $trimIdle);
+            $trackedPresent = 0;   // the stored span ran to the auto sign-out; rebuilt from the buckets below
+        }
+
         // Actual Present = logout − login (login = the day start above); when logout is missing
         // (today / open shift) fall back to the tracked present span so the row still shows a
         // sensible figure.
@@ -975,6 +1000,54 @@ class ProductivityController extends Controller
             'productivity' => $productivity,
             'live' => (bool) $m['live'],
         ];
+    }
+
+    /**
+     * 09-Oct-2026 (Ejaz): the real end of a day closed by the post-shift AUTO sign-out.
+     * The later of the last door punch-out and the last keyboard/mouse activity (= where the
+     * final idle stretch began); with neither, the shift end. Never after the auto sign-out.
+     * Returns [end, idle seconds that fall after it].
+     */
+    private function autoLogoutEnd(Employee $emp, string $date, Carbon $dayStart, Carbon $autoOut): array
+    {
+        $evEnd = fn ($e) => $e->ended_at ? Carbon::parse($e->ended_at)
+            : Carbon::parse($e->started_at)->addSeconds((int) $e->duration_seconds);
+
+        $lastPunch = \App\Models\BiometricLog::withoutGlobalScopes()
+            ->where('company_id', $emp->company_id)->where('employee_id', $emp->id)
+            ->whereBetween('punched_at', [$dayStart, $autoOut])
+            ->orderByDesc('punched_at')->first(['punch_type', 'punched_at']);
+        $punchOut = ($lastPunch && in_array($lastPunch->punch_type, ['OUT', 'BREAK_OUT'], true))
+            ? Carbon::parse($lastPunch->punched_at) : null;
+
+        $lastActive = EmployeeActivityEvent::where('company_id', $emp->company_id)->where('employee_id', $emp->id)
+            ->where('event_type', 'ACTIVE')->whereBetween('started_at', [$dayStart, $autoOut])
+            ->orderByDesc('started_at')->first(['started_at', 'ended_at', 'duration_seconds']);
+        $activeEnd = $lastActive ? $evEnd($lastActive) : null;
+
+        $end = collect([$punchOut, $activeEnd])->filter()->max();
+        if (! $end && $emp->shift?->end_time) {
+            $end = Carbon::parse($date . ' ' . $emp->shift->end_time);
+            if ($emp->shift->start_time && ($emp->shift->crosses_midnight
+                || $end->lessThanOrEqualTo(Carbon::parse($date . ' ' . $emp->shift->start_time)))) {
+                $end->addDay();
+            }
+        }
+        if (! $end || $end->greaterThan($autoOut)) $end = $autoOut->copy();
+        if ($end->lessThan($dayStart)) $end = $dayStart->copy();
+
+        // Idle recorded after the real end (the tail the agent logged until the auto sign-out).
+        $trim = 0;
+        EmployeeActivityEvent::where('company_id', $emp->company_id)->where('employee_id', $emp->id)
+            ->where('event_type', 'IDLE')->whereBetween('started_at', [$dayStart, $autoOut])
+            ->get(['started_at', 'ended_at', 'duration_seconds'])
+            ->each(function ($e) use (&$trim, $end, $autoOut, $evEnd) {
+                $s = Carbon::parse($e->started_at)->max($end);
+                $f = $evEnd($e)->min($autoOut);
+                if ($f->greaterThan($s)) $trim += (int) $f->diffInSeconds($s, true);
+            });
+
+        return [$end, $trim];
     }
 
     /**

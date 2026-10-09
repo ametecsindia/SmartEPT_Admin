@@ -22,9 +22,7 @@
       {{-- 05-Oct-2026: report controls in their own wrapping groups, so nothing runs past the window --}}
       <span class="es-grp" style="margin-left:auto"><select id="es-rep"></select>
         <button class="btn" id="es-export">Export CSV</button></span>
-      <span class="es-grp"><span class="mut" style="padding:0">Compliance report</span>
-        <input type="date" id="es-cr-from" title="From"><input type="date" id="es-cr-to" title="To">
-        <button class="btn solid" id="es-cr" title="Every PC, every checkpoint, for the chosen period — audit-ready PDF">Download PDF</button></span>
+      {{-- 08-Oct-2026 (Ejaz): the Compliance report moved to the top of PC Audit Log (same ids, same code below). --}}
     </div>
     <div class="es-scroll"><table><thead><tr><th>Employee</th><th>Device</th><th>Antivirus</th><th>Status</th><th>Real-Time</th><th>Definitions</th>
       <th>Last Scan</th><th>Threats</th><th>Firewall</th><th>Compliance</th><th>Last Seen</th><th></th></tr></thead>

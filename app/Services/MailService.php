@@ -370,7 +370,7 @@ class MailService
      * 30-Sep-2026: HTML mail with attachments (Reports → Schedule Report). Same mailer resolution
      * and mail_logs record as send(); $attachments = [[bytes, filename, mime], ...].
      */
-    public static function sendHtml(string $to, string $subject, string $html, array $attachments = [], ?string $kind = null, ?int $companyId = null): string
+    public static function sendHtml(string $to, string $subject, string $html, array $attachments = [], ?string $kind = null, ?int $companyId = null, ?string $amp = null): string
     {
         $status = 'sent';
         $error  = null;
@@ -381,10 +381,23 @@ class MailService
             try {
                 [$mailer, $fromAddress, $fromName] = self::resolveMailer($companyId);
                 $pending = $mailer ? Mail::mailer($mailer) : Mail::mailer();
-                $pending->html($html, function ($message) use ($to, $subject, $fromAddress, $fromName, $attachments) {
+                $pending->html($html, function ($message) use ($to, $subject, $fromAddress, $fromName, $attachments, $html, $amp) {
                     $message->to($to)->subject($subject);
                     if ($fromAddress) {
                         $message->from($fromAddress, $fromName ?: config('mail.from.name'));
+                    }
+                    if ($amp) {
+                        // 08-Oct-2026: interactive AMP part (Gmail) between plain text and HTML — AMP must come
+                        // before the HTML part, which stays the fallback for every other mail app.
+                        $alt = new \Symfony\Component\Mime\Part\Multipart\AlternativePart(
+                            new \Symfony\Component\Mime\Part\TextPart(trim(html_entity_decode(strip_tags(preg_replace('/<(br|\/p|\/tr|\/div)[^>]*>/i', "\n", $html)), ENT_QUOTES, 'UTF-8')), 'utf-8', 'plain'),
+                            new \Symfony\Component\Mime\Part\TextPart($amp, 'utf-8', 'x-amp-html'),
+                            new \Symfony\Component\Mime\Part\TextPart($html, 'utf-8', 'html'),
+                        );
+                        $files = array_map(fn ($a) => new \Symfony\Component\Mime\Part\DataPart($a[0], $a[1], $a[2]), $attachments);
+                        $message->getSymfonyMessage()->setBody($files ? new \Symfony\Component\Mime\Part\Multipart\MixedPart($alt, ...$files) : $alt);
+
+                        return;
                     }
                     foreach ($attachments as [$bytes, $name, $mime]) {
                         $message->attachData($bytes, $name, ['mime' => $mime]);
