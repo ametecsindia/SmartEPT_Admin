@@ -41,4 +41,22 @@ class Company extends Model
     public function shifts()       { return $this->hasMany(Shift::class); }
     public function employees()    { return $this->hasMany(Employee::class); }
     public function users()        { return $this->hasMany(User::class); }
+
+    /**
+     * 09-Oct-2026 (Ejaz: one place per setting) — how long a screenshot / webcam photo FILE is
+     * kept. Audit & Ops → Retention is the only place; the Screenshot and Webcam policies'
+     * own retention fields are gone (they expired files on a different day than the purge
+     * deleted their rows). Same windows as smartept:purge; null = keep (auto-cleanup off).
+     */
+    public function mediaRetentionDays(bool $violationEvidence): ?int
+    {
+        if (! ($this->auto_cleanup_enabled ?? true)) {
+            return null;
+        }
+        $base = (int) ($this->data_retention_days ?: config('smartept.default_retention_days', 90));
+
+        return $violationEvidence && ($this->retention_keep_violation_evidence ?? true)
+            ? (int) ($this->retention_violation_days ?: $base)
+            : (int) ($this->retention_screenshots_days ?: $base);
+    }
 }

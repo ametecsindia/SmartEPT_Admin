@@ -140,9 +140,14 @@ class OrgController extends Controller
                 'end_time' => ['nullable', 'date_format:H:i:s'],
                 'grace_minutes' => ['nullable', 'integer', 'min:0'],
                 'working_days' => ['nullable', 'array'],
-                'break_minutes_allowed' => ['nullable', 'integer', 'min:0'],
+                // 09-Oct-2026 (Ejaz): every time rule lives on the shift only — per-type break
+                // limits (total = their sum) and the half-day minimum working hours.
+                'break_lunch_min' => ['nullable', 'integer', 'min:0', 'max:600'],
+                'break_tea_min' => ['nullable', 'integer', 'min:0', 'max:600'],
+                'break_other_min' => ['nullable', 'integer', 'min:0', 'max:600'],
+                'min_working_hours' => ['nullable', 'numeric', 'min:0', 'max:24'],
                 // 19-Aug-2026: minutes AFTER end_time at which an agent that never signed out is
-                // signed out by the server. null = inherit the attendance policy; 0 = at shift end.
+                // signed out by the server. null = never; 0 = at shift end.
                 // Capped at 12h so a typo cannot park a session open for a week.
                 'post_shift_auto_logout_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
                 // 26-Aug-2026: refuse AGENT sign-in outside [start_time, end_time + the

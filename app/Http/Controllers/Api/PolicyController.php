@@ -161,11 +161,13 @@ class PolicyController extends Controller
         // "Other" is stored as break_type CUSTOM; expose both keys so the agent maps cleanly.
         $company = Company::withoutGlobalScopes()->find($employee->company_id);
         if (is_array($bundle) && $company) {
+            // 09-Oct-2026: from the employee's SHIFT (the only place break limits are set).
+            $shift = $employee->shift ?? new \App\Models\Shift();
             $bundle['break_limits'] = [
-                'LUNCH'  => (int) ($company->break_limit_lunch_min ?? 30) * 60,
-                'TEA'    => (int) ($company->break_limit_tea_min ?? 10) * 60,
-                'OTHER'  => (int) ($company->break_limit_other_min ?? 10) * 60,
-                'CUSTOM' => (int) ($company->break_limit_other_min ?? 10) * 60,
+                'LUNCH'  => $shift->breakLimitMinutes('LUNCH') * 60,
+                'TEA'    => $shift->breakLimitMinutes('TEA') * 60,
+                'OTHER'  => $shift->breakLimitMinutes('OTHER') * 60,
+                'CUSTOM' => $shift->breakLimitMinutes('CUSTOM') * 60,
             ];
 
             // QA Phase 2 (A8): exit/uninstall lock. The agent receives ONLY a SHA-256 of

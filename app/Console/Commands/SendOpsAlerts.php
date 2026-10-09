@@ -164,7 +164,8 @@ class SendOpsAlerts extends Command
             if (empty($p['on'])) {
                 continue;
             }
-            $late = $late->filter(fn ($r) => $r->late_minutes >= (int) $p['minutes'])->sortByDesc('late_minutes');
+            // 09-Oct-2026 (Ejaz): late_minutes is already past the shift grace — no second threshold here.
+            $late = $late->sortByDesc('late_minutes');
 
             // 07-Oct-2026 (Ejaz): "The late employee" ticked → each late employee is told once a
             // day, on the first sweep after their late login (not held back to the list hour).

@@ -100,7 +100,7 @@ class ProductivityController extends Controller
             // 26-Aug-2026: crosses_midnight + post_shift_auto_logout_minutes are needed by row()
             // to bound a day that has no recorded sign-out (see the shift-end cap below).
             ->with(['department:id,name', 'team:id,name', 'reportingManager:id,name',
-                'shift:id,name,start_time,end_time,break_minutes_allowed,crosses_midnight,post_shift_auto_logout_minutes'])
+                'shift:id,name,start_time,end_time,break_lunch_min,break_tea_min,break_other_min,crosses_midnight,post_shift_auto_logout_minutes'])
             ->get()->keyBy('id');
 
         // Break counts + timeouts, grouped employee|date, for the whole range.
@@ -415,7 +415,7 @@ class ProductivityController extends Controller
             $red = [
                 'O' => ($x['break_exceed_seconds'] ?? 0) > 5 * 60,                               // break exceed > 5 min
                 'S' => $x['productivity'] !== null && (float) $x['productivity'] < 60,           // productivity < 60%
-                'T' => ($x['late_minutes'] ?? 0) > 15,                                           // late login > 15 min
+                'T' => ($x['late_minutes'] ?? 0) > 0,                                            // any late login (shift grace already applied)
             ];
             foreach (array_keys(array_filter($red)) as $c) {
                 $sheet->getStyle($c . $r)->getFont()->setBold(true)->getColor()->setRGB('D92D20');
@@ -496,7 +496,7 @@ class ProductivityController extends Controller
             ->with([
                 'branch:id,name', 'department:id,name', 'designation:id,name',
                 'team:id,name,team_leader_user_id', 'reportingManager:id,name',
-                'shift:id,name,start_time,end_time,break_minutes_allowed',
+                'shift:id,name,start_time,end_time,break_lunch_min,break_tea_min,break_other_min',
             ])->get()->keyBy('id');
 
         if ($employees->isEmpty()) {

@@ -85,8 +85,12 @@ class AgentStatusController extends Controller
             ->whereDate('idle_start', $today)->sum('duration_seconds');
         $idleSeconds = max($idleFromEvents, $idleFromLogs);
 
+        // 09-Oct-2026 (Ejaz): a door punch-out the employee never clicked a Break for is Away,
+        // not Break — the report already books it that way; the agent card now agrees.
         $breakSeconds = (int) EmployeeBreakLog::where('employee_id', $employee->id)
-            ->whereDate('start_at', $today)->sum('duration_seconds');
+            ->whereDate('start_at', $today)
+            ->whereNot(fn ($q) => $q->where('source', 'BIOMETRIC')->whereNull('device_uuid'))
+            ->sum('duration_seconds');
 
         // QA Phase 2 (A1/A2): the shown login time must never be blank right after a
         // login. Prefer the write-once first_login_at, then the earliest login session,

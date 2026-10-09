@@ -33,7 +33,7 @@ class ScheduledReports
     /** Max rows in each "Show only" list of the report email (keeps it under Gmail's ~100 KB clip). */
     private const VIEW_ROWS = 30;
     /** 08-Oct-2026 (Ejaz): late login counts from 10 minutes in the report email. */
-    private const LATE_MIN = 10;
+    private const LATE_MIN = 0; // 09-Oct-2026: any late minutes — the shift grace is already applied
     /** How many names in each of the Top / Bottom employee columns. */
     private const TOP_N = 5;
 
@@ -616,7 +616,7 @@ class ScheduledReports
             ['v-low', 'Productivity below 60%', $only($isLow)],
             ['v-break', 'Break exceeded (over 5 min)', $only($isBreak)],
             ['v-work', 'Working time under 6 hours', $only($isShort)],
-            ['v-late', 'Late login (over ' . self::LATE_MIN . ' min)', $only($isLate)],
+            ['v-late', 'Late login', $only($isLate)],
             ['v-idle', 'Idle time over 1 hour', $only($isIdle)],
         ];
         // Top / Bottom employees side by side, above the filters and tables.
@@ -774,7 +774,7 @@ td{padding:6px;border-bottom:1px solid #EDEAE2}.r{color:#D92D20;font-weight:700}
 <label><input type="checkbox" on="change:AMP.setState({ui: {low: event.checked}})"> Productivity below 60%</label>
 <label><input type="checkbox" on="change:AMP.setState({ui: {exc: event.checked}})"> Break exceeded</label>
 <label><input type="checkbox" on="change:AMP.setState({ui: {short: event.checked}})"> Working under 6 h</label>
-<label><input type="checkbox" on="change:AMP.setState({ui: {late: event.checked}})"> Late over 10 min</label>
+<label><input type="checkbox" on="change:AMP.setState({ui: {late: event.checked}})"> Late login</label>
 </div>
 <table><tr>{$th}</tr></table>
 <amp-list layout="fixed-height" height="{$height}" src="amp-state:rows" items="."
@@ -783,7 +783,7 @@ td{padding:6px;border-bottom:1px solid #EDEAE2}.r{color:#D92D20;font-weight:700}
 <table><tr><td style="width:18%"><b>{{name}}</b></td><td style="width:14%">{{dept}}</td><td style="width:5%">{{days}}</td><td style="width:8%">{{workT}}</td><td style="width:8%">{{idleT}}</td><td style="width:8%">{{brkT}}</td><td style="width:8%">{{awayT}}</td><td style="width:9%">{{prodT}}</td><td style="width:11%" class="{{pc}}">{{pctT}}</td><td style="width:11%" class="{{lc}}">{{late}}</td></tr></table>
 </template>
 </amp-list>
-<p class="m">{$n} employees · click a heading to sort (again to reverse) · Red = productivity below 60% / late login over 10 min.</p>
+<p class="m">{$n} employees · click a heading to sort (again to reverse) · Red = productivity below 60% / late login.</p>
 </div>
 </body>
 </html>

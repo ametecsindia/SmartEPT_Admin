@@ -21,6 +21,8 @@
     --accent:#006699;--accent-2:#1A8CC4;--accent-3:#4FB3E0;--accent-weak:#E0F0F8;--accent-ink:#00527A;
     --ok:#0A9464;--ok-w:#E3F6EE;--warn:#B7791F;--warn-w:#FBF3E2;--danger:#D22A4C;--danger-w:#FBE9ED;
     --info:#0B72C9;--info-w:#E6F1FB;--idle:#6D28D9;--idle-w:#F0EAFC;
+    /* 09-Oct-2026: one distinct colour per live status — cards, donut and table tags share them */
+    --brk:#0D9488;--brk-w:#E1F5F3;--away:#EA580C;--away-w:#FDEEE5;--meet:#C026D3;--meet-w:#FAE8FC;
     /* 05-Oct-2026: brand blue #006699, as on smartept.com */
     --navy:#003352;--navy-2:#00507A;
     --font-head:'Plus Jakarta Sans','Inter','Segoe UI',sans-serif;
@@ -139,6 +141,7 @@
 
   /* ---------- KPI cards ---------- */
   .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+  @media(min-width:1101px){#kpis{grid-template-columns:repeat(5,1fr)}} /* 9 live cards incl. Away */
   .kpi{background:var(--card);border:1px solid var(--border);border-radius:15px;padding:15px 16px;position:relative;
     overflow:hidden;box-shadow:var(--shadow-1);transition:transform .14s, box-shadow .14s}
   .kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow-2)}
@@ -150,9 +153,10 @@
   .k-total{--kc:var(--accent);--kc2:var(--accent-2);--kcw:var(--accent-weak)}
   .k-ok{--kc:var(--ok);--kc2:var(--ok);--kcw:var(--ok-w)}
   .k-idle{--kc:var(--idle);--kc2:var(--idle);--kcw:var(--idle-w)}
-  .k-away{--kc:var(--warn);--kc2:var(--warn);--kcw:var(--warn-w)}
+  .k-away{--kc:var(--away);--kc2:var(--away);--kcw:var(--away-w)}
+  .k-meet{--kc:var(--meet);--kc2:var(--meet);--kcw:var(--meet-w)}
   .k-off{--kc:var(--ink-3);--kc2:var(--ink-3);--kcw:#EDF1F4}
-  .k-break{--kc:var(--info);--kc2:var(--info);--kcw:var(--info-w)}
+  .k-break{--kc:var(--brk);--kc2:var(--brk);--kcw:var(--brk-w)}
   .k-cam{--kc:var(--danger);--kc2:var(--danger);--kcw:var(--danger-w)}
   .k-viol{--kc:var(--danger);--kc2:var(--danger);--kcw:var(--danger-w)}
   .k-shot{--kc:var(--warn);--kc2:var(--warn);--kcw:var(--warn-w)}   /* deep yellow */
@@ -248,6 +252,7 @@
   .t-off{background:#EDF1F4;color:var(--ink-3)}
   .t-danger{background:var(--danger-w);color:var(--danger)}
   .t-info{background:var(--info-w);color:var(--info)}
+  .t-brk{background:var(--brk-w);color:var(--brk)}.t-away{background:var(--away-w);color:var(--away)}.t-meet{background:var(--meet-w);color:var(--meet)}
   .clk{cursor:pointer}
   .clk:hover td{background:var(--accent-weak)!important}
   .btn{background:var(--card);border:1.5px solid var(--border);border-radius:9px;padding:7px 13px;font-size:12px;
@@ -392,6 +397,13 @@
   .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
   .fgrid .full{grid-column:1 / -1}
   .fbool{display:flex;align-items:center;gap:9px;padding:9px 2px 0;font-size:12.5px;color:var(--ink-2);font-weight:600}
+  /* 09-Oct-2026: form section headers — a clear tinted band, and darker field labels in the
+     Shift / Policy forms (the light grey read as disabled). */
+  .pol-sec{margin:18px 0 4px;padding:8px 12px;border-radius:8px;border-left:4px solid var(--accent);
+    background:var(--accent-weak);color:var(--accent-ink);font-size:12px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}
+  .fgrid > .pol-sec:first-child{margin-top:2px}
+  #pol-form .fbool{padding-top:4px;color:var(--ink)}
+  #org-form label,#pol-form label{color:var(--ink);font-size:12px}
   textarea{min-height:64px;resize:vertical;font-size:12px}
   .search{min-width:220px}
 
@@ -858,15 +870,6 @@
       <div class="card" id="co-tz-card">
         <h3>Company time zone <span class="hint">local day boundary for dashboards &amp; reports · individual branches can override below</span></h3>
         <div class="row"><select id="co-tz" style="max-width:280px"></select><button class="btn solid" id="co-tz-save">Save</button><span class="mut" id="co-tz-msg"></span></div>
-      </div>
-      <div class="card" id="co-break-card">
-        <h3>Break time limits <span class="hint">permitted minutes per break — the agent asks the employee for a reason when a break runs over</span></h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;max-width:460px">
-          <div><label>Lunch (min)</label><input id="brk-lunch" type="number" min="1" max="600" value="30"></div>
-          <div><label>Tea (min)</label><input id="brk-tea" type="number" min="1" max="600" value="10"></div>
-          <div><label>Other (min)</label><input id="brk-other" type="number" min="1" max="600" value="10"></div>
-        </div>
-        <div class="row" style="margin-top:10px"><button class="btn solid" id="brk-save">Save</button><span class="mut" id="brk-msg"></span></div>
       </div>
       <div class="card" id="co-track-card">
         <h3>Tracking mode — company default <span class="hint">applies to everyone unless a branch, department, team, designation or employee sets its own</span></h3>
@@ -3388,9 +3391,9 @@ let DASH_FILTER = null; // active KPI filter: null | 'all' | work_status | 'BREA
 // QA Phase 1 (B2/B3/B15): the live board is driven by the authoritative status_timeline
 // work_status, so each employee sits in exactly one category and a break widget opens the
 // SAME filtered list as Active/Idle (never the Attendance tab).
-const WORK_TAG = { ACTIVE: 't-ok', IDLE: 't-idle', TEA_BREAK: 't-info', LUNCH_BREAK: 't-info', OTHER_BREAK: 't-info', MEETING: 't-warn', OFFLINE: 't-off' };
-const WORK_LABEL = { ACTIVE: 'Active', IDLE: 'Idle', TEA_BREAK: 'Tea break', LUNCH_BREAK: 'Lunch', OTHER_BREAK: 'Other break', MEETING: 'Meeting', OFFLINE: 'Offline', BREAK: 'On break' };
-const WORK_KCLS = { ACTIVE: 'k-ok', IDLE: 'k-idle', BREAK: 'k-break', TEA_BREAK: 'k-break', LUNCH_BREAK: 'k-break', OTHER_BREAK: 'k-break', MEETING: 'k-away', OFFLINE: 'k-off' };
+const WORK_TAG = { ACTIVE: 't-ok', IDLE: 't-idle', TEA_BREAK: 't-brk', LUNCH_BREAK: 't-brk', OTHER_BREAK: 't-brk', AWAY: 't-away', MEETING: 't-meet', OFFLINE: 't-off' };
+const WORK_LABEL = { ACTIVE: 'Active', IDLE: 'Idle', TEA_BREAK: 'Tea break', LUNCH_BREAK: 'Lunch', OTHER_BREAK: 'Other break', AWAY: 'Away', MEETING: 'Meeting', OFFLINE: 'Offline', BREAK: 'On break' };
+const WORK_KCLS = { ACTIVE: 'k-ok', IDLE: 'k-idle', BREAK: 'k-break', TEA_BREAK: 'k-break', LUNCH_BREAK: 'k-break', OTHER_BREAK: 'k-break', AWAY: 'k-away', MEETING: 'k-meet', OFFLINE: 'k-off' };
 const isBreakWS = (s) => s === 'TEA_BREAK' || s === 'LUNCH_BREAK' || s === 'OTHER_BREAK';
 function renderLiveRows() {
   const f = DASH_FILTER;
@@ -3417,7 +3420,7 @@ function renderLiveRows() {
     const cls = WORK_TAG[ws] || 't-off';
     const lbl = WORK_LABEL[ws] || ws;
     // Break / meeting rows carry their start time + running elapsed (B2/B3).
-    const onBreak = isBreakWS(ws) || ws === 'MEETING';
+    const onBreak = isBreakWS(ws) || ws === 'MEETING' || ws === 'AWAY'; // Away = door punch-out, no Break clicked
     const extra = (onBreak && e.break_started_at)
       ? ' <span class="mut" style="font-size:11px">since ' + t(e.break_started_at) + ' · ' + secH(e.elapsed) + '</span>'
       : '';
@@ -3449,7 +3452,8 @@ async function loadDashboard() {
       ['Active', c.active, 'k-ok', 'ACTIVE'],
       ['Idle', c.idle, 'k-idle', 'IDLE'],
       ['On break', c.break_total, 'k-break', 'BREAK', 'Tea ' + (c.break_tea || 0) + ' · Lunch ' + (c.break_lunch || 0) + ' · Other ' + (c.break_other || 0)],
-      ['In meeting', c.meeting, 'k-away', 'MEETING'],
+      ['Away', c.away || 0, 'k-away', 'AWAY', 'Punched out, no break'],
+      ['In meeting', c.meeting, 'k-meet', 'MEETING'],
       ['Offline', c.offline_count, 'k-off', 'OFFLINE'],
       ['Violations today', c.violations_today, 'k-viol', 'view:violations'],
       ['Screenshots', c.screenshots_today, 'k-shot', 'view:screenshots'],
@@ -3467,9 +3471,9 @@ async function loadDashboard() {
         + '<div class="kside"><div class="l">' + esc(l) + '</div>' + subLine + '</div>'
         + '<div class="kmain"><span class="go">' + go + '</span><div class="v">' + (v ?? 0) + '</div></div></div>';
     }).join('');
-    // 05-Oct-2026: the donut uses the SAME colours as the status tiles above it (.k-ok / .k-idle / .k-break / .k-away / .k-off).
+    // The donut uses the SAME colours as the status cards above it (.k-ok / .k-idle / .k-break / .k-away / .k-meet / .k-off).
     const cv = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-    const wf = [['Active', c.active, cv('--ok')], ['Idle', c.idle, cv('--idle')], ['On break', c.break_total, cv('--info')], ['Meeting', c.meeting, cv('--warn')], ['Offline', c.offline_count, cv('--ink-3')]];
+    const wf = [['Active', c.active, cv('--ok')], ['Idle', c.idle, cv('--idle')], ['On break', c.break_total, cv('--brk')], ['Away', c.away || 0, cv('--away')], ['Meeting', c.meeting, cv('--meet')], ['Offline', c.offline_count, cv('--ink-3')]];
     const wfTotal = c.total_employees || wf.reduce((a, [, v]) => a + (v || 0), 0);
     $('#wf-donut').innerHTML = svgDonut(wf.map(([label, value, color]) => ({ label, value: value || 0, color })), wfTotal);
     $('#wf-leg').innerHTML = wf.map(([l, v, col]) => '<div class="r"><span class="dot" style="background:' + col + '"></span><span class="nm">' + l + '</span><span class="ct">' + (v || 0) + '</span><span class="pc">' + (wfTotal ? Math.round((v || 0) / wfTotal * 100) : 0) + '%</span></div>').join('');
@@ -4565,7 +4569,10 @@ const ORG_DEFS = {
   designations: { label: 'Designation', cols: ['name','code','level'],
                   fields: [['name','Name','text',1],['code','Code','text'],['level','Level (0=junior)','num'],['tracking_mode','Tracking mode for this designation','trackmode']] },
   shifts:       { label: 'Shift',       cols: ['name','code','timing'],
-                  fields: [['name','Name','text',1],['code','Code','text'],['start_time','Start (HH:MM)','time'],['end_time','End (HH:MM)','time'],['grace_minutes','Grace (min)','num'],['break_minutes_allowed','Break allowed (min)','num'],['post_shift_auto_logout_minutes','Auto sign-out after shift end (min) — blank = never','num'],['restrict_login_to_shift','Block agent sign-in outside these hours (the SmartEPT agent only — never the admin console)','yesno',1],['enforcement_mode','App/Web enforcement for this shift','enfmode',1]] },
+                  // 09-Oct-2026 (Ejaz): three clear sections — timings, breaks, then sign-in / sign-out options.
+                  fields: [['_s1','Shift timings','sec'],['name','Name','text',1],['code','Code','text'],['grace_minutes','Late grace (min)','num'],['start_time','Start (HH:MM)','time'],['end_time','End (HH:MM)','time'],['min_working_hours','Minimum working hours — half-day = half of this (blank = shift length)','num',1],
+                           ['_s2','Breaks — minutes allowed per break · total = allotted break in reports','sec'],['_brk','','group',[['break_lunch_min','Lunch (blank = 30)','num'],['break_tea_min','Tea (blank = 10)','num'],['break_other_min','Other (blank = 10)','num']]],
+                           ['_s3','Sign-in & sign-out','sec'],['post_shift_auto_logout_minutes','Auto sign-out after shift end (min) — blank = never','num',1],['restrict_login_to_shift','Block agent sign-in outside these hours (the SmartEPT agent only — never the admin console)','yesno',1],['enforcement_mode','App/Web enforcement for this shift','enfmode',1]] },
 };
 let ORG_TAB = 'branches';
 async function initOrg() {
@@ -4602,32 +4609,6 @@ async function initOrg() {
         } catch (e) { $('#co-tz-msg').textContent = '✕ ' + e.message; }
       };
     }
-  }
-  if (!window.COBRK_INIT) {
-    window.COBRK_INIT = true;
-    // Section 3: load & save this company's break-time limits.
-    (async () => {
-      try {
-        const c = (await api('/companies/' + ME.company_id)).data;
-        if (c) {
-          if (c.break_limit_lunch_min) $('#brk-lunch').value = c.break_limit_lunch_min;
-          if (c.break_limit_tea_min) $('#brk-tea').value = c.break_limit_tea_min;
-          if (c.break_limit_other_min) $('#brk-other').value = c.break_limit_other_min;
-        }
-      } catch (e) { /* keep defaults */ }
-    })();
-    $('#brk-save').onclick = async () => {
-      const body = {
-        break_limit_lunch_min: Math.max(1, parseInt($('#brk-lunch').value, 10) || 30),
-        break_limit_tea_min: Math.max(1, parseInt($('#brk-tea').value, 10) || 10),
-        break_limit_other_min: Math.max(1, parseInt($('#brk-other').value, 10) || 10),
-      };
-      try {
-        await api('/companies/' + ME.company_id, { method: 'PUT', body: JSON.stringify(body) });
-        toast('Break limits saved');
-        $('#brk-msg').textContent = '✓ Saved.';
-      } catch (e) { $('#brk-msg').textContent = '✕ ' + e.message; }
-    };
   }
   if (!window.COTRACK_INIT) {
     window.COTRACK_INIT = true;
@@ -4747,6 +4728,9 @@ function orgOpen(row) {
   $('#org-m-title').textContent = (row ? 'Edit ' : 'Add ') + def.label;
   $('#org-err').textContent = '';
   $('#org-form').innerHTML = '<div class="fgrid">' + def.fields.map((f) => {
+    if (f[2] === 'sec') return '<div class="full pol-sec">' + esc(f[1]) + '</div>';
+    if (f[2] === 'group') return '<div class="full" style="display:grid;grid-template-columns:repeat(' + f[3].length + ',1fr);gap:0 16px">'
+      + f[3].map((g) => '<div>' + orgField(g, row ? row[g[0]] : '') + '</div>').join('') + '</div>';
     let v = row ? row[f[0]] : '';
     if ((f[2] === 'time') && v) v = String(v).slice(0,5);
     return '<div class="' + (f[3] ? 'full' : '') + '">' + orgField(f, v) + '</div>';
@@ -5799,12 +5783,25 @@ function lvWallRender() {
 }
 
 // ---- 7. policies ----
+// 09-Oct-2026 (Ejaz: every setting in ONE place). Gone from here: Application + Website (edited in
+// App & Web Rules), Break + Attendance (late grace, breaks, half-day, auto sign-out are on the Shift).
+// 09-Oct-2026 (Ejaz): HIDDEN, not removed — Network, Device compliance, USB and VPN / Proxy policies
+// are read by neither the server nor the agent, so setting them did nothing. Re-list a type here
+// once something actually enforces it.
 const POLICY_TYPES = [
   ['monitoring', 'Monitoring (master)'], ['screenshot', 'Screenshot'], ['webcam', 'Webcam presence'],
-  ['application', 'Application'], ['website', 'Website'], ['network', 'Network'],
-  ['device', 'Device compliance'], ['usb', 'USB'], ['vpn_proxy', 'VPN / Proxy'],
-  ['break', 'Break'], ['attendance', 'Attendance'],
 ];
+// Same rule for single fields: nothing reads these yet, so they are hidden (stored values are kept —
+// the inputs still exist, just not shown, so a save writes them back unchanged).
+const HIDDEN_POLICY_FIELDS = new Set([
+  'monitoring.tracking_interval_seconds', 'monitoring.network_compliance_enabled', 'monitoring.usb_tracking_enabled',
+  'monitoring.vpn_proxy_detection_enabled', 'monitoring.remote_access_detection_enabled',
+  'monitoring.employee_status_visible', 'monitoring.is_active',
+  'screenshot.random_enabled', 'screenshot.on_violation', 'screenshot.during_idle', 'screenshot.active_work_only',
+  'screenshot.blur_sensitive', 'screenshot.excluded_apps', 'screenshot.excluded_websites',
+  'webcam.photo_enabled', 'webcam.photo_on_violation', 'webcam.photo_on_attendance',
+  'webcam.face_confidence_threshold', 'webcam.camera_blocked_threshold_seconds', 'webcam.multiple_face_threshold_seconds',
+]);
 // Field schemas mirror the policy table columns (see policy migrations).
 // t: text | bool | num | dec | time | select | list (comma-separated → JSON array) | json (raw JSON object)
 const POLICY_FIELDS = {
@@ -5812,13 +5809,8 @@ const POLICY_FIELDS = {
     { k: 'name', l: 'Policy name', t: 'text', full: 1 },
     { k: 'description', l: 'Description', t: 'text', full: 1 },
     { k: 'tracking_enabled', l: 'Tracking enabled', t: 'bool' },
-    { k: 'working_hours_only', l: 'Track working hours only', t: 'bool' },
-    { k: 'working_start', l: 'Working start', t: 'time' },
-    { k: 'working_end', l: 'Working end', t: 'time' },
     { k: 'tracking_interval_seconds', l: 'Tracking interval (sec)', t: 'num' },
     { k: 'idle_threshold_seconds', l: 'Idle threshold (sec)', t: 'num' },
-    { k: 'away_threshold_seconds', l: 'Away threshold (sec)', t: 'num' },
-    { k: 'data_retention_days', l: 'Data retention (days)', t: 'num' },
     { k: 'app_usage_enabled', l: 'App usage tracking', t: 'bool' },
     { k: 'website_usage_enabled', l: 'Website usage tracking', t: 'bool' },
     { k: 'network_compliance_enabled', l: 'Network compliance', t: 'bool' },
@@ -5841,7 +5833,6 @@ const POLICY_FIELDS = {
     { k: 'during_idle', l: 'Capture during idle', t: 'bool' },
     { k: 'active_work_only', l: 'Active work only', t: 'bool' },
     { k: 'blur_sensitive', l: 'Blur sensitive areas', t: 'bool' },
-    { k: 'retention_days', l: 'Retention (days)', t: 'num' },
     { k: 'excluded_apps', l: 'Excluded apps (comma-separated)', t: 'list', full: 1 },
     { k: 'excluded_websites', l: 'Excluded websites (comma-separated)', t: 'list', full: 1 },
   ],
@@ -5849,14 +5840,12 @@ const POLICY_FIELDS = {
     { k: 'name', l: 'Policy name', t: 'text', full: 1 },
     { k: 'presence_enabled', l: 'Presence detection (yes/no signal)', t: 'bool' },
     { k: 'photo_enabled', l: 'Presence photos', t: 'bool' },
-    { k: 'photo_interval_seconds', l: 'Photo interval (sec)', t: 'num' },
+    { k: 'photo_interval_seconds', l: 'Presence check interval (sec) — camera is opened only for each check, then released (default 60)', t: 'num' },
     { k: 'photo_on_violation', l: 'Photo on violation', t: 'bool' },
     { k: 'photo_on_attendance', l: 'Photo on attendance', t: 'bool' },
     { k: 'face_confidence_threshold', l: 'Face confidence (0–1)', t: 'dec' },
-    { k: 'away_threshold_seconds', l: 'Away threshold (sec)', t: 'num' },
     { k: 'camera_blocked_threshold_seconds', l: 'Camera-blocked threshold (sec)', t: 'num' },
     { k: 'multiple_face_threshold_seconds', l: 'Multiple-face threshold (sec)', t: 'num' },
-    { k: 'photo_retention_days', l: 'Photo retention (days)', t: 'num' },
   ],
   application: [
     { k: 'name', l: 'Policy name', t: 'text', full: 1 },
@@ -5911,7 +5900,6 @@ const POLICY_FIELDS = {
   ],
   attendance: [
     { k: 'name', l: 'Policy name', t: 'text', full: 1 },
-    { k: 'late_grace_minutes', l: 'Late grace (min)', t: 'num' },
     { k: 'early_logout_grace_minutes', l: 'Early-logout grace (min)', t: 'num' },
     { k: 'min_working_hours', l: 'Minimum working hours', t: 'num' },
     // 19-Aug-2026: the fallback used when a Shift leaves its own auto sign-out blank.
@@ -5954,12 +5942,20 @@ function renderPolicyForm(type, policy) {
   const label = (POLICY_TYPES.find((p) => p[0] === type) || [type, type])[1];
   $('#pol-form-title').textContent = (policy ? 'Edit "' + policy.name + '" (v' + (policy.version ?? 1) + ' → v' + ((policy.version ?? 1) + 1) + ' on save)' : 'Create ' + label + ' policy');
   $('#pol-err').textContent = '';
-  $('#pol-form').innerHTML = (POLICY_FIELDS[type] || []).map((f, i) => {
+  // 09-Oct-2026: tidy layout — text / number / list fields first, then every on/off switch together
+  // under one "Options" heading, so a checkbox never sits beside an input box on the same row.
+  const allF = POLICY_FIELDS[type] || [];
+  const shown = (f) => !HIDDEN_POLICY_FIELDS.has(type + '.' + f.k);
+  const bools = allF.filter((f) => f.t === 'bool');
+  const ordered = allF.filter((f) => f.t !== 'bool').concat(bools);
+  const firstBool = bools.find(shown);
+  $('#pol-form').innerHTML = ordered.map((f, i) => {
     const v = policy ? policy[f.k] : undefined;
-    const wrap = (inner) => '<div' + (f.full ? ' class="full"' : '') + '>' + inner + '</div>';
+    const wrap = (inner) => '<div' + (f.full ? ' class="full"' : '') + (HIDDEN_POLICY_FIELDS.has(type + '.' + f.k) ? ' style="display:none"' : '') + '>' + inner + '</div>';
     const id = 'pf-' + f.k;
     if (f.t === 'bool') {
-      return wrap('<div class="fbool"><input type="checkbox" id="' + id + '"' + (v ? ' checked' : '') + '><label for="' + id + '" style="margin:0;cursor:pointer">' + esc(f.l) + '</label></div>');
+      return (f === firstBool ? '<div class="full pol-sec">Options</div>' : '')
+        + wrap('<div class="fbool"><input type="checkbox" id="' + id + '"' + (v ? ' checked' : '') + '><label for="' + id + '" style="margin:0;cursor:pointer">' + esc(f.l) + '</label></div>');
     }
     if (f.t === 'select') {
       return wrap('<label>' + esc(f.l) + '</label><select id="' + id + '">'
@@ -7828,9 +7824,9 @@ $('#pr-rows').addEventListener('click', async (ev) => {
 const PR_RULES = {
   breakExceed: (x) => (x.break_exceed_seconds || 0) > 5 * 60,           // break exceeded by more than 5 min
   lowProd: (x) => x.productivity != null && Number(x.productivity) < 60,  // productivity below 60%
-  late: (x) => (x.late_minutes || 0) > 15,                                // late login more than 15 min
+  late: (x) => (x.late_minutes || 0) > 0,                                 // any late login — the shift grace is already applied
 };
-const PR_LEGEND = 'Break exceed over 5 min · Productivity below 60% · Late login over 15 min';
+const PR_LEGEND = 'Break exceed over 5 min · Productivity below 60% · Late login (after shift start + shift grace)';
 const PR_RED = (on) => (on ? ' style="color:#D92D20;font-weight:700"' : '');
 // R4 item 6: extracted reports use hh:mm, not raw seconds/minutes.
 const hhmm = (sec) => { const m = Math.max(0, Math.round((sec || 0) / 60)); return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
@@ -9351,7 +9347,7 @@ const NT_CO = [
   { k: 'violation_spike', name: 'Violations', what: 'Rule violations in your company within one hour. At most one email per hour.',
     when: (p) => 'When <input type="number" min="1" data-f="threshold" value="' + p.threshold + '" style="width:70px"> or more in 1 hour' },
   { k: 'late_login', name: 'Late logins', what: 'One list per day of employees who logged in late. Tick "The late employee" to also tell each late employee (once a day, soon after they sign in).', emp: true,
-    when: (p) => 'More than <input type="number" min="1" data-f="minutes" value="' + p.minutes + '" style="width:60px"> min late — sent at ' + NT_HOURS('hour', p.hour) },
+    when: (p) => 'Late past shift start + shift grace — sent at ' + NT_HOURS('hour', p.hour) },
   { k: 'gate_long_break', name: 'Long out-of-office break', what: 'The biometric door shows an employee stayed out too long.',
     when: (p) => 'Break longer than <input type="number" min="0.1" max="24" step="0.1" data-f="hours" value="' + p.hours + '" style="width:60px"> hours' },
   { k: 'security_alert', name: 'Endpoint security', what: 'A PC lost antivirus / real-time protection / firewall, has outdated signatures, or Defender found a threat. Sent once when a problem starts (Enforcer & Commander).',

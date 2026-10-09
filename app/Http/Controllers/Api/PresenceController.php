@@ -92,7 +92,8 @@ class PresenceController extends Controller
         $storageFileId = null;
         if ($request->hasFile('image')) {
             abort_if(empty($webcam['photo_enabled']), 403, 'Webcam photo capture is not enabled by policy.');
-            $file = $storage->storeUpload($request->file('image'), $employee->company_id, $employee->id, 'WEBCAM_PHOTO', $webcam['photo_retention_days'] ?? null);
+            $file = $storage->storeUpload($request->file('image'), $employee->company_id, $employee->id, 'WEBCAM_PHOTO',
+                \App\Models\Company::withoutGlobalScopes()->find($employee->company_id)?->mediaRetentionDays(false));
             $storageFileId = $file->id;
         }
 

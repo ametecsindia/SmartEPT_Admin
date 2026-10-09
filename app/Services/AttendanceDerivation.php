@@ -29,7 +29,7 @@ use Illuminate\Support\Collection;
  */
 class AttendanceDerivation
 {
-    public function __construct(private GateService $gate, private PolicyResolver $policies) {}
+    public function __construct(private GateService $gate) {}
 
     /**
      * Recompute the derived summary for one employee/day from raw punches + the
@@ -181,21 +181,9 @@ class AttendanceDerivation
             return null;
         }
 
-        // EPT25-01: honour the "Late grace (min)" the admin set on the effective
-        // Attendance policy (Policy tab). Falls back to the shift grace when no
-        // attendance policy is assigned, so existing behaviour is preserved.
-        $graceMinutes = null;
-        try {
-            $attPolicy = $this->policies->resolvePolicy($employee, 'ATTENDANCE');
-            if ($attPolicy !== null
-                && array_key_exists('late_grace_minutes', $attPolicy)
-                && $attPolicy['late_grace_minutes'] !== null) {
-                $graceMinutes = (int) $attPolicy['late_grace_minutes'];
-            }
-        } catch (\Throwable $e) {
-            $graceMinutes = null; // never let policy lookup break derivation
-        }
-        $graceMinutes ??= (int) ($shift->grace_minutes ?? 0);
+        // 09-Oct-2026 (Ejaz): late grace lives ONLY on the shift. The Attendance policy's
+        // "Late grace" silently overrode it (40 min while the shift said 10) — removed.
+        $graceMinutes = (int) ($shift->grace_minutes ?? 0);
 
         $permitted = Carbon::parse($date . ' ' . $shift->start_time)->addMinutes($graceMinutes);
         $minutes = $effective->greaterThan($permitted) ? (int) $effective->diffInMinutes($permitted, true) : 0;
@@ -221,9 +209,11 @@ class AttendanceDerivation
             default:
                 $gated = $company ? $this->gate->enabledFor($company) : false;
                 if ($gated) {
-                    // Later of the two when the door actually gates the day.
-                    $later = $this->maxCarbon([$agentLogin, $bioIn]);
-                    return [$later, 'LATER_OF_BOTH'];
+                    // 09-Oct-2026 (Ejaz: punched 09:28 for a 09:30 shift, mailed "28 min late"):
+                    // on a gated site the DOOR IN is the arrival. The PC sign-in waits on the
+                    // gate, and eTimeOffice delivers punches 20–27 min late, so "later of both"
+                    // charged the employee for our sync lag. Gate→PC time is reported separately.
+                    return [$bioIn ?: $agentLogin, $bioIn ? 'BIOMETRIC_IN' : 'AGENT_LOGIN'];
                 }
                 // No biometric gate → the agent login is the arrival (door is advisory).
                 return [$agentLogin ?: $bioIn, $agentLogin ? 'AGENT_LOGIN' : 'BIOMETRIC_IN'];
@@ -350,18 +340,6 @@ class AttendanceDerivation
         }
 
         return [$best, $label];
-    }
-
-    private function maxCarbon(array $times): ?Carbon
-    {
-        $best = null;
-        foreach ($times as $t) {
-            if ($t && (! $best || $t->greaterThan($best))) {
-                $best = $t;
-            }
-        }
-
-        return $best;
     }
 
     private function differs(?Carbon $a, ?Carbon $b): bool

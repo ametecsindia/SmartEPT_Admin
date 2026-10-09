@@ -21,6 +21,28 @@ class Shift extends Model
     public function employees() { return $this->hasMany(Employee::class); }
 
     /**
+     * 09-Oct-2026 (Ejaz: one place for every setting) — break limits live on the SHIFT, per
+     * type. The agent's over-limit reason, the server's break-exceed check and the report's
+     * Allotted break all read these; the Organisation break-limit card is gone.
+     * "Other" is stored as break_type CUSTOM. Unset = 30 / 10 / 10 (the old company default).
+     */
+    public function breakLimitMinutes(?string $type): ?int
+    {
+        return match (strtoupper((string) $type)) {
+            'LUNCH'           => (int) ($this->break_lunch_min ?? 30),
+            'TEA'             => (int) ($this->break_tea_min ?? 10),
+            'OTHER', 'CUSTOM' => (int) ($this->break_other_min ?? 10),
+            default           => null, // BIO / TRAINING / PRAYER / MEETING have no limit
+        };
+    }
+
+    /** Allotted break for the day = Lunch + Tea + Other — no separate total to disagree with. */
+    public function getBreakMinutesAllowedAttribute($value): int
+    {
+        return $this->breakLimitMinutes('LUNCH') + $this->breakLimitMinutes('TEA') + $this->breakLimitMinutes('OTHER');
+    }
+
+    /**
      * May an agent sign-in be accepted at this wall-clock instant? (Ejaz, 26-Aug-2026 —
      * the AGENT app only; the admin console never reaches this code.)
      *

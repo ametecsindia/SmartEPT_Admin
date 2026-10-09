@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Company;
 use App\Models\EmployeeBreakLog;
 use App\Services\ConflictingStatusException;
 use App\Services\OutboundPusher;
@@ -113,16 +112,15 @@ class BreakController extends Controller
         // recomputes the permitted vs actual duration authoritatively (Section 3 — never
         // trust the UI alone) and records the excess + the reason. A break that ran over
         // its limit with NO reason is flagged PENDING for the admin to chase.
-        $company = Company::withoutGlobalScopes()->find($employee->company_id);
         $reason = trim((string) ($data['delay_reason'] ?? ''));
         $overWithoutReason = [];
 
         $closed = 0;
         EmployeeBreakLog::where('employee_id', $employee->id)
             ->whereNull('end_at')->get()
-            ->each(function ($o) use ($at, &$closed, $company, $reason, &$overWithoutReason) {
+            ->each(function ($o) use ($at, &$closed, $employee, $reason, &$overWithoutReason) {
                 $dur = $o->start_at ? (int) $at->diffInSeconds($o->start_at, true) : null;
-                $permitted = $this->permittedSecondsFor($company, $o->break_type);
+                $permitted = $this->permittedSecondsFor($employee, $o->break_type);
                 $excess = ($permitted && $dur !== null) ? max(0, $dur - $permitted) : 0;
 
                 $update = [
@@ -188,20 +186,11 @@ class BreakController extends Controller
         } catch (\Throwable $e) { /* relay is never allowed to fail the break */ }
     }
 
-    /** Section 3: permitted seconds for a break type, from this company's limits. */
-    private function permittedSecondsFor(?Company $company, ?string $type): ?int
+    /** Permitted seconds for a break type — from the employee's SHIFT (09-Oct-2026: the only place). */
+    private function permittedSecondsFor($employee, ?string $type): ?int
     {
-        if (! $company) {
-            return null;
-        }
-        // "Other" is stored as CUSTOM. BIO/TRAINING/PRAYER/MEETING have no break limit.
-        $min = match ($type) {
-            'LUNCH'  => $company->break_limit_lunch_min ?? 30,
-            'TEA'    => $company->break_limit_tea_min ?? 10,
-            'CUSTOM' => $company->break_limit_other_min ?? 10,
-            default  => null,
-        };
+        $min = ($employee->shift ?? new \App\Models\Shift())->breakLimitMinutes($type);
 
-        return $min !== null ? (int) $min * 60 : null;
+        return $min !== null ? $min * 60 : null;
     }
 }

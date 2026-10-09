@@ -189,6 +189,7 @@ class StatusService
                     'started_at'  => $s->started_at,
                     'meeting_id'  => $s->meeting_id,
                     'device_uuid' => $s->device_uuid,
+                    'source'      => $s->source, // BIOMETRIC = door punch-out, no Break clicked → Away
                 ];
             });
 

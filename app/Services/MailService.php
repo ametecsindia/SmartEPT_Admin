@@ -131,7 +131,7 @@ class MailService
             'body' => "SmartEPT recorded {total} compliance violations in the last hour — above your alert limit of {threshold}.\n\nA spike usually means a policy change that is too strict, one team testing limits, or a misconfigured application/website rule. Open the console → Violations to see who and what, and → Usage & Compliance for the day's detail.\n\n— SmartEPT"],
         'late_login' => ['vars' => ['date', 'minutes', 'count', 'list'],
             'subject' => 'SmartEPT: late logins today — {date}',
-            'body' => "These employees logged in more than {minutes} minutes late today ({date}):\n\n{list}\n\nOpen the console → Attendance for the full day.\n\n— SmartEPT"],
+            'body' => "These employees logged in late today ({date}), after their shift start + shift grace:\n\n{list}\n\nOpen the console → Attendance for the full day.\n\n— SmartEPT"],
         // 07-Oct-2026: to the late employee themselves (email and/or SmartEPT agent popup).
         'late_login_employee' => ['vars' => ['name', 'date', 'late', 'check_in'],
             'subject' => 'Late login — {date}',

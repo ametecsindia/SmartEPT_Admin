@@ -2,11 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Models\AttendancePolicy;
 use App\Models\Employee;
 use App\Models\EmployeeAttendanceLog;
 use App\Models\EmployeeLoginSession;
-use App\Models\PolicyAssignment;
 use App\Services\WorkCalendar;
 use App\Support\ResolvesLocalNow;
 use Illuminate\Console\Command;
@@ -33,8 +31,6 @@ class MarkAttendance extends Command
     /** Cap for auto-closed sessions: an agent that died on Friday must not credit a whole weekend. */
     private const MAX_AUTO_SESSION_SECONDS = 16 * 3600;
 
-    /** company_id => min working seconds from the company AttendancePolicy (null = none assigned). */
-    private array $minSecondsCache = [];
 
     public function handle(WorkCalendar $calendar, \App\Services\AttendanceDerivation $derivation): int
     {
@@ -244,35 +240,16 @@ class MarkAttendance extends Command
     }
 
     /**
-     * Half-day cut-off = half the expected full day. The company AttendancePolicy's
-     * min_working_hours (when one is assigned) overrides the shift span; employees
-     * without a shift default to 8h — mirrors ScoringService::expectedSeconds().
+     * Half-day cut-off = half the expected full day: the shift's "Minimum working hours"
+     * when set (09-Oct-2026, Ejaz: shift only — the Attendance policy no longer overrides),
+     * else the shift span; no shift = 8h — mirrors ScoringService::expectedSeconds().
      */
     private function halfDayThresholdSeconds(Employee $employee): int
     {
-        $full = $this->companyMinWorkingSeconds($employee->company_id) ?? $this->expectedSeconds($employee);
+        $min = (float) ($employee->shift?->min_working_hours ?? 0);
+        $full = $min > 0 ? (int) round($min * 3600) : $this->expectedSeconds($employee);
 
         return (int) floor($full / 2);
-    }
-
-    private function companyMinWorkingSeconds(int $companyId): ?int
-    {
-        if (! array_key_exists($companyId, $this->minSecondsCache)) {
-            $assignment = PolicyAssignment::withoutGlobalScopes()
-                ->where('company_id', $companyId)
-                ->where('policy_type', 'ATTENDANCE')
-                ->where('assignable_type', 'COMPANY')
-                ->where('assignable_id', $companyId)
-                ->first();
-
-            $policy = $assignment ? AttendancePolicy::withoutGlobalScopes()->find($assignment->policy_id) : null;
-
-            $this->minSecondsCache[$companyId] = ($policy && (int) $policy->min_working_hours > 0)
-                ? (int) $policy->min_working_hours * 3600
-                : null;
-        }
-
-        return $this->minSecondsCache[$companyId];
     }
 
     private function expectedSeconds(Employee $employee): int

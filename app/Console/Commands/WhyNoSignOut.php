@@ -251,14 +251,10 @@ class WhyNoSignOut extends Command
         return self::SUCCESS;
     }
 
-    /** Identical resolution to AutoLogoutPostShift: shift wins, assigned policy is the fallback. */
+    /** Identical resolution to AutoLogoutPostShift: the shift only. */
     private function resolveMinutes(Employee $employee, PolicyResolver $resolver): ?int
     {
         $minutes = $employee->shift?->post_shift_auto_logout_minutes;
-
-        if ($minutes === null) {
-            $minutes = $resolver->resolvePolicy($employee, 'ATTENDANCE')['post_shift_auto_logout_minutes'] ?? null;
-        }
 
         return $minutes === null ? null : max(0, (int) $minutes);
     }

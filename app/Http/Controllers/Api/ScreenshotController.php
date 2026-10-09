@@ -63,15 +63,16 @@ class ScreenshotController extends Controller
             409, 'Storage is full — new screenshots are paused until space is freed. Activity tracking continues.'
         );
 
+        $trigger = $data['trigger_reason'] ?? 'INTERVAL';
+
         $file = $storage->storeUpload(
             $request->file('image'),
             $employee->company_id,
             $employee->id,
             'SCREENSHOT',
-            $shot['retention_days'] ?? null
+            \App\Models\Company::withoutGlobalScopes()->find($employee->company_id)
+                ?->mediaRetentionDays(in_array($trigger, ['VIOLATION', 'BLOCKED_APP', 'BLOCKED_SITE'], true))
         );
-
-        $trigger = $data['trigger_reason'] ?? 'INTERVAL';
 
         $log = EmployeeScreenshotLog::create([
             'company_id'          => $employee->company_id,

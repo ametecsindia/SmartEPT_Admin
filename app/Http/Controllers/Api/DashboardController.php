@@ -102,6 +102,11 @@ class DashboardController extends Controller
                 // Breaks and meetings are explicit, one-off transitions — the timeline is right.
                 $work = $seg['state'];
                 $breakStart = $seg['started_at'];
+                // 09-Oct-2026 (Ejaz): door punch-out with no Break clicked is Away, not "Other
+                // break" — same rule the Productivity report has used since 28-Sep.
+                if ($work === 'OTHER_BREAK' && ($seg['source'] ?? null) === 'BIOMETRIC') {
+                    $work = 'AWAY';
+                }
             } else {
                 // 28-Sep-2026: Active vs Idle comes from the device heartbeat, NOT the timeline.
                 // The timeline's ACTIVE/IDLE segments are built from COMPLETED activity stretches
@@ -153,6 +158,7 @@ class DashboardController extends Controller
             'break_lunch'       => $breakLunch,
             'break_other'       => $breakOther,
             'meeting'           => $byWork('MEETING'),
+            'away'              => $byWork('AWAY'),
             'offline_count'     => $byWork('OFFLINE'),
             'camera_blocked'    => EmployeePresenceEvent::whereDate('started_at', $today)->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))->where('event_type', 'CAMERA_BLOCKED')->distinct()->count('employee_id'),
             'violations_today'  => EmployeeComplianceEvent::whereDate('started_at', $today)->when($visible !== null, fn ($q) => $q->whereIn('employee_id', $visible))->count(),

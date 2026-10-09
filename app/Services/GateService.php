@@ -506,13 +506,33 @@ class GateService
         // made the server refuse (423) and the agent drop every idle stretch until the IN punch.
         // The whole absence vanished into Unaccounted. A session that ended in a LOCK within the
         // last day is still a working day — only a real sign-out (USER / auto) closes it.
+        // 09-Oct-2026 (Ejaz, Nandini: "Break 55m" though she never clicked Break — the agent sat
+        // on "punch IN at the door" the whole time). Two holes let a pre-sign-in punch open a break:
+        //  - the session search had no upper bound, so a sign-in made AFTER the punch (door
+        //    punches arrive late from eTimeOffice) counted as "signed in when they walked out";
+        //  - the 24h LOCK carve-out reached back to YESTERDAY's locked session, so the first
+        //    punch of the morning read as OUT was booked as a walk-out from work.
+        // Now: only a session started before the punch, within this working day (the last 24h
+        // only for a night shift), and only when the employee's previous punch that day put
+        // them INSIDE. You cannot walk out of a building you never walked into.
+        $shift = Employee::withoutGlobalScopes()->find($employeeId)?->shift; // no shift_id → company's single shift
+        $since = ($shift && $shift->crosses_midnight) ? $at->copy()->subDay() : $at->copy()->startOfDay();
+
         $sessionOpen = EmployeeLoginSession::withoutGlobalScopes()
             ->where('company_id', $companyId)->where('employee_id', $employeeId)
-            ->where('login_at', '>=', $at->copy()->subDay())
+            ->whereBetween('login_at', [$since, $at])
             ->latest('login_at')->first();
 
         if (! $sessionOpen || ($sessionOpen->logout_at && $sessionOpen->logout_reason !== 'LOCK')) {
             return; // evening walk-out after log-off = day closing, not a break
+        }
+
+        $prevPunch = BiometricLog::withoutGlobalScopes()
+            ->where('company_id', $companyId)->where('employee_id', $employeeId)
+            ->where('punched_at', '>=', $since)->where('punched_at', '<', $at)
+            ->orderByDesc('punched_at')->value('punch_type');
+        if (! in_array($prevPunch, ['IN', 'BREAK_IN'], true)) {
+            return; // not inside yet (or already out) — nothing to walk out of
         }
 
         // 23-Sep-2026: a walk-out AFTER the shift has ended is the day closing too, even while
@@ -521,8 +541,6 @@ class GateService
         // until midnight and every report booked the evening as break time.
         // "After the shift" = the session began inside the shift window and this punch is
         // outside it (works for night shifts; an early-bird pre-shift OUT is unchanged).
-        $shiftId = Employee::withoutGlobalScopes()->whereKey($employeeId)->value('shift_id');
-        $shift = $shiftId ? \App\Models\Shift::withoutGlobalScopes()->find($shiftId) : null;
         if ($shift && $shift->end_time) {
             $inShift = $shift->replicate();
             $inShift->post_shift_auto_logout_minutes = 0; // ponytail: the bare start..end window, no sign-out tail

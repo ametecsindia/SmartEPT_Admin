@@ -26,9 +26,8 @@ use Illuminate\Support\Carbon;
  * (shift end + N) — not at "now", so an employee whose PC sat idle overnight is not
  * credited the extra hours.
  *
- * N resolves per employee: shifts.post_shift_auto_logout_minutes, falling back to the
- * effective Attendance policy's post_shift_auto_logout_minutes. NULL in both = disabled,
- * so nothing changes for a tenant that has not configured it.
+ * N = the employee's shift post_shift_auto_logout_minutes (09-Oct-2026, Ejaz: the shift is
+ * the ONLY place — the Attendance-policy fallback is gone). NULL = disabled.
  *
  * What a close does, in order:
  *   1. employee_login_sessions  — logout_at, duration_seconds (16h cap), reason POST_SHIFT_AUTO
@@ -155,12 +154,7 @@ class AutoLogoutPostShift extends Command
             return $this->minutesCache[$employee->id];
         }
 
-        $minutes = $employee->shift?->post_shift_auto_logout_minutes;
-
-        if ($minutes === null) {
-            $policy = $resolver->resolvePolicy($employee, 'ATTENDANCE');
-            $minutes = $policy['post_shift_auto_logout_minutes'] ?? null;
-        }
+        $minutes = $employee->shift?->post_shift_auto_logout_minutes; // shift only (09-Oct-2026)
 
         return $this->minutesCache[$employee->id] = $minutes === null ? null : max(0, (int) $minutes);
     }
